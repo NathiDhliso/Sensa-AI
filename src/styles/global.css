@@ -1,0 +1,229 @@
+/* Base styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-amethyst: #6B46C1;
+  --color-coral: #F97316;
+  --color-plum: #7C2D92;
+  --color-amber: #F59E0B;
+  --color-rose: #EC4899;
+  --color-sage: #10B981;
+}
+
+/* Global styles */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden; /* Prevent horizontal scroll on html */
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* Prevent horizontal scroll on body */
+  width: 100%;
+  max-width: 100vw; /* Ensure body doesn't exceed viewport width */
+}
+
+/* Prevent any element from causing horizontal overflow */
+* {
+  box-sizing: border-box;
+}
+
+/* Container classes to prevent overflow */
+.container, .max-w-7xl, .max-w-6xl, .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl, .max-w-xl {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure all grid and flex containers don't overflow */
+.grid, .flex {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix for any potential wide elements */
+img, video, iframe, embed, object {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Responsive typography */
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.75rem !important;
+  }
+  h2 {
+    font-size: 1.5rem !important;
+  }
+  h3 {
+    font-size: 1.25rem !important;
+  }
+  p {
+    font-size: 0.9375rem !important;
+  }
+  
+  /* Ensure mobile containers don't overflow */
+  .px-4 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Fix for any wide text or content */
+  .text-4xl, .text-5xl, .text-6xl {
+    font-size: 1.875rem !important;
+  }
+  
+  /* Ensure buttons and interactive elements fit */
+  button, .btn {
+    max-width: 100%;
+    word-wrap: break-word;
+  }
+  
+  /* Fix for any potential overflow in cards or containers */
+  .rounded-2xl, .rounded-xl, .bg-white {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Mermaid diagram styles */
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Perspective styles for memory cards */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Gradient text */
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(243, 244, 246, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.5);
+}
+
+/* Hide horizontal scrollbar but keep functionality */
+::-webkit-scrollbar:horizontal {
+  display: none;
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-amethyst);
+  outline-offset: 2px;
+}
+
+/* Utility classes */
+.text-balance {
+  text-wrap: balance;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Animation utilities */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  /* Ensure no element can cause horizontal scroll */
+  body, html, #root {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  
+  /* Fix for any potential wide containers */
+  .container, [class*="max-w-"] {
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Ensure grid layouts don't overflow */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Fix for any wide flex items */
+  .flex {
+    flex-wrap: wrap;
+  }
+  
+  /* Ensure text doesn't cause overflow */
+  .whitespace-nowrap {
+    white-space: normal !important;
+  }
+  
+  /* Fix for any potential wide elements */
+  * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Specific fixes for common overflow causes */
+  .space-x-4 > * + * {
+    margin-left: 0.5rem !important;
+  }
+  
+  .space-x-6 > * + * {
+    margin-left: 0.75rem !important;
+  }
+  
+  /* Ensure buttons and interactive elements don't overflow */
+  button, a, .btn {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

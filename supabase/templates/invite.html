@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Sensa AI - Your Personalized Learning Journey Awaits</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .tagline {
+            font-size: 16px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+        .message {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+            color: #666;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 16px 0;
+            transition: all 0.3s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        .invite-features {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+        .invite-features h3 {
+            margin: 0 0 16px 0;
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .feature-list li:before {
+            content: "🧠";
+            margin-right: 8px;
+        }
+        .invite-note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 16px;
+            margin: 24px 0;
+            border-radius: 8px;
+        }
+        .invite-note h4 {
+            margin: 0 0 8px 0;
+            color: #856404;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .invite-note p {
+            margin: 0;
+            font-size: 14px;
+            color: #856404;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 8px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 40px 20px;">
+        <div class="container">
+            <div class="header">
+                <div class="logo">Sensa AI</div>
+                <p class="tagline">Memory-Powered Learning</p>
+            </div>
+            
+            <div class="content">
+                <h1 class="greeting">You're Invited to Join Sensa AI! 🎓</h1>
+                
+                <p class="message">
+                    You've been personally invited to experience the future of learning! 
+                    Sensa AI transforms any course into a personalized journey by connecting new concepts to your unique childhood memories.
+                </p>
+                
+                <p class="message">
+                    Ready to revolutionize how you learn? Accept your invitation and create your account:
+                </p>
+                
+                <div style="text-align: center;">
+                    <a href="{{ .ConfirmationURL }}" class="cta-button">
+                        Accept Invitation & Join Sensa AI
+                    </a>
+                </div>
+                
+                <div class="invite-features">
+                    <h3>🚀 What makes Sensa AI special:</h3>
+                    <ul class="feature-list">
+                        <li>Memory-powered learning that connects to your personal experiences</li>
+                        <li>AI-driven course analysis that adapts to your learning style</li>
+                        <li>Beautiful mind maps that simplify complex topics</li>
+                        <li>Personalized study paths based on your memory patterns</li>
+                        <li>Progress tracking with insights that help you learn faster</li>
+                    </ul>
+                </div>
+                
+                <div class="invite-note">
+                    <h4>🎯 Exclusive Access</h4>
+                    <p>This invitation is specially crafted for you. Join our community of memory-powered learners and discover a more effective way to master any subject.</p>
+                </div>
+                
+                <p class="message">
+                    Having trouble? Copy and paste this link into your browser:<br>
+                    <a href="{{ .ConfirmationURL }}" style="color: #667eea; word-break: break-all;">{{ .ConfirmationURL }}</a>
+                </p>
+            </div>
+            
+            <div class="footer">
+                <p>
+                    This invitation was sent to <strong>{{ .Email }}</strong><br>
+                    You're receiving this because someone thought you'd love <a href="https://sensalearn.co.za">Sensa AI</a>
+                </p>
+                
+                <div class="social-links">
+                    <a href="https://sensalearn.co.za">Website</a> •
+                    <a href="mailto:support@sensalearn.co.za">Support</a> •
+                    <a href="https://sensalearn.co.za/privacy">Privacy Policy</a>
+                </div>
+                
+                <p style="font-size: 12px; color: #999; margin-top: 20px;">
+                    © 2024 Sensa AI. All rights reserved.<br>
+                    Transform your learning through the power of memory.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

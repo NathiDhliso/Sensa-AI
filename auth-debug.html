@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensa Auth Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #6B46C1;
+            text-align: center;
+        }
+        .section {
+            margin: 2rem 0;
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .section h3 {
+            color: #4f46e5;
+            margin-top: 0;
+        }
+        button {
+            background: #6B46C1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #553C9A;
+        }
+        .result {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #6B46C1;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success { border-left-color: #10b981; background: #f0fdf4; }
+        .error { border-left-color: #ef4444; background: #fef2f2; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Sensa Auth Debug Tool</h1>
+        
+        <div class="section">
+            <h3>🔍 Current Status Check</h3>
+            <button onclick="checkStatus()">Check Auth Status</button>
+            <button onclick="checkSession()">Check Session</button>
+            <button onclick="clearStorage()">Clear Local Storage</button>
+            <div id="status-result" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Manual Login Test</h3>
+            <input type="email" id="email" placeholder="Your email" value="nkosinathi.dhilso@gmail.com">
+            <input type="password" id="password" placeholder="Your password">
+            <br>
+            <button onclick="testLogin()">Test Login</button>
+            <button onclick="testMagicLink()">Send Magic Link</button>
+            <button onclick="resendConfirmation()">Resend Confirmation</button>
+            <div id="login-result" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📧 Email Actions</h3>
+            <button onclick="checkEmailConfirmation()">Check Email Confirmation Status</button>
+            <button onclick="refreshSession()">Refresh Session</button>
+            <div id="email-result" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🧪 Advanced Debug</h3>
+            <button onclick="dumpAuthState()">Dump Full Auth State</button>
+            <button onclick="testEdgeFunction()">Test Edge Function</button>
+            <div id="debug-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase
+        const supabaseUrl = 'https://okvdirskoukqnjzqsowb.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rdmRpcnNrb3VrcW5qenFzb3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODQxNjQsImV4cCI6MjA2NjE2MDE2NH0.k2q9Zb0mT53xrZIH5v5MN_to6knZIrjfhRWI-HDyZQo';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        async function checkStatus() {
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    log('status-result', `Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                const status = {
+                    isLoggedIn: !!user,
+                    user: user ? {
+                        id: user.id,
+                        email: user.email,
+                        emailConfirmed: user.email_confirmed_at,
+                        lastSignIn: user.last_sign_in_at,
+                        createdAt: user.created_at
+                    } : null
+                };
+                
+                log('status-result', JSON.stringify(status, null, 2), user ? 'success' : 'error');
+            } catch (err) {
+                log('status-result', `Exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function checkSession() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    log('status-result', `Session Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                const sessionInfo = {
+                    hasSession: !!session,
+                    accessToken: session?.access_token ? 'Present' : 'Missing',
+                    refreshToken: session?.refresh_token ? 'Present' : 'Missing',
+                    expiresAt: session?.expires_at,
+                    user: session?.user ? {
+                        email: session.user.email,
+                        emailConfirmed: session.user.email_confirmed_at
+                    } : null
+                };
+                
+                log('status-result', JSON.stringify(sessionInfo, null, 2), session ? 'success' : 'error');
+            } catch (err) {
+                log('status-result', `Session Exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('login-result', 'Please enter both email and password', 'error');
+                return;
+            }
+
+            try {
+                log('login-result', 'Attempting login...', 'info');
+                
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    log('login-result', `Login failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('login-result', `Login successful!\nUser: ${data.user.email}\nConfirmed: ${data.user.email_confirmed_at}`, 'success');
+            } catch (err) {
+                log('login-result', `Login exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function testMagicLink() {
+            const email = document.getElementById('email').value;
+            
+            if (!email) {
+                log('login-result', 'Please enter email address', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signInWithOtp({
+                    email: email,
+                    options: {
+                        shouldCreateUser: false
+                    }
+                });
+
+                if (error) {
+                    log('login-result', `Magic link failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('login-result', 'Magic link sent! Check your email.', 'success');
+            } catch (err) {
+                log('login-result', `Magic link exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function resendConfirmation() {
+            const email = document.getElementById('email').value;
+            
+            if (!email) {
+                log('email-result', 'Please enter email address', 'error');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: email
+                });
+
+                if (error) {
+                    log('email-result', `Resend failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('email-result', 'Confirmation email resent! Check your inbox.', 'success');
+            } catch (err) {
+                log('email-result', `Resend exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function refreshSession() {
+            try {
+                const { data, error } = await supabase.auth.refreshSession();
+
+                if (error) {
+                    log('email-result', `Refresh failed: ${error.message}`, 'error');
+                    return;
+                }
+
+                log('email-result', 'Session refreshed successfully!', 'success');
+            } catch (err) {
+                log('email-result', `Refresh exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function checkEmailConfirmation() {
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    log('email-result', `Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (!user) {
+                    log('email-result', 'No user logged in', 'error');
+                    return;
+                }
+
+                const confirmationStatus = {
+                    email: user.email,
+                    emailConfirmedAt: user.email_confirmed_at,
+                    isConfirmed: !!user.email_confirmed_at,
+                    userMetadata: user.user_metadata,
+                    appMetadata: user.app_metadata
+                };
+                
+                log('email-result', JSON.stringify(confirmationStatus, null, 2), user.email_confirmed_at ? 'success' : 'error');
+            } catch (err) {
+                log('email-result', `Exception: ${err.message}`, 'error');
+            }
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            log('status-result', 'Local storage cleared. Refresh the page to test.', 'success');
+        }
+
+        async function dumpAuthState() {
+            try {
+                const session = await supabase.auth.getSession();
+                const user = await supabase.auth.getUser();
+                
+                const fullState = {
+                    timestamp: new Date().toISOString(),
+                    localStorage: {
+                        keys: Object.keys(localStorage)
+                    },
+                    sessionStorage: {
+                        keys: Object.keys(sessionStorage)
+                    },
+                    session: session.data,
+                    user: user.data,
+                    errors: {
+                        session: session.error,
+                        user: user.error
+                    }
+                };
+                
+                log('debug-result', JSON.stringify(fullState, null, 2), 'info');
+            } catch (err) {
+                log('debug-result', `Exception: ${err.message}`, 'error');
+            }
+        }
+
+        async function testEdgeFunction() {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+                
+                const response = await fetch(`${supabaseUrl}/functions/v1/test-deploy`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token || supabaseKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+                
+                const result = await response.json();
+                
+                log('debug-result', `Edge Function Test:\nStatus: ${response.status}\nResponse: ${JSON.stringify(result, null, 2)}`, response.ok ? 'success' : 'error');
+            } catch (err) {
+                log('debug-result', `Edge Function Exception: ${err.message}`, 'error');
+            }
+        }
+
+        // Auto-check status on load
+        window.onload = () => {
+            checkStatus();
+        };
+    </script>
+</body>
+</html> 

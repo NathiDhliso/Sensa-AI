@@ -1,0 +1,235 @@
+/* Mind Map Editor Styles */
+.editor {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editorContainer {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  height: 100%;
+  max-width: 80rem;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.header {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.headerTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actionButton {
+  padding: 0.5rem;
+  color: #6b7280;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  color: #111827;
+  background-color: #e5e7eb;
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.deleteButton:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.canvas {
+  flex: 1;
+  position: relative;
+}
+
+.reactFlowWrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  top: 1rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  padding: 1rem;
+  z-index: 10;
+}
+
+.overlayLeft {
+  left: 1rem;
+}
+
+.overlayRight {
+  right: 1rem;
+}
+
+.overlayTitle {
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
+.shapeGrid {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.shapeButton {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.shapeButton:hover {
+  background-color: #f9fafb;
+}
+
+.colorGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.colorButton {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  border: 2px solid #d1d5db;
+  transition: border-color 0.2s ease;
+}
+
+.colorButton:hover {
+  border-color: #6b7280;
+}
+
+.textColorGrid {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.slider {
+  width: 100%;
+}
+
+.exportMenu {
+  min-width: 12rem;
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  text-align: left;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.exportButton:hover {
+  background-color: #f9fafb;
+}
+
+.instructions {
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Custom Node Styles */
+.customNode {
+  transition: all 0.2s ease;
+}
+
+.customNode:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.nodeInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+}
+
+/* React Flow Overrides */
+.react-flow__node-custom {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: #6366f1 !important;
+  border: 2px solid white !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2px;
+}
+
+.react-flow__arrowhead {
+  fill: #374151;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .editorContainer {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+  
+  .header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .headerTitle {
+    font-size: 1.125rem;
+  }
+  
+  .overlay {
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .colorGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+} 

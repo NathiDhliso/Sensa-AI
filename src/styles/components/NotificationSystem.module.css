@@ -1,0 +1,142 @@
+.notificationContainer {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 100%;
+  width: 24rem;
+}
+
+@media (max-width: 640px) {
+  .notificationContainer {
+    width: calc(100% - 2rem);
+    right: 0.5rem;
+  }
+}
+
+.notification {
+  border-radius: 0.5rem;
+  border-width: 1px;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.notificationSuccess {
+  background-color: rgba(240, 253, 244, 0.95);
+  border-color: #bbf7d0;
+}
+
+.notificationError {
+  background-color: rgba(254, 242, 242, 0.95);
+  border-color: #fecaca;
+}
+
+.notificationWarning {
+  background-color: rgba(255, 251, 235, 0.95);
+  border-color: #fed7aa;
+}
+
+.notificationInfo {
+  background-color: rgba(239, 246, 255, 0.95);
+  border-color: #bfdbfe;
+}
+
+.notificationIcon {
+  flex-shrink: 0;
+}
+
+.notificationIconSuccess {
+  color: #16a34a;
+}
+
+.notificationIconError {
+  color: #dc2626;
+}
+
+.notificationIconWarning {
+  color: #d97706;
+}
+
+.notificationIconInfo {
+  color: #2563eb;
+}
+
+.notificationContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.notificationTitle {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.notificationTitleSuccess {
+  color: #166534;
+}
+
+.notificationTitleError {
+  color: #991b1b;
+}
+
+.notificationTitleWarning {
+  color: #92400e;
+}
+
+.notificationTitleInfo {
+  color: #1e40af;
+}
+
+.notificationMessage {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.notificationMessageSuccess {
+  color: #15803d;
+}
+
+.notificationMessageError {
+  color: #b91c1c;
+}
+
+.notificationMessageWarning {
+  color: #b45309;
+}
+
+.notificationMessageInfo {
+  color: #1d4ed8;
+}
+
+.closeButton {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.closeButton:hover {
+  opacity: 1;
+}
+
+.closeButtonSuccess {
+  color: #166534;
+}
+
+.closeButtonError {
+  color: #991b1b;
+}
+
+.closeButtonWarning {
+  color: #92400e;
+}
+
+.closeButtonInfo {
+  color: #1e40af;
+}

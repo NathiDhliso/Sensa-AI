@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your Sensa AI Password</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        .tagline {
+            font-size: 16px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+        .message {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+            color: #666;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 16px 0;
+            transition: all 0.3s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        .security-note {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            margin: 24px 0;
+            border-radius: 8px;
+        }
+        .security-note h4 {
+            margin: 0 0 8px 0;
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .security-note p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 8px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 40px 20px;">
+        <div class="container">
+            <div class="header">
+                <div class="logo">Sensa AI</div>
+                <p class="tagline">Memory-Powered Learning</p>
+            </div>
+            
+            <div class="content">
+                <h1 class="greeting">Reset Your Password</h1>
+                
+                <p class="message">
+                    We received a request to reset the password for your Sensa AI account. 
+                    Click the button below to create a new password and continue your personalized learning journey.
+                </p>
+                
+                <div style="text-align: center;">
+                    <a href="{{ .ConfirmationURL }}" class="cta-button">
+                        Reset Password
+                    </a>
+                </div>
+                
+                <div class="security-note">
+                    <h4>🔒 Security Note</h4>
+                    <p>This link will expire in 1 hour for your security. If you didn't request this password reset, please ignore this email or contact our support team.</p>
+                </div>
+                
+                <p class="message">
+                    Having trouble? Copy and paste this link into your browser:<br>
+                    <a href="{{ .ConfirmationURL }}" style="color: #667eea; word-break: break-all;">{{ .ConfirmationURL }}</a>
+                </p>
+            </div>
+            
+            <div class="footer">
+                <p>
+                    This email was sent to <strong>{{ .Email }}</strong><br>
+                    You're receiving this because you signed up for <a href="https://sensalearn.co.za">Sensa AI</a>
+                </p>
+                
+                <div class="social-links">
+                    <a href="https://sensalearn.co.za">Website</a> •
+                    <a href="mailto:support@sensalearn.co.za">Support</a> •
+                    <a href="https://sensalearn.co.za/privacy">Privacy Policy</a>
+                </div>
+                
+                <p style="font-size: 12px; color: #999; margin-top: 20px;">
+                    © 2024 Sensa AI. All rights reserved.<br>
+                    Transform your learning through the power of memory.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

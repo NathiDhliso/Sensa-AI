@@ -1,0 +1,288 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.headerContent {
+  max-width: 84rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logoIcon {
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+}
+
+.logoTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.logoSubtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.navButtons {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.signInButton {
+  color: #4b5563;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.signInButton:hover {
+  color: #1f2937;
+}
+
+.getStartedButton {
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.getStartedButton:hover {
+  transform: scale(1.05);
+}
+
+.floatingElement {
+  position: absolute;
+  opacity: 0.2;
+}
+
+.mainContent {
+  text-align: center;
+  max-width: 64rem;
+  margin: 0 auto;
+  margin-top: 5rem;
+  z-index: 1;
+}
+
+.heroLogo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.heroLogoContainer {
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.heroLogoContent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heroTitle {
+  font-size: 2.25rem;
+  font-weight: 300;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .heroTitle {
+    font-size: 3.75rem;
+  }
+}
+
+.heroTitleHighlight {
+  font-weight: 500;
+}
+
+.heroDescription {
+  font-size: 1.25rem;
+  color: #4b5563;
+  margin-bottom: 3rem;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+@media (min-width: 768px) {
+  .heroDescription {
+    font-size: 1.5rem;
+  }
+}
+
+.descriptionHighlight {
+  font-weight: 500;
+}
+
+.ctaContainer {
+  margin-bottom: 1.5rem;
+}
+
+.ctaButton {
+  color: white;
+  padding: 1rem 3rem;
+  border-radius: 9999px;
+  font-size: 1.125rem;
+  font-weight: 500;
+  transition: all 0.3s;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.ctaButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.ctaButton:active {
+  transform: scale(0.95);
+}
+
+.privacyNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.sensaDifference {
+  margin-top: 4rem;
+  background-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid rgba(229, 231, 235, 0.5);
+}
+
+.differenceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.differenceTitle {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.differenceDescription {
+  color: #4b5563;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.differenceFeatures {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .differenceFeatures {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.featureCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.featureIcon {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+
+.featureContent {
+  text-align: left;
+}
+
+.featureTitle {
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.featureDescription {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.coreFeatures {
+  margin-top: 3rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 768px) {
+  .coreFeatures {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.footer {
+  margin-top: 4rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.footerContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
