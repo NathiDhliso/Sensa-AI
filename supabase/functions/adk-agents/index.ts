@@ -142,6 +142,7 @@ interface ADKRequest {
   analysis_requirements?: string[];
   subject?: string;
   content?: string;
+  focus_question?: string;
 }
 
 serve(async (req) => {
@@ -1218,6 +1219,7 @@ async function generateAIMindMap(requestData: ADKRequest) {
     
     // The frontend sends data directly in the request object, not nested under payload
     const subject = (requestData.subject as string) || 'Learning Topic'
+    const focusQuestion = (requestData.focus_question as string) || ''
     // Handle content that might be an object (syllabus array) or string
     let content = ''
     const rawContent = requestData.content
@@ -1257,92 +1259,83 @@ async function generateAIMindMap(requestData: ADKRequest) {
     
     if (isCertificationContent) {
       // Certification-specific prompt
-      mindMapPrompt = `Create a certification-focused mind map for "${subject}" with CLOCKWISE POSITIONING starting at 12 o'clock.
+      const focusQuestionSection = focusQuestion ? `
 
-CERTIFICATION REQUIREMENTS:
+FOCUS QUESTION (Answer this through the mind map structure):
+"${focusQuestion}"
+
+The mind map should be organized to help answer this question. Position the most relevant domains and skills prominently.` : ''
+
+      const promptParts = [
+`Create a certification-focused mind map for "${subject}" with CLOCKWISE POSITIONING starting at 12 o'clock.${focusQuestionSection}`,
+`CERTIFICATION REQUIREMENTS:
 - Use Mermaid mindmap syntax with proper clockwise positioning
 - Structure around the 5 EXACT exam domains from the AZ-104 content
 - Position domains CLOCKWISE starting at 12 o'clock: Domain1(12), Domain2(2:30), Domain3(5), Domain4(7:30), Domain5(10)
 - Each main domain MUST include its exam weight percentage
-- Create clear hierarchy: Domain → Skill Groups → Specific Tasks → Personal Anchors
+- Create clear hierarchy: Domain -> Skill Groups -> Specific Tasks -> Personal Anchors
 - IMPORTANT: Keep node text simple - avoid special characters and long text
-
-EXAM CONTENT TO ANALYZE:
-${contentStr.substring(0, 2000)}
-
-REQUIRED CLOCKWISE STRUCTURE FOR AZ-104:
+${focusQuestion ? '- FOCUS: Emphasize domains and skills most relevant to answering the focus question' : ''}`,
+`EXAM CONTENT TO ANALYZE:
+${contentStr.substring(0, 2000)}`,
+`REQUIRED CLOCKWISE STRUCTURE & STYLING FOR AZ-104:
 mindmap
+  classDef domain1 fill:#6B46C1,color:#fff,stroke:#4C1D95,stroke-width:2px
+  classDef domain2 fill:#F97316,color:#fff,stroke:#B45309,stroke-width:2px
+  classDef domain3 fill:#7C2D92,color:#fff,stroke:#581C87,stroke-width:2px
+  classDef domain4 fill:#F59E0B,color:#fff,stroke:#B45309,stroke-width:2px
+  classDef domain5 fill:#10B981,color:#fff,stroke:#065F46,stroke-width:2px
+  classDef anchor fill:#EC4899,color:#fff,stroke:#831843,stroke-width:2px
+
   root((Mastering Azure Administration AZ-104))
-    )Manage Azure identities and governance 20-25%(
-      )Manage Microsoft Entra users and groups(
-        Create users and groups
-        Manage user properties
-        Manage licenses
-        Personal Anchor
-          Lab Practice
-          Real World Use
-      )Manage access to Azure resources(
-        Built-in Azure roles
-        Assign roles at scopes
-        Personal Anchor
-          Principle of Least Privilege
-          Access Troubleshooting
-      )Manage subscriptions and governance(
-        Azure Policy
-        Resource locks
-        Tags and cost management
-    )Implement and manage storage 15-20%(
-      )Configure storage access(
-        Storage firewalls
-        SAS tokens
-        Access keys
-        Personal Anchor
-          Security Best Practices
-      )Manage storage accounts(
-        Create and configure
-        Redundancy options
-        Encryption
-    )Deploy and manage compute 20-25%(
-      )Automate deployment(
-        ARM templates
-        Bicep files
-        Personal Anchor
-          Infrastructure as Code
-      )Virtual machines(
-        Create and configure
-        Disk encryption
-        Scaling and availability
-    )Virtual networking 15-20%(
-      )Configure virtual networks(
-        VNets and subnets
-        Network peering
-        Personal Anchor
-          Network Design
-      )Secure access(
-        NSGs and ASGs
-        Azure Bastion
-        Private endpoints
-    )Monitor and maintain 10-15%(
-      )Monitor resources(
-        Azure Monitor
-        Log Analytics
-        Alerts and metrics
-        Personal Anchor
-          Monitoring Strategy
-      )Backup and recovery(
-        Recovery Services vault
-        Azure Backup
-        Site Recovery
-
-CRITICAL INSTRUCTIONS:
-1. Follow the EXACT clockwise positioning shown above
-2. Each domain must be positioned as: )Domain Name Percentage(
-3. Include ALL 5 domains with their percentages
-4. Group skills logically under each domain
-5. Add Personal Anchor nodes for practical application
-6. Keep node names short and clear
-
-Generate the mindmap following this EXACT structure and positioning.`
+    )Manage Azure identities and governance 20-25%(:::domain1
+      [Manage Microsoft Entra users and groups]
+        (Create users and groups)
+        (Manage user properties)
+        {Personal Anchor}:::anchor
+          (Lab Practice)
+          (Real World Use)
+      [Manage access to Azure resources]
+        (Built-in Azure roles)
+        (Assign roles at scopes)
+        {Personal Anchor}:::anchor
+          (Principle of Least Privilege)
+          (Access Troubleshooting)
+    )Implement and manage storage 15-20%(:::domain2
+      [Configure storage access]
+        (Storage firewalls)
+        (SAS tokens)
+        {Personal Anchor}:::anchor
+          (Security Best Practices)
+    )Deploy and manage compute 20-25%(:::domain3
+      [Automate deployment]
+        (ARM templates)
+        (Bicep files)
+        {Personal Anchor}:::anchor
+          (Infrastructure as Code)
+    )Virtual networking 15-20%(:::domain4
+      [Configure virtual networks]
+        (VNets and subnets)
+        (Network peering)
+        {Personal Anchor}:::anchor
+          (Network Design)
+    )Monitor and maintain 10-15%(:::domain5
+      [Monitor resources]
+        (Azure Monitor)
+        (Log Analytics)
+        {Personal Anchor}:::anchor
+          (Monitoring Strategy)
+`,
+`CRITICAL INSTRUCTIONS:
+1. Follow the EXACT clockwise positioning and styling shown above.
+2. Use \`classDef\` to define colors as specified.
+3. Assign the correct class to each domain and anchor node using \`:::\`.
+4. Use the specified node shapes: \`((root))\`, \`[skill group]\`, \`(task)\`, \`{personal anchor}\`.
+5. Include ALL 5 domains with their percentages.
+6. Keep node names short and clear.`,
+`Generate the mindmap following this EXACT structure and styling.`
+      ];
+      mindMapPrompt = promptParts.join('\n');
     } else {
       // Generic subject prompt
       mindMapPrompt = `Create a comprehensive learning mind map for "${subject}".

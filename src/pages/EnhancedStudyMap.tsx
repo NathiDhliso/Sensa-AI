@@ -88,6 +88,11 @@ const IntegratedLearningHub: React.FC = () => {
   const [pasteContent, setPasteContent] = useState('');
   const [showMindMapEditor, setShowMindMapEditor] = useState<boolean | string>(false);
   
+  // Focus Question feature for deeper learning
+  const [focusQuestion, setFocusQuestion] = useState('');
+  const [showFocusQuestion, setShowFocusQuestion] = useState(false);
+  const [pendingAnalysis, setPendingAnalysis] = useState<{course?: Course, file?: File} | null>(null);
+  
   // Store analyzed document information for mind map generation
   const [analyzedDocument, setAnalyzedDocument] = useState<{
     fileName: string;
@@ -95,6 +100,7 @@ const IntegratedLearningHub: React.FC = () => {
     content: string;
     topics: string[];
     adkAnalysis?: any;
+    focusQuestion?: string;
   } | null>(null);
 
   const mermaidRef = useRef<HTMLDivElement>(null);
@@ -279,26 +285,48 @@ const IntegratedLearningHub: React.FC = () => {
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: true,
-      theme: 'base',
+      theme: 'base', // Using base theme to build our custom variables on top
       themeVariables: {
-        primaryColor: '#6B46C1',
-        primaryTextColor: '#1f2937',
-        primaryBorderColor: '#ffffff',
-        lineColor: '#6B46C1',
-        secondaryColor: '#F97316',
-        tertiaryColor: '#F59E0B',
-        background: '#ffffff',
-        mainBkg: '#ffffff',
-        secondBkg: '#f8fafc',
-        tertiaryBkg: '#f1f5f9',
+        // --- Custom Sensa Theme ---
+
+        // Core Colors
+        background: '#F8FAFC', // Light gray background for the container
+        primaryColor: '#6D28D9', // Deep purple for root and main branches
+        primaryTextColor: '#FFFFFF', // White text for primary nodes
+        primaryBorderColor: '#4C1D95', // Darker purple for borders
+
+        // Secondary Colors (for the next level of nodes)
+        secondaryColor: '#BE185D', // Vibrant pink/magenta
+        secondaryTextColor: '#FFFFFF', // White text
+        secondaryBorderColor: '#831843',
+
+        // Tertiary Colors (for leaf nodes, specific skills, etc.)
+        tertiaryColor: '#047857', // Teal/green
+        tertiaryTextColor: '#FFFFFF', // White text
+        tertiaryBorderColor: '#064E3B',
+        
+        // Special Colors for Node Types
+        noteBkgColor: '#FDF2F8', // Light pink for personal anchors/analogies
+        noteTextColor: '#831843', // Dark pink text
+        noteBorderColor: '#BE185D',
+        
+        // Lines and Connections
+        lineColor: '#71717A', // Neutral gray for connection lines
+        textColor: '#1F2937', // Default text color for labels if needed
+
+        // Other settings
+        mainBkg: '#6D28D9', // Used for some diagram types
+        secondBkg: '#BE185D',
+        tertiaryBkg: '#047857',
+        titleColor: '#1F2937',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: '14px',
       },
       mindmap: {
-        padding: 20,
+        padding: 30, // Increase padding for more space
         maxNodeWidth: 200,
         useMaxWidth: true
       },
-      fontFamily: 'Inter, system-ui, sans-serif',
-      fontSize: '14px',
       securityLevel: 'loose'
     });
   }, []);
@@ -321,7 +349,14 @@ const IntegratedLearningHub: React.FC = () => {
   }, [studyMap, activeTab]);
 
   // Unified analysis function
-  const performAnalysis = async (course?: Course, file?: File) => {
+  const performAnalysis = async (course?: Course, file?: File, skipFocusQuestion = false) => {
+    // Show focus question dialog unless skipped
+    if (!skipFocusQuestion) {
+      setPendingAnalysis({course, file});
+      setShowFocusQuestion(true);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       let analysisData: AnalysisResult | null = null;
@@ -414,6 +449,7 @@ const IntegratedLearningHub: React.FC = () => {
       console.log('🤖 Starting ADK-powered course analysis...');
       console.log('📊 Course data:', course);
       console.log('🧠 Available memories:', memories.length);
+      console.log('🎯 Focus Question:', focusQuestion); // Log the focus question
       
       // Skip test and go directly to ADK call since logs show it's working
       
@@ -438,19 +474,18 @@ const IntegratedLearningHub: React.FC = () => {
       console.log('📡 Calling ADK orchestrator agent...');
       console.log('📋 Request payload:', requestData);
       
-      // Call ADK function directly with correct format
+      // Call ADK function directly with correct format, including focus_question
       const adkResponse = await callEdgeFunction('adk-agents', {
         agent_type: 'orchestrator',
-        payload: {
-          task: 'comprehensive_course_analysis',
-          course: requestData.course_data,
-          memories: requestData.user_memories,
-          analysis_requirements: [
-            'revolutionary_insights',
-            'memory_connections', 
-            'personalized_career_path'
-          ]
-        }
+        task: 'comprehensive_course_analysis',
+        course: requestData.course_data,
+        memories: requestData.user_memories,
+        analysis_requirements: [
+          'revolutionary_insights',
+          'memory_connections',
+          'personalized_career_path'
+        ],
+        focus_question: focusQuestion || ''
       });
 
       console.log('✅ ADK response received:', adkResponse);
@@ -720,7 +755,8 @@ const IntegratedLearningHub: React.FC = () => {
       subject,
       content,
       topics,
-      adkAnalysis
+      adkAnalysis,
+      focusQuestion: focusQuestion || undefined
     });
     
     return { subject, contentType, complexity, topics };
@@ -1569,6 +1605,7 @@ const IntegratedLearningHub: React.FC = () => {
         agent_type: 'orchestrator',
         subject: fieldOfStudy,
         content: courseSyllabus,
+        focus_question: focusQuestion || analyzedDocument?.focusQuestion || '',
         memories: relevantMemories.map(m => ({
           id: m.id || `memory-${Date.now()}-${Math.random()}`,
           content: m.text_content || '',
@@ -1912,6 +1949,65 @@ ${section.title} (${section.priority} priority)
     setShowPasteInput(!showPasteInput);
   };
 
+  // Handle focus question submission and proceed with analysis
+  const handleFocusQuestionSubmit = async () => {
+    if (!pendingAnalysis) return;
+    
+    setShowFocusQuestion(false);
+    
+    // Proceed with analysis including the focus question
+    await performAnalysis(pendingAnalysis.course, pendingAnalysis.file, true);
+    
+    setPendingAnalysis(null);
+  };
+
+  // Get focus question examples based on content type
+  const getFocusQuestionExamples = (course?: Course, file?: File) => {
+    const subject = course?.category || file?.name || 'this material';
+    
+    if (course) {
+      switch (course.category.toLowerCase()) {
+        case 'computer science':
+          return [
+            'Why does recursion solve problems that iteration cannot?',
+            'How do data structures affect algorithm performance in real applications?',
+            'What makes object-oriented programming more maintainable than procedural code?'
+          ];
+        case 'psychology':
+          return [
+            'How do cognitive biases influence everyday decision-making?',
+            'Why do some therapeutic approaches work better for specific disorders?',
+            'What role does neuroplasticity play in learning and recovery?'
+          ];
+        case 'mathematics':
+          return [
+            'Why does calculus provide the foundation for understanding change?',
+            'How do mathematical models predict real-world phenomena?',
+            'What makes some mathematical proofs more elegant than others?'
+          ];
+        case 'accounting':
+          return [
+            'How do financial statements reveal a company\'s true health?',
+            'Why do accounting principles vary across different industries?',
+            'What makes forensic accounting essential for fraud detection?'
+          ];
+        default:
+          return [
+            `Why is understanding ${subject} crucial for solving real-world problems?`,
+            `How do the core principles of ${subject} apply to current industry challenges?`,
+            `What makes some approaches in ${subject} more effective than others?`
+          ];
+      }
+    } else {
+      // For uploaded files, provide generic but thoughtful examples
+      return [
+        `What deep insights can I extract from this material that others might miss?`,
+        `How do the concepts in this content connect to solve complex problems?`,
+        `Why is mastering this material essential for my professional growth?`
+      ];
+    }
+  };
+
   // Tab configuration
   const tabs = [
     {
@@ -1947,7 +2043,80 @@ ${section.title} (${section.priority} priority)
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <>
+      {/* Focus Question Dialog */}
+      {showFocusQuestion && pendingAnalysis && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center mr-4">
+                  <span className="text-2xl">🎯</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Deep Learning Focus</h3>
+                  <p className="text-gray-600 text-sm">Transform passive reading into active learning</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  What <strong>deep question</strong> do you want to answer with this material? 
+                  This will guide your study and create more meaningful connections.
+                </p>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold text-blue-800 mb-2">💡 Example Questions:</h4>
+                  <div className="space-y-2">
+                    {getFocusQuestionExamples(pendingAnalysis.course, pendingAnalysis.file).map((example, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setFocusQuestion(example)}
+                        className="block w-full text-left text-sm text-blue-700 hover:text-blue-900 hover:bg-blue-100 rounded p-2 transition-colors"
+                      >
+                        "{example}"
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <textarea
+                  value={focusQuestion}
+                  onChange={(e) => setFocusQuestion(e.target.value)}
+                  placeholder="Enter your deep question here..."
+                  className="w-full h-24 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowFocusQuestion(false);
+                    setPendingAnalysis(null);
+                    setFocusQuestion('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleFocusQuestionSubmit}
+                  disabled={!focusQuestion.trim()}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Continue Analysis
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -2609,6 +2778,7 @@ ${section.title} (${section.priority} priority)
 
       </div>
     </div>
+    </>
   );
 };
 

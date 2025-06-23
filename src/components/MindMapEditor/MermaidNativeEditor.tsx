@@ -97,7 +97,7 @@ export const MermaidNativeEditor: React.FC<MermaidNativeEditorProps> = ({
         background: '#FFFFFF',
         mainBkg: '#6B46C1',
         secondBkg: '#F97316',
-      },
+      } as any,
       flowchart: {
         htmlLabels: true,
         curve: 'cardinal',
@@ -117,16 +117,21 @@ export const MermaidNativeEditor: React.FC<MermaidNativeEditorProps> = ({
       // Clear previous content
       previewRef.current.innerHTML = '';
       
+      // Sanitize code: strip Markdown ``` fences (e.g., ```mermaid ... ```)
+      const sanitizedCode = mermaidCode
+        .replace(/^\s*```(?:mermaid)?\s*/i, '') // opening fence with optional mermaid
+        .replace(/\s*```\s*$/i, ''); // closing fence
+
       // Generate unique ID
       const id = `mermaid-${Date.now()}`;
       
       // Validate and render
-      const isValid = await mermaid.parse(mermaidCode);
+      const isValid = await mermaid.parse(sanitizedCode);
       if (!isValid) {
         throw new Error('Invalid Mermaid syntax');
       }
 
-      const { svg } = await mermaid.render(id, mermaidCode);
+      const { svg } = await mermaid.render(id, sanitizedCode);
       previewRef.current.innerHTML = svg;
 
       // Add interactivity
