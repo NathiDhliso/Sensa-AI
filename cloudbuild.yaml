@@ -1,54 +1,54 @@
 steps:
-  # Install dependencies
-  - name: 'node:18'
-    entrypoint: 'npm'
-    args: ['ci']
-
-  # Build the application
-  - name: 'node:18'
-    entrypoint: 'npm'
-    args: ['run', 'build']
-
-  # Build Docker image
+  # 1. Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'build',
-      '-t', 'gcr.io/$PROJECT_ID/sensa-ai:$COMMIT_SHA',
-      '-t', 'gcr.io/$PROJECT_ID/sensa-ai:latest',
-      '.'
-    ]
+    args:
+      - 'build'
+      - '-t'
+      - 'africa-south1-docker.pkg.dev/$PROJECT_ID/sensa-ai-repo/sensa-ai-frontend:$BUILD_ID'
+      - '.'
 
-  # Push to Container Registry
+  # 2. Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/sensa-ai:$COMMIT_SHA']
+    args:
+      - 'push'
+      - 'africa-south1-docker.pkg.dev/$PROJECT_ID/sensa-ai-repo/sensa-ai-frontend:$BUILD_ID'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/sensa-ai:latest']
-
-  # Deploy to Cloud Run
+  # 3. Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args: [
-      'run', 'deploy', 'sensa-ai',
-      '--image', 'gcr.io/$PROJECT_ID/sensa-ai:$COMMIT_SHA',
-      '--region', 'us-central1',
-      '--platform', 'managed',
-      '--allow-unauthenticated',
-      '--port', '80',
-      '--memory', '1Gi',
-      '--cpu', '1',
-      '--max-instances', '10',
-      '--set-env-vars', 'NODE_ENV=production'
-    ]
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sensa-ai-frontend'
+      - '--image'
+      - 'africa-south1-docker.pkg.dev/$PROJECT_ID/sensa-ai-repo/sensa-ai-frontend:$BUILD_ID'
+      - '--region'
+      - 'africa-south1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '80'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '5'
+      - '--set-env-vars=VITE_SUPABASE_URL=$_VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY=$_VITE_SUPABASE_ANON_KEY'
+      # The VITE_ variables are build-time arguments and must be passed to the Docker build.
+      # Cloud Run doesn't directly support passing --build-arg, so we rely on them being
+      # present in the environment where `gcloud builds submit` is run.
+      # For Cloud Run runtime, you'd use --set-env-vars. Since Vite bakes these into static files,
+      # they are not needed at runtime.
 
-# Store images in Container Registry
+# Store the image in Artifact Registry
 images:
-  - 'gcr.io/$PROJECT_ID/sensa-ai:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/sensa-ai:latest'
+  - 'africa-south1-docker.pkg.dev/$PROJECT_ID/sensa-ai-repo/sensa-ai-frontend:$BUILD_ID'
 
-# Build options
+# Build options - using a more standard machine type
 options:
-  machineType: 'E2_HIGHCPU_8'
+  machineType: 'E2_MEDIUM'
 
-# Timeout
-timeout: '1200s' 
+# Timeout for the build
+timeout: '1600s' 
