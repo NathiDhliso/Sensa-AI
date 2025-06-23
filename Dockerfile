@@ -20,7 +20,7 @@ RUN npm run build
 FROM nginx:alpine
 
 # Install gettext for envsubst
-RUN apk update && apk add --no-cache gettext
+RUN apk update && apk add --no-cache gettext curl
 
 # Copy the build output from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html

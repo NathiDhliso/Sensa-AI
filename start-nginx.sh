@@ -1,9 +1,18 @@
 #!/bin/sh
 set -e
 
-# Replace ${PORT} with the value of the PORT environment variable and save it to the final nginx config file.
-# The 'g' flag ensures that if for some reason ${PORT} appears multiple times, all instances are replaced.
-envsubst 'g' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+# Set default PORT if not provided
+export PORT=${PORT:-8080}
+
+# Replace ${PORT} with the value of the PORT environment variable
+envsubst '$PORT' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+
+# Verify the configuration was created correctly
+echo "Generated nginx.conf:"
+cat /etc/nginx/nginx.conf
+
+# Test nginx configuration
+nginx -t
 
 # Start Nginx in the foreground
 nginx -g 'daemon off;' 
