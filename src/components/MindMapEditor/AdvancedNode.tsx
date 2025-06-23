@@ -2,7 +2,7 @@ import React, { useState, useCallback, memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { 
   ChevronDown, ChevronRight, Link, Paperclip, MessageCircle, 
-  Tag, Star, Eye, EyeOff, Edit3, Trash2 
+  Tag, Star, Eye, EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

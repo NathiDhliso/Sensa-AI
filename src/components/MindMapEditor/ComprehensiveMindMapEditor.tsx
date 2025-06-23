@@ -20,13 +20,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download, Palette, Square, Circle, Diamond, Trash2, Plus, RotateCcw, FileText, Image, Code, X,
-  Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, ZoomIn, ZoomOut, Move,
+  AlignRight, ZoomIn, ZoomOut, Move,
   Layers, Settings, Save, FolderOpen, Copy, Scissors, Clipboard, RotateCw, Maximize, Link,
   Search, Eye, EyeOff, Grid, List, MousePointer, Pen, Eraser, Highlighter, Focus,
   ChevronDown, ChevronRight, Share2, Users, MessageCircle, Tag, Upload, History
 } from 'lucide-react';
 import { toPng, toSvg } from 'html-to-image';
-import { MermaidParser, MermaidGenerator } from './MermaidParser';
+import { parseMermaidMindMap, validateParsedMindMap } from './OfficialMermaidParser';
 import SimpleAdvancedNode, { SimpleAdvancedNodeData as AdvancedNodeData } from './SimpleAdvancedNode';
 import '@xyflow/react/dist/style.css';
 
@@ -316,8 +316,7 @@ export const ComprehensiveMindMapEditor: React.FC<{
   }, []);
 
   // Mermaid Integration
-  const mermaidParser = new MermaidParser();
-  const mermaidGenerator = new MermaidGenerator();
+  // Using functional approach instead of class instances
   
   const importFromMermaid = useCallback(() => {
     const input = document.createElement('input');
@@ -331,10 +330,24 @@ export const ComprehensiveMindMapEditor: React.FC<{
       reader.onload = (event) => {
         const mermaidCode = event.target?.result as string;
         try {
-          const { nodes: parsedNodes, edges: parsedEdges } = mermaidParser.parseMermaidMindmap(mermaidCode);
-          setNodes(parsedNodes);
-          setEdges(parsedEdges);
-          saveToHistory();
+          const parsedMindMap = parseMermaidMindMap(mermaidCode);
+          if (validateParsedMindMap(parsedMindMap)) {
+            // Convert parsed data to React Flow format (simplified)
+            const parsedNodes = parsedMindMap.nodes.map(node => ({
+              id: node.id,
+              type: 'default',
+              position: { x: Math.random() * 400, y: Math.random() * 300 },
+              data: { label: node.label }
+            }));
+            const parsedEdges = parsedMindMap.edges.map(edge => ({
+              id: edge.id,
+              source: edge.source,
+              target: edge.target
+            }));
+            setNodes(parsedNodes);
+            setEdges(parsedEdges);
+            saveToHistory();
+          }
         } catch (error) {
           console.error('Failed to parse Mermaid:', error);
           alert('Failed to parse Mermaid file. Please check the syntax.');
@@ -347,7 +360,11 @@ export const ComprehensiveMindMapEditor: React.FC<{
   
   const exportToMermaid = useCallback(() => {
     try {
-      const mermaidCode = mermaidGenerator.generateMermaidMindmap(nodes, edges);
+      // Generate basic Mermaid mindmap syntax
+      const mermaidCode = `mindmap
+  root((Central Topic))
+${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
+      
       const blob = new Blob([mermaidCode], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -358,19 +375,33 @@ export const ComprehensiveMindMapEditor: React.FC<{
     } catch (error) {
       console.error('Mermaid export failed:', error);
     }
-  }, [nodes, edges, mermaidGenerator]);
+  }, [nodes]);
   
   const loadMermaidFromText = useCallback((mermaidText: string) => {
     try {
-      const { nodes: parsedNodes, edges: parsedEdges } = mermaidParser.parseMermaidMindmap(mermaidText);
-      setNodes(parsedNodes);
-      setEdges(parsedEdges);
-      saveToHistory();
+      const parsedMindMap = parseMermaidMindMap(mermaidText);
+      if (validateParsedMindMap(parsedMindMap)) {
+        // Convert parsed data to React Flow format (simplified)
+        const parsedNodes = parsedMindMap.nodes.map(node => ({
+          id: node.id,
+          type: 'default',
+          position: { x: Math.random() * 400, y: Math.random() * 300 },
+          data: { label: node.label }
+        }));
+        const parsedEdges = parsedMindMap.edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+        setNodes(parsedNodes);
+        setEdges(parsedEdges);
+        saveToHistory();
+      }
     } catch (error) {
       console.error('Failed to parse Mermaid text:', error);
       throw error;
     }
-  }, [mermaidParser, setNodes, setEdges, saveToHistory]);
+  }, [setNodes, setEdges, saveToHistory]);
   
   // Drawing Functions
   const startDrawing = useCallback((e: React.MouseEvent) => {

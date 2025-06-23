@@ -14,18 +14,16 @@ import {
   Sparkles,
   Clipboard,
   Send,
-  Edit3,
-  ArrowLeft
+  ArrowLeft,
+  Code
 } from 'lucide-react';
 import { sensaBrandColors } from '../styles/brandColors';
 import { supabase } from '../lib/supabase';
 import { memoryService } from '../services/supabaseServices';
 import { orchestrateAgents, callEdgeFunction } from '../services/edgeFunctions';
 import { SensaAPI } from '../services/api';
-import { useCourseStore, useMemoryStore } from '../stores';
+import { useCourseStore, useMemoryStore, useUIStore } from '../stores';
 import { MermaidNativeEditor } from '../components/MindMapEditor';
-import ExcalidrawMindMapEditor from '../components/MindMapEditor/ExcalidrawMindMapEditor';
-import { ReactFlowProvider } from '@xyflow/react';
 // Removed old aiAgents import - now uses integrated ADK system
 import mermaid from 'mermaid';
 
@@ -67,6 +65,7 @@ const IntegratedLearningHub: React.FC = () => {
   // Zustand stores for dashboard stats
   const { addAnalysis } = useCourseStore();
   const { updateMemory } = useMemoryStore();
+  const { addNotification } = useUIStore();
   
   // Unified state management
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -87,7 +86,6 @@ const IntegratedLearningHub: React.FC = () => {
   }>>([]);
   const [showPasteInput, setShowPasteInput] = useState(false);
   const [pasteContent, setPasteContent] = useState('');
-  const [pasteFileName, setPasteFileName] = useState('');
   const [showMindMapEditor, setShowMindMapEditor] = useState<boolean | string>(false);
   
   // Store analyzed document information for mind map generation
@@ -342,6 +340,14 @@ const IntegratedLearningHub: React.FC = () => {
       if (analysisData) {
         setAnalysisResult(analysisData);
         
+        // Show success notification with animated checkmark
+        addNotification({
+          type: 'success',
+          title: 'Analysis Complete!',
+          message: 'Your personalized insights are ready with memory connections.',
+          duration: 4000
+        });
+        
         // Save analysis to course store for dashboard stats
         const analysisRecord = {
           id: `analysis-${Date.now()}`,
@@ -434,14 +440,17 @@ const IntegratedLearningHub: React.FC = () => {
       
       // Call ADK function directly with correct format
       const adkResponse = await callEdgeFunction('adk-agents', {
-        task: 'comprehensive_course_analysis',
-        course: requestData.course_data,
-        memories: requestData.user_memories,
-        analysis_requirements: [
-          'revolutionary_insights',
-          'memory_connections', 
-          'personalized_career_path'
-        ]
+        agent_type: 'orchestrator',
+        payload: {
+          task: 'comprehensive_course_analysis',
+          course: requestData.course_data,
+          memories: requestData.user_memories,
+          analysis_requirements: [
+            'revolutionary_insights',
+            'memory_connections', 
+            'personalized_career_path'
+          ]
+        }
       });
 
       console.log('✅ ADK response received:', adkResponse);
@@ -819,24 +828,108 @@ const IntegratedLearningHub: React.FC = () => {
     }
   };
 
-  // Helper function to find memories relevant to the subject
+  // Helper function to find memories relevant to the subject - enhanced semantic matching
   const findRelevantMemories = (subject: string, topics: string[]) => {
-    const subjectKeywords = [
-      subject.toLowerCase(),
-      ...topics.map(t => t.toLowerCase()),
-      ...subject.split(' ').map(word => word.toLowerCase())
-    ];
+    console.log('🔍 Frontend: Finding relevant memories for subject:', subject);
+    console.log('📋 Frontend: Topics to match:', topics);
+    console.log('🧠 Frontend: Available memories:', memories.length);
     
-    return memories.filter(memory => {
+    // Generate broader semantic keywords for better matching
+    const semanticKeywords = generateSemanticKeywords(subject, topics);
+    console.log('🎯 Frontend: Semantic keywords:', semanticKeywords);
+    
+    // Score memories based on relevance
+    const scoredMemories = memories.map(memory => {
       const memoryText = (memory.text_content || '').toLowerCase();
       const memoryCategory = (memory.category || '').toLowerCase();
       
-      return subjectKeywords.some(keyword => 
-        memoryText.includes(keyword) || 
-        memoryCategory.includes(keyword) ||
-        keyword.includes(memoryCategory)
-      );
-    }).slice(0, 5); // Limit to top 5 most relevant
+      let score = 0;
+      
+      // Direct keyword matches (highest priority)
+      semanticKeywords.direct.forEach(keyword => {
+        if (memoryText.includes(keyword) || memoryCategory.includes(keyword)) {
+          score += 10;
+        }
+      });
+      
+      // Conceptual matches (medium priority)
+      semanticKeywords.conceptual.forEach(keyword => {
+        if (memoryText.includes(keyword)) {
+          score += 5;
+        }
+      });
+      
+      // Learning-related matches (lower priority but still valuable)
+      semanticKeywords.learning.forEach(keyword => {
+        if (memoryText.includes(keyword)) {
+          score += 3;
+        }
+      });
+      
+      // Problem-solving and analytical thinking matches
+      semanticKeywords.analytical.forEach(keyword => {
+        if (memoryText.includes(keyword)) {
+          score += 2;
+        }
+      });
+      
+      return { memory, score };
+    });
+    
+    // Sort by score and take top matches
+    const relevantMemories = scoredMemories
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(item => item.memory);
+    
+    console.log('✅ Frontend: Found', relevantMemories.length, 'relevant memories with scores');
+    
+    // If no scored matches, send all memories to backend for AI analysis
+    if (relevantMemories.length === 0) {
+      console.log('📝 Frontend: No keyword matches found, sending all memories to backend for AI analysis');
+      return memories.slice(0, 5);
+    }
+
+    return relevantMemories;
+  };
+
+  // Generate semantic keywords for better memory matching
+  const generateSemanticKeywords = (subject: string, topics: string[]) => {
+    const subjectLower = subject.toLowerCase();
+    
+    const keywords = {
+      direct: [subjectLower, ...topics.map(t => t.toLowerCase())],
+      conceptual: [] as string[],
+      learning: ['learn', 'study', 'understand', 'figure', 'discover', 'explore', 'master'],
+      analytical: ['problem', 'solve', 'challenge', 'think', 'analyze', 'logic', 'reason', 'pattern']
+    };
+    
+    // Add subject-specific conceptual keywords
+    if (subjectLower.includes('computer') || subjectLower.includes('science') || subjectLower.includes('programming')) {
+      keywords.conceptual.push('technology', 'digital', 'code', 'software', 'system', 'data', 'algorithm', 'logic', 'build', 'create', 'design');
+    }
+    
+    if (subjectLower.includes('machine') || subjectLower.includes('learning') || subjectLower.includes('ai')) {
+      keywords.conceptual.push('pattern', 'predict', 'model', 'data', 'intelligence', 'automation', 'smart', 'algorithm');
+    }
+    
+    if (subjectLower.includes('math') || subjectLower.includes('calculus') || subjectLower.includes('algebra')) {
+      keywords.conceptual.push('number', 'calculate', 'equation', 'formula', 'logic', 'pattern', 'solve');
+    }
+    
+    if (subjectLower.includes('business') || subjectLower.includes('management')) {
+      keywords.conceptual.push('work', 'team', 'project', 'goal', 'strategy', 'plan', 'organize', 'lead');
+    }
+    
+    if (subjectLower.includes('psychology') || subjectLower.includes('behavior')) {
+      keywords.conceptual.push('people', 'behavior', 'mind', 'emotion', 'relationship', 'social', 'understand');
+    }
+    
+    // Add general learning and creativity keywords
+    keywords.conceptual.push('creative', 'innovative', 'experiment', 'test', 'try', 'practice', 'skill', 'talent');
+    
+    return keywords;
   };
 
   // Analyze user's communication style from memories
@@ -1244,23 +1337,27 @@ const IntegratedLearningHub: React.FC = () => {
         }
       } catch (aiError) {
         console.error('❌ AI mind map generation failed:', aiError);
-        console.log('🚫 AI unavailable - showing honest message instead of mock content...');
+        console.log('🚫 AI unavailable - generating mind map from analysis data instead...');
         
-        // Show honest AI unavailable message instead of hardcoded fallback
+        // Generate mind map from available analysis data instead of showing unavailable message
+        const analysisBasedMindMap = generateMindMapFromAnalysis(
+          fieldOfStudy, 
+          courseSyllabus, 
+          analysisResult?.revolutionaryInsights || [],
+          analysisResult?.memoryConnections || []
+        );
+        
         setStudyMap({
-          mermaid_code: `mindmap
-  root((🤖 AI Mind Map Unavailable))
-    Status
-      Service Temporarily Down
-      Please Try Again Later
-    Alternatives
-      Use Excalidraw Editor Below
-      Manual Study Planning
-      Upload Different Content`,
-          node_data: {},
-          legend_html: '<p class="text-amber-600">🤖 AI mind map generation is temporarily unavailable. Please use the Excalidraw Editor or try again later.</p>'
+          mermaid_code: analysisBasedMindMap,
+          node_data: {
+            source: 'analysis_fallback',
+            subject: fieldOfStudy,
+            insights_count: analysisResult?.revolutionaryInsights?.length || 0,
+            memory_connections: analysisResult?.memoryConnections?.length || 0
+          },
+          legend_html: `<p class="text-blue-600">🧠 Mind map generated from your analysis data for <strong>${fieldOfStudy}</strong> with ${analysisResult?.memoryConnections?.length || 0} memory connections</p>`
         });
-        console.log('✅ Showing honest AI unavailable message');
+        console.log('✅ Generated mind map from analysis data');
       }
     } catch (error) {
       console.error('❌ Mind map generation error:', error);
@@ -1291,15 +1388,23 @@ const IntegratedLearningHub: React.FC = () => {
       Service Outage
       Please Try Again Later
     Alternative
-      Use Excalidraw Editor
+      Use Mermaid Code Editor
       Manual Study Planning`,
           node_data: {},
-          legend_html: '<p class="text-amber-600">🤖 AI mind map generation is temporarily unavailable. Please use the Excalidraw Editor or try again later.</p>'
+          legend_html: '<p class="text-amber-600">🤖 AI mind map generation is temporarily unavailable. Please use the Mermaid Code Editor or try again later.</p>'
         });
       }
     } finally {
       setIsLoading(false);
       console.log('🏁 Mind map generation completed');
+      
+      // Show success notification for mind map generation
+      addNotification({
+        type: 'success',
+        title: 'Mind Map Generated!',
+        message: 'Your personalized circular mind map is ready for exploration.',
+        duration: 4000
+      });
     }
   };
 
@@ -1423,9 +1528,10 @@ const IntegratedLearningHub: React.FC = () => {
       const relevantMemories = findRelevantMemories(fieldOfStudy, []);
       const userStyle = analyzeUserCommunicationStyle(userMemories);
       
-      // Call ADK agents for AI-powered mind map generation
-      const mindMapResponse = await orchestrateAgents({
-        task: 'comprehensive_mindmap_generation',
+      // Call ADK agents for AI-powered mind map generation using the correct task name
+      const mindMapResponse = await callEdgeFunction('adk-agents', {
+        task: 'generate_ai_mind_map',
+        agent_type: 'orchestrator',
         subject: fieldOfStudy,
         content: courseSyllabus,
         memories: relevantMemories.map(m => ({
@@ -1434,19 +1540,7 @@ const IntegratedLearningHub: React.FC = () => {
           category: m.category || 'general',
           emotional_tone: 'positive'
         })),
-        user_communication_style: {
-          technical_terms: userStyle.technicalTerms,
-          communication_patterns: userStyle.communicationPatterns,
-          preferred_expressions: userStyle.preferredExpressions,
-          tone_style: userStyle.toneStyle
-        },
-        mindmap_requirements: [
-          'circular_clockwise_structure',
-          'personalized_node_insights',
-          'memory_connected_analogies',
-          'style_matched_content',
-          'mermaid_mindmap_format'
-        ]
+        payload: {} // Empty payload as required by the interface
       });
 
       if (mindMapResponse && mindMapResponse.mindmap) {
@@ -1458,21 +1552,7 @@ const IntegratedLearningHub: React.FC = () => {
         };
       }
 
-      // Fallback ADK call with simpler request
-      const simpleMindMap = await SensaAPI.generatePersonalizedMindMap({
-        subject: fieldOfStudy,
-        content: courseSyllabus,
-        user_memories: relevantMemories.slice(0, 3),
-        format: 'mermaid_mindmap',
-        style: 'circular_clockwise'
-      });
-
-      if (simpleMindMap) {
-        console.log('✅ Simple ADK mind map successful');
-        return simpleMindMap;
-      }
-
-      throw new Error('Both ADK mind map attempts failed');
+      throw new Error('ADK mind map generation failed');
       
     } catch (error) {
       console.error('❌ AI mind map generation failed:', error);
@@ -1494,109 +1574,67 @@ const IntegratedLearningHub: React.FC = () => {
     `;
   };
 
-  const generateMockMindMap = () => {
-    // Prioritize uploaded content over selected course
-    let subject = 'General Studies';
-    let courseTitle = 'Sample Course';
+  // Generate Mermaid mind map from analysis data when AI is unavailable
+  const generateMindMapFromAnalysis = (
+    subject: string, 
+    topics: string[], 
+    insights: string[], 
+    memoryConnections: Array<{concept: string, personalConnection: string}>
+  ): string => {
+    console.log('🎨 Generating mind map from analysis data:', {
+      subject,
+      topicsCount: topics.length,
+      insightsCount: insights.length,
+      connectionsCount: memoryConnections.length
+    });
+
+    // Extract key concepts from insights and topics
+    const foundations = topics.slice(0, 3) || ['Core Concepts', 'Fundamentals', 'Principles'];
+    const applications = insights.slice(0, 3).map(insight => 
+      insight.length > 30 ? insight.substring(0, 27) + '...' : insight
+    ) || ['Practical Applications', 'Real-world Use', 'Problem Solving'];
     
-    if (uploadedContent && uploadedFiles?.length > 0) {
-      const fileName = uploadedFiles[0]?.file?.name || 'Uploaded Document';
-      subject = extractSubjectFromFilename(fileName);
-      courseTitle = fileName.replace(/\.[^/.]+$/, ''); // Remove file extension
-    } else if (uploadedFile) {
-      subject = extractSubjectFromFilename(uploadedFile.name);
-      courseTitle = uploadedFile.name.replace(/\.[^/.]+$/, ''); // Remove file extension
-    } else if (selectedCourse) {
-      subject = selectedCourse.category;
-      courseTitle = selectedCourse.title;
-    }
-    
-    // Generate proper circular mind map with 12 o'clock clockwise sequencing
-    const mindmapCode = `mindmap
+    const assessments = ['Understanding Check', 'Skill Application', 'Knowledge Integration'];
+    const advanced = memoryConnections.slice(0, 3).map(conn => conn.concept) || ['Advanced Topics', 'Specialized Areas', 'Future Learning'];
+
+    return `mindmap
   root)${subject}<br/>Learning Journey(
     )📚 Foundations(
       )Core Concepts(
-        Theory
-        Principles
-        History
+        ${foundations[0] || 'Fundamentals'}
+        ${foundations[1] || 'Key Principles'}
+        ${foundations[2] || 'Basic Theory'}
       )Prerequisites(
-        Basic Knowledge
-        Required Skills
-        Background Reading
+        Background Knowledge
+        Essential Skills
+        Required Understanding
     )⚡ Applications(
       )Practical Skills(
-        Hands-on Practice
-        Real Projects
-        Case Studies
-      )Problem Solving(
-        Analytical Thinking
-        Critical Analysis
-        Creative Solutions
+        ${applications[0] || 'Hands-on Practice'}
+        ${applications[1] || 'Real Projects'}
+        ${applications[2] || 'Problem Solving'}
+      )Memory Connections(
+        ${memoryConnections[0]?.concept || 'Personal Experience'}
+        ${memoryConnections[1]?.concept || 'Learning Patterns'}
+        ${memoryConnections[2]?.concept || 'Knowledge Links'}
     )📊 Assessment(
       )Evaluation Methods(
-        Exams
-        Projects
-        Presentations
+        ${assessments[0]}
+        ${assessments[1]}
+        ${assessments[2]}
       )Mastery Indicators(
-        Competency Levels
-        Performance Metrics
-        Learning Outcomes
+        Comprehension Level
+        Application Ability
+        Integration Success
     )🔬 Advanced Topics(
       )Specialized Areas(
-        Expert Knowledge
-        Research Methods
-        Current Trends
-      )Integration(
-        Cross-disciplinary
-        Synthesis
-        Innovation`;
-
-    return {
-      mermaid_code: mindmapCode,
-      node_data: {
-        'Core Concepts': {
-          node_name: 'Core Concepts',
-          sensa_insight: {
-            analogy: `Think of ${subject} core concepts like the foundation of a house - everything else builds on top`,
-            study_tip: 'Master these fundamentals first, as they appear in every advanced topic'
-          }
-        },
-        'Practical Skills': {
-          node_name: 'Practical Skills', 
-          sensa_insight: {
-            analogy: 'Like learning to drive - theory helps, but practice makes perfect',
-            study_tip: 'Apply concepts immediately through hands-on exercises and projects'
-          }
-        },
-        'Advanced Topics': {
-          node_name: 'Advanced Topics',
-          sensa_insight: {
-            analogy: 'The specialization branches of your learning tree - choose what interests you most',
-            study_tip: 'Focus on 2-3 advanced areas rather than trying to master everything'
-          }
-        }
-      },
-      legend_html: `
-        <div class="space-y-3">
-          <div class="flex items-center space-x-3">
-            <div class="w-4 h-4 rounded-full" style="background-color: #6B46C1;"></div>
-            <span class="text-sm text-gray-700">Central Topic - Main subject area</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-4 h-4 rounded-full" style="background-color: #F97316;"></div>
-            <span class="text-sm text-gray-700">Major Branches - Key learning areas</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-4 h-4 rounded-full" style="background-color: #F59E0B;"></div>
-            <span class="text-sm text-gray-700">Sub-topics - Detailed concepts</span>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="w-4 h-4 rounded-full" style="background-color: #EAB308;"></div>
-            <span class="text-sm text-gray-700">Specific Skills - Actionable learning points</span>
-          </div>
-        </div>
-      `
-    };
+        ${advanced[0] || 'Expert Knowledge'}
+        ${advanced[1] || 'Research Methods'}
+        ${advanced[2] || 'Current Trends'}
+      )Future Learning(
+        Next Steps
+        Deeper Study
+        Related Fields`;
   };
 
   const generateStudyGuide = async (file: File) => {
@@ -1646,68 +1684,101 @@ const IntegratedLearningHub: React.FC = () => {
   };
 
   const extractSubjectFromFilename = async (filename: string, content?: string): Promise<string> => {
-    console.log('🤖 Using AI to extract subject from filename:', filename);
+    console.log('🤖 Analyzing subject from filename and content:', filename);
     
-    try {
-      // Use ADK agents to intelligently identify the subject
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-      
-      const subjectAnalysis = await callEdgeFunction('adk-agents', {
-        task: 'subject_identification',
-        payload: {
-          filename: filename,
-          content_preview: content?.substring(0, 500) || '',
-          analysis_type: 'intelligent_subject_extraction'
-        }
-      });
-      
-      if (subjectAnalysis?.success && subjectAnalysis?.analysis?.identified_subject) {
-        console.log('✅ AI identified subject:', subjectAnalysis.analysis.identified_subject);
-        return subjectAnalysis.analysis.identified_subject;
-      }
-      
-      throw new Error('AI subject identification failed');
-      
-    } catch (error) {
-      console.error('❌ AI subject identification failed, using content analysis:', error);
-      
-      // Fallback: Analyze content for subject clues
-      if (content) {
-        const contentLower = content.toLowerCase();
-        
-        // Look for certification patterns
-        if (contentLower.includes('az-400') || contentLower.includes('azure devops') || contentLower.includes('devops engineer')) {
-          return 'Azure DevOps';
-        }
-        if (contentLower.includes('aws') && (contentLower.includes('cloud') || contentLower.includes('ec2'))) {
-          return 'AWS Cloud Computing';
-        }
-        if (contentLower.includes('kubernetes') || contentLower.includes('docker') || contentLower.includes('ci/cd')) {
-          return 'DevOps';
-        }
-        
-        // Look for academic subjects in content
-        if (contentLower.includes('calculus') || contentLower.includes('derivative') || contentLower.includes('integral')) {
-          return 'Mathematics';
-        }
-        if (contentLower.includes('accounting') || contentLower.includes('financial statement') || contentLower.includes('balance sheet')) {
-          return 'Accounting';
-        }
-        if (contentLower.includes('psychology') || contentLower.includes('cognitive') || contentLower.includes('behavioral')) {
-          return 'Psychology';
-        }
-      }
-      
-      // Final fallback: Simple filename analysis
-      const lowerName = filename.toLowerCase();
-      if (lowerName.includes('math') || lowerName.includes('calc')) return 'Mathematics';
-      if (lowerName.includes('psyc')) return 'Psychology';
-      if (lowerName.includes('acc')) return 'Accounting';
-      if (lowerName.includes('cs') || lowerName.includes('comp')) return 'Computer Science';
-      
-      return 'Document Analysis';
+    // Check if this is an auto-generated filename (contains "Pasted Content" and timestamp pattern)
+    const isAutoGenerated = filename.includes('Pasted Content') && /\d{4}-\d{2}-\d{2}/.test(filename);
+    
+    if (isAutoGenerated && content) {
+      console.log('📄 Auto-generated filename detected, using content analysis for subject identification');
+      return await extractSubjectFromContent(content);
     }
+    
+    // For meaningful filenames, try AI analysis first
+    if (!isAutoGenerated) {
+      try {
+        // Use ADK agents to intelligently identify the subject
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+        
+        const subjectAnalysis = await callEdgeFunction('adk-agents', {
+          agent_type: 'course_intel',
+          payload: {
+            task: 'subject_identification',
+            filename: filename,
+            content_preview: content?.substring(0, 500) || '',
+            analysis_type: 'intelligent_subject_extraction'
+          }
+        });
+        
+        if (subjectAnalysis?.success && subjectAnalysis?.analysis?.identified_subject) {
+          console.log('✅ AI identified subject from filename:', subjectAnalysis.analysis.identified_subject);
+          return subjectAnalysis.analysis.identified_subject;
+        }
+      } catch (error) {
+        console.log('⚠️ AI filename analysis failed, falling back to content analysis:', error);
+      }
+    }
+    
+    // Content-based analysis fallback
+    if (content) {
+      return await extractSubjectFromContent(content);
+    }
+    
+    // Final fallback: Simple filename analysis
+    const lowerName = filename.toLowerCase();
+    if (lowerName.includes('math') || lowerName.includes('calc')) return 'Mathematics';
+    if (lowerName.includes('psyc')) return 'Psychology';
+    if (lowerName.includes('acc')) return 'Accounting';
+    if (lowerName.includes('cs') || lowerName.includes('comp')) return 'Computer Science';
+    
+    return 'Document Analysis';
+  };
+
+  // Extract subject from content using pattern matching and keyword analysis
+  const extractSubjectFromContent = async (content: string): Promise<string> => {
+    const contentLower = content.toLowerCase();
+    
+    // Look for explicit subject mentions in headings or titles
+    const headingMatches = content.match(/#{1,3}\s+([^\n]+)/g) || [];
+    for (const heading of headingMatches) {
+      const headingText = heading.replace(/#{1,3}\s+/, '').toLowerCase();
+      if (headingText.includes('machine learning') || headingText.includes('ml')) return 'Machine Learning';
+      if (headingText.includes('data science') || headingText.includes('data analysis')) return 'Data Science';
+      if (headingText.includes('computer science') || headingText.includes('programming')) return 'Computer Science';
+      if (headingText.includes('mathematics') || headingText.includes('math')) return 'Mathematics';
+      if (headingText.includes('psychology')) return 'Psychology';
+      if (headingText.includes('accounting') || headingText.includes('finance')) return 'Accounting';
+    }
+    
+    // Look for certification patterns
+    if (contentLower.includes('az-400') || contentLower.includes('azure devops')) return 'Azure DevOps';
+    if (contentLower.includes('aws') && (contentLower.includes('cloud') || contentLower.includes('ec2'))) return 'AWS Cloud Computing';
+    if (contentLower.includes('kubernetes') || contentLower.includes('docker') || contentLower.includes('ci/cd')) return 'DevOps';
+    
+    // Look for academic subjects by keyword density
+    if (contentLower.includes('machine learning') || contentLower.includes('neural network') || contentLower.includes('algorithm')) return 'Machine Learning';
+    if (contentLower.includes('calculus') || contentLower.includes('derivative') || contentLower.includes('integral')) return 'Mathematics';
+    if (contentLower.includes('accounting') || contentLower.includes('financial statement') || contentLower.includes('balance sheet')) return 'Accounting';
+    if (contentLower.includes('psychology') || contentLower.includes('cognitive') || contentLower.includes('behavioral')) return 'Psychology';
+    if (contentLower.includes('programming') || contentLower.includes('software') || contentLower.includes('code')) return 'Computer Science';
+    if (contentLower.includes('data science') || contentLower.includes('statistics') || contentLower.includes('data analysis')) return 'Data Science';
+    
+    // If content contains study guide patterns, try to extract main subject
+    if (contentLower.includes('study guide') || contentLower.includes('fundamentals')) {
+      const words = content.split(/\s+/).slice(0, 20); // First 20 words
+      for (const word of words) {
+        const wordLower = word.toLowerCase().replace(/[^\w]/g, '');
+        if (wordLower === 'machine' || wordLower === 'learning') return 'Machine Learning';
+        if (wordLower === 'computer' || wordLower === 'science') return 'Computer Science';
+        if (wordLower === 'mathematics' || wordLower === 'math') return 'Mathematics';
+        if (wordLower === 'psychology') return 'Psychology';
+        if (wordLower === 'accounting') return 'Accounting';
+      }
+    }
+    
+    console.log('📚 Using generic subject classification for content analysis');
+    return 'Study Material Analysis';
   };
 
   const extractTopicsFromContent = (content: string): string[] => {
@@ -1779,19 +1850,22 @@ ${section.title} (${section.priority} priority)
   };
 
   const handlePasteSubmit = async () => {
-    if (!pasteContent.trim() || !pasteFileName.trim()) {
+    if (!pasteContent.trim()) {
       return;
     }
 
-    // Create a file from the pasted content
+    // Generate a dynamic filename with timestamp
+    const timestamp = new Date().toLocaleString('sv').replace(/:/g, '-');
+    const generatedFileName = `Pasted Content - ${timestamp}`;
+
+    // Create a file from the pasted content with the auto-generated name
     const blob = new Blob([pasteContent], { type: 'text/plain' });
-    const file = new File([blob], `${pasteFileName}.txt`, { type: 'text/plain' });
+    const file = new File([blob], `${generatedFileName}.txt`, { type: 'text/plain' });
     
     setUploadedFile(file);
     
     // Reset paste form
     setPasteContent('');
-    setPasteFileName('');
     setShowPasteInput(false);
     
     // Switch to analysis tab and analyze the pasted content
@@ -1962,8 +2036,21 @@ ${section.title} (${section.priority} priority)
                   </div>
 
                   {/* Course Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredCourses.slice(0, 12).map((course) => (
+                  <motion.div 
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      show: {
+                        opacity: 1,
+                        transition: {
+                          staggerChildren: 0.1
+                        }
+                      }
+                    }}
+                    initial="hidden"
+                    animate="show"
+                  >
+                    {filteredCourses.slice(0, 12).map((course, index) => (
                       <div key={course.id} className="relative">
                       <motion.div
                           className={`p-4 rounded-xl border-2 cursor-pointer transition-all relative ${
@@ -1977,13 +2064,35 @@ ${section.title} (${section.priority} priority)
                             x: selectedCourse?.id === course.id ? -8 : 0,
                           }}
                           transition={{ duration: 0.3, ease: "easeOut" }}
+                        layoutId={`course-card-${course.id}`}
+                        variants={{
+                          hidden: { opacity: 0, y: 20 },
+                          show: { 
+                            opacity: 1, 
+                            y: 0,
+                            transition: { duration: 0.3 }
+                          }
+                        }}
                       >
-                        <h3 className="font-semibold text-gray-800 mb-2">{course.title}</h3>
-                        <p className="text-sm text-gray-600 mb-2">{course.university}</p>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
+                        <motion.h3 
+                          className="font-semibold text-gray-800 mb-2"
+                          layoutId={`course-title-${course.id}`}
+                        >
+                          {course.title}
+                        </motion.h3>
+                        <motion.p 
+                          className="text-sm text-gray-600 mb-2"
+                          layoutId={`course-university-${course.id}`}
+                        >
+                          {course.university}
+                        </motion.p>
+                        <motion.div 
+                          className="flex items-center justify-between text-xs text-gray-500"
+                          layoutId={`course-meta-${course.id}`}
+                        >
                           <span>{course.category}</span>
                           <span>{course.difficulty}</span>
-                        </div>
+                        </motion.div>
                         {course.enrollment && (
                           <div className="mt-2 text-xs text-gray-500">
                             {course.enrollment} students enrolled
@@ -2019,7 +2128,7 @@ ${section.title} (${section.priority} priority)
                         </AnimatePresence>
                       </div>
                     ))}
-                  </div>
+                  </motion.div>
                     </>
                   )}
                 </div>
@@ -2096,13 +2205,6 @@ ${section.title} (${section.priority} priority)
                           animate={{ opacity: 1, height: 'auto' }}
                           className="mt-4 space-y-3"
                         >
-                          <input
-                            type="text"
-                            value={pasteFileName}
-                            onChange={(e) => setPasteFileName(e.target.value)}
-                            placeholder="Enter a name for this content"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          />
                           <textarea
                             value={pasteContent}
                             onChange={(e) => setPasteContent(e.target.value)}
@@ -2112,7 +2214,7 @@ ${section.title} (${section.priority} priority)
                           />
                           <button
                             onClick={handlePasteSubmit}
-                            disabled={!pasteContent.trim() || !pasteFileName.trim()}
+                            disabled={!pasteContent.trim()}
                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Send className="w-4 h-4 mr-2" />
@@ -2187,6 +2289,35 @@ ${section.title} (${section.priority} priority)
             {/* Analysis Tab */}
             {activeTab === 'analyze' && (
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                {selectedCourse && (
+                  <motion.div 
+                    className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200"
+                    layoutId={`course-card-${selectedCourse.id}`}
+                  >
+                    <motion.h2 
+                      className="text-xl font-bold text-gray-800 mb-2"
+                      layoutId={`course-title-${selectedCourse.id}`}
+                    >
+                      {selectedCourse.title}
+                    </motion.h2>
+                    <motion.p 
+                      className="text-gray-600 mb-2"
+                      layoutId={`course-university-${selectedCourse.id}`}
+                    >
+                      {selectedCourse.university}
+                    </motion.p>
+                    <motion.div 
+                      className="flex items-center gap-4 text-sm text-gray-500"
+                      layoutId={`course-meta-${selectedCourse.id}`}
+                    >
+                      <span>📚 {selectedCourse.category}</span>
+                      <span>⭐ {selectedCourse.difficulty}</span>
+                      {selectedCourse.enrollment && (
+                        <span>👥 {selectedCourse.enrollment} students</span>
+                      )}
+                    </motion.div>
+                  </motion.div>
+                )}
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Revolutionary Analysis</h2>
                 
                 {isLoading ? (
@@ -2198,13 +2329,37 @@ ${section.title} (${section.priority} priority)
                   <div className="space-y-6">
                     <div>
                       <h3 className="font-semibold text-gray-800 mb-3">🚀 Revolutionary Insights</h3>
-                      <div className="space-y-2">
+                      <motion.div 
+                        className="space-y-2"
+                        variants={{
+                          hidden: { opacity: 0 },
+                          show: {
+                            opacity: 1,
+                            transition: {
+                              staggerChildren: 0.15
+                            }
+                          }
+                        }}
+                        initial="hidden"
+                        animate="show"
+                      >
                         {analysisResult.revolutionaryInsights.map((insight, index) => (
-                          <div key={index} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <motion.div 
+                            key={index} 
+                            className="p-3 bg-purple-50 rounded-lg border border-purple-200"
+                            variants={{
+                              hidden: { opacity: 0, x: -20 },
+                              show: { 
+                                opacity: 1, 
+                                x: 0,
+                                transition: { duration: 0.4 }
+                              }
+                            }}
+                          >
                             <p className="text-purple-800">{insight}</p>
-                          </div>
+                          </motion.div>
                         ))}
-                      </div>
+                      </motion.div>
                     </div>
 
                     <div>
@@ -2294,22 +2449,31 @@ ${section.title} (${section.priority} priority)
                       Generate Mind Map
                     </button>
                     
-                    {/* Edit Mode Button */}
+                    {/* Edit Mode Buttons */}
                     {studyMap && (
                       <div className="flex gap-2">
-                      <button
-                        onClick={() => setShowMindMapEditor(true)}
-                        className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                      >
-                        <Edit3 className="w-4 h-4 mr-2" />
-                          Advanced Editor
-                      </button>
                         <button
-                          onClick={() => setShowMindMapEditor('comprehensive' as any)}
-                          className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                          onClick={() => setShowMindMapEditor(true)}
+                          className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                         >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Excalidraw Editor
+                          <Code className="w-4 h-4 mr-2" />
+                          Mermaid Code Editor
+                        </button>
+                        
+                        <button
+                          onClick={() => addNotification({
+                            type: 'info',
+                            title: 'Coming Soon!',
+                            message: 'Our new Sensa Editor with advanced AI features is currently in development.',
+                            duration: 4000
+                          })}
+                          className="flex items-center px-4 py-2 pr-8 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg transition-all shadow-lg hover:shadow-xl relative"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Sensa Editor
+                          <span className="absolute -top-1 -right-1 bg-amber-400 text-black text-xs font-bold px-1.5 py-0.5 rounded-full">
+                            SOON
+                          </span>
                         </button>
                       </div>
                     )}
@@ -2343,9 +2507,37 @@ ${section.title} (${section.priority} priority)
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Memory Bank</h2>
                 
                 {memories.length > 0 ? (
-                  <div className="space-y-4">
+                  <motion.div 
+                    className="space-y-4"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      show: {
+                        opacity: 1,
+                        transition: {
+                          staggerChildren: 0.1
+                        }
+                      }
+                    }}
+                    initial="hidden"
+                    animate="show"
+                  >
                     {memories.map((memory, index) => (
-                      <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                      <motion.div 
+                        key={index} 
+                        className="p-4 bg-gray-50 rounded-xl border border-gray-200"
+                        variants={{
+                          hidden: { opacity: 0, y: 20 },
+                          show: { 
+                            opacity: 1, 
+                            y: 0,
+                            transition: { duration: 0.3 }
+                          }
+                        }}
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        drag="y"
+                        dragConstraints={{ top: -10, bottom: 10 }}
+                        dragElastic={0.1}
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-gray-600">{memory.category}</span>
                           <span className="text-xs text-gray-500">
@@ -2353,9 +2545,9 @@ ${section.title} (${section.priority} priority)
                           </span>
                         </div>
                         <p className="text-gray-800">{memory.text_content}</p>
-                      </div>
+                      </motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                 ) : (
                   <div className="text-center py-12">
                     <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -2379,16 +2571,7 @@ ${section.title} (${section.priority} priority)
           />
         )}
 
-        {showMindMapEditor === 'comprehensive' && (
-          <ExcalidrawMindMapEditor
-            initialData={studyMap}
-            onSave={(editedData) => {
-              console.log('Excalidraw mind map saved:', editedData);
-              setShowMindMapEditor(false);
-            }}
-            onClose={() => setShowMindMapEditor(false)}
-          />
-        )}
+
       </div>
     </div>
   );

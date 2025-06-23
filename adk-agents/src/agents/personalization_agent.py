@@ -66,7 +66,7 @@ Make it personal, memorable, and emotionally resonant."""
             )
         except Exception as e:
             self.log(f"Error creating analogy: {str(e)}", "ERROR")
-            return self._generate_fallback_connection(course_concept, learning_profile)
+            raise
     
     async def generate_study_tip(self, course_concept: str, learning_profile: Dict[str, Any]) -> str:
         """Generate an actionable study tip aligned with the user's learning style"""
@@ -90,7 +90,7 @@ Provide just the study tip as a clear, concise sentence."""
             return response_text.strip()
         except Exception as e:
             self.log(f"Error generating study tip: {str(e)}", "ERROR")
-            return self._generate_fallback_study_tip(course_concept, learning_profile)
+            raise
     
     async def personalize_course_content(self, course_analysis: CourseAnalysisResult, learning_profile: Dict[str, Any], user_memories: List[Dict]) -> PersonalizationResult:
         """Create personalized content for an entire course based on user profile and memories"""
@@ -106,9 +106,8 @@ Provide just the study tip as a clear, concise sentence."""
                 memory_connections.append(connection)
             except Exception as e:
                 self.log(f"Error personalizing topic {topic}: {str(e)}", "ERROR")
-                # Add fallback connection
-                fallback = self._generate_fallback_connection(topic, learning_profile)
-                memory_connections.append(fallback)
+                # Skip this topic if personalization fails
+                continue
         
         return PersonalizationResult(memory_connections=memory_connections)
     
@@ -139,15 +138,4 @@ Provide just the study tip as a clear, concise sentence."""
         else:
             raise ValueError(f"Unknown action: {action}")
     
-    def _generate_fallback_connection(self, concept: str, learning_profile: Dict[str, Any]) -> MemoryConnection:
-        """Generate fallback memory connection when AI processing fails"""
-        return MemoryConnection(
-            concept=concept,
-            analogy='AI analogy generation is currently unavailable. Please try again later.',
-            memory_connection="AI service unavailable for memory connections.",
-            study_tip='AI study tip generation is currently unavailable. Please try again later.'
-        )
-    
-    def _generate_fallback_study_tip(self, concept: str, learning_profile: Dict[str, Any]) -> str:
-        """Generate fallback study tip"""
-        return 'AI study tip generation is currently unavailable. Please try again later.' 
+    # Fallback generation methods removed – rely on upstream error handling instead. 

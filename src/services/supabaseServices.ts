@@ -320,6 +320,21 @@ export const memoryService = {
     return data;
   },
 
+  async updateMemoryContent(memoryId: string, textContent: string) {
+    const { data, error } = await supabase
+      .from('memories')
+      .update({ text_content: textContent })
+      .eq('id', memoryId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating memory content:', error);
+      throw error;
+    }
+    return data;
+  },
+
   async analyzeMemory(memoryContent: string, category: string) {
     try {
       console.warn('⚠️ Using legacy memoryService.analyzeMemory - consider migrating to SensaAPI.analyzeMemory');

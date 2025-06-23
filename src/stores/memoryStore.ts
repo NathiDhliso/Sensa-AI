@@ -9,7 +9,7 @@ interface MemoryState {
   error: string | null;
   
   // Actions
-  setMemories: (memories: MemoryInsight[]) => void;
+  setMemories: (memories: MemoryInsight[] | ((prev: MemoryInsight[]) => MemoryInsight[])) => void;
   addMemory: (memory: MemoryInsight) => void;
   updateMemory: (id: string, updates: Partial<MemoryInsight>) => void;
   removeMemory: (id: string) => void;
@@ -32,20 +32,36 @@ export const useMemoryStore = create<MemoryState>()(
       loading: false,
       error: null,
 
-      setMemories: (memories) => set({ memories }),
+      setMemories: (memories) => {
+        if (typeof memories === 'function') {
+          // Handle React-style function updates
+          set((state) => {
+            const currentMemories = Array.isArray(state.memories) ? state.memories : [];
+            const newMemories = memories(currentMemories);
+            return { memories: Array.isArray(newMemories) ? newMemories : [] };
+          });
+        } else if (!Array.isArray(memories)) {
+          console.warn('setMemories called with non-array value:', memories);
+          set({ memories: [] });
+        } else {
+          set({ memories });
+        }
+      },
       
       addMemory: (memory) => set((state) => ({ 
-        memories: [...state.memories, memory] 
+        memories: Array.isArray(state.memories) ? [...state.memories, memory] : [memory]
       })),
       
       updateMemory: (id, updates) => set((state) => ({
-        memories: state.memories.map(memory => 
-          memory.id === id ? { ...memory, ...updates } : memory
-        )
+        memories: Array.isArray(state.memories) 
+          ? state.memories.map(memory => memory.id === id ? { ...memory, ...updates } : memory)
+          : []
       })),
       
       removeMemory: (id) => set((state) => ({
-        memories: state.memories.filter(memory => memory.id !== id)
+        memories: Array.isArray(state.memories) 
+          ? state.memories.filter(memory => memory.id !== id)
+          : []
       })),
       
       setLearningProfile: (profile) => set({ learningProfile: profile }),
@@ -58,9 +74,18 @@ export const useMemoryStore = create<MemoryState>()(
       }),
 
       // Computed values
-      getMemoryCount: () => get().memories.length,
-      getConnectionCount: () => get().memories.reduce((acc, memory) => acc + memory.connections.length, 0),
-      hasMemories: () => get().memories.length > 0,
+      getMemoryCount: () => {
+        const memories = get().memories;
+        return Array.isArray(memories) ? memories.length : 0;
+      },
+      getConnectionCount: () => {
+        const memories = get().memories;
+        return Array.isArray(memories) ? memories.reduce((acc, memory) => acc + memory.connections.length, 0) : 0;
+      },
+      hasMemories: () => {
+        const memories = get().memories;
+        return Array.isArray(memories) && memories.length > 0;
+      },
     }),
     {
       name: 'sensa-memories',

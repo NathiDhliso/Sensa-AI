@@ -77,7 +77,7 @@ Focus on depth over breadth. Prioritize actionable insights over general descrip
             )
         except Exception as e:
             self.log(f"Error analyzing course: {str(e)}", "ERROR")
-            return self._generate_fallback_course_analysis(course_name, syllabus)
+            raise
     
     async def analyze_user_document(self, document_content: str, document_type: str = "general") -> Dict[str, Any]:
         """Extract key topics and learning objectives from user-uploaded files"""
@@ -102,7 +102,7 @@ Focus on educational value and learning potential."""
             return self.extract_json_from_text(response_text)
         except Exception as e:
             self.log(f"Error analyzing document: {str(e)}", "ERROR")
-            return self._generate_fallback_document_analysis(document_content)
+            raise
     
     async def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Main processing method for the Course Intel Agent"""
@@ -123,29 +123,4 @@ Focus on educational value and learning potential."""
         else:
             raise ValueError(f"Unknown action: {action}")
     
-    def _generate_fallback_course_analysis(self, course_name: str, syllabus: str) -> CourseAnalysisResult:
-        """Generate fallback course analysis when AI processing fails"""
-        return CourseAnalysisResult(
-            course_id=f"course_{hash(course_name + syllabus) % 100000}",
-            course_name=course_name or 'AI Analysis Unavailable',
-            university='AI service unavailable',
-            core_goal='AI course analysis is currently unavailable. Please try again later.',
-            practical_outcome='AI analysis required for course insights',
-            learning_objectives=['AI analysis currently unavailable'],
-            prerequisites=['AI service unavailable'],
-            estimated_duration='Unknown - AI analysis required',
-            difficulty_level='AI analysis unavailable',
-            key_topics=['AI analysis currently unavailable'],
-            career_outcomes=['AI analysis required for career insights']
-        )
-    
-    def _generate_fallback_document_analysis(self, content: str) -> Dict[str, Any]:
-        """Generate fallback document analysis"""
-        return {
-            'key_topics': ['AI Analysis Unavailable'],
-            'learning_objectives': ['AI analysis currently unavailable'],
-            'complexity_level': 'AI analysis required',
-            'estimated_study_time': 'Unknown - AI analysis required',
-            'prerequisite_knowledge': ['AI service unavailable'],
-            'practical_applications': ['AI analysis currently unavailable']
-        } 
+    # Fallback generation methods removed – rely on upstream error handling. 

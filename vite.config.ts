@@ -36,8 +36,9 @@ export default defineConfig({
       }
     }
   },
-  // Prevent service worker caching issues
+  // This `define` block makes environment variables available in your client-side code
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+    'process.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
+    'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY)
   }
 });

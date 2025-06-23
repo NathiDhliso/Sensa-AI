@@ -29,6 +29,9 @@ Create a logical flow from prerequisites to advanced concepts."""
             response_text = await self.call_gemini(prompt, temperature=0.5)
             response_data = self.extract_json_from_text(response_text)
             
+            if 'mermaid_code' not in response_data or not response_data['mermaid_code']:
+                raise ValueError('AI response did not include mermaid_code')
+            
             node_data = {}
             raw_node_data = response_data.get('node_data', {})
             
@@ -44,14 +47,14 @@ Create a logical flow from prerequisites to advanced concepts."""
                     )
             
             return MermaidStudyMap(
-                mermaid_code=response_data.get('mermaid_code', self._generate_fallback_mermaid(course_analysis)),
+                mermaid_code=response_data.get('mermaid_code'),
                 node_data=node_data,
                 legend_html=response_data.get('legend_html', self._generate_legend_html())
             )
             
         except Exception as e:
             self.log(f"Error generating Mermaid study map: {str(e)}", "ERROR")
-            return self._generate_fallback_mermaid_map(course_analysis, personalized_insights)
+            raise
     
     async def create_study_guide(self, course_analysis: CourseAnalysisResult, learning_profile: Dict[str, Any]) -> StudyMap:
         """Generate a structured study guide from course analysis"""
@@ -96,7 +99,7 @@ Organize the content logically from foundational to advanced concepts."""
             
         except Exception as e:
             self.log(f"Error creating study guide: {str(e)}", "ERROR")
-            return self._generate_fallback_study_guide(course_analysis)
+            raise
     
     async def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Main processing method for the Study Map Agent"""
@@ -134,48 +137,6 @@ Organize the content logically from foundational to advanced concepts."""
             in_course=node_data.get('in_course', True),
             sensa_insight=insight,
             children=children
-        )
-    
-    def _generate_fallback_mermaid(self, course_analysis: CourseAnalysisResult) -> str:
-        """Generate fallback Mermaid code when AI processing fails"""
-        return "flowchart TD\n    Start([AI Unavailable]) --> End([Please try again later])\n"
-    
-    def _generate_fallback_mermaid_map(self, course_analysis: CourseAnalysisResult, insights: List[Dict]) -> MermaidStudyMap:
-        """Generate fallback Mermaid study map"""
-        mermaid_code = self._generate_fallback_mermaid(course_analysis)
-        
-        node_data = {
-            'Start': NodeData(
-                node_name='AI Analysis Unavailable',
-                sensa_insight=SensaInsight(
-                    analogy='AI study map generation is currently unavailable',
-                    study_tip='Please try again later when AI service is available'
-                )
-            )
-        }
-        
-        return MermaidStudyMap(
-            mermaid_code=mermaid_code,
-            node_data=node_data,
-            legend_html=self._generate_legend_html()
-        )
-    
-    def _generate_fallback_study_guide(self, course_analysis: CourseAnalysisResult) -> StudyMap:
-        """Generate fallback study guide"""
-        knowledge_nodes = [
-            KnowledgeNode(
-                node_name='AI Analysis Unavailable',
-                in_course=False,
-                sensa_insight=SensaInsight(
-                    analogy='AI study guide generation is currently unavailable',
-                    study_tip='Please try again later when AI service is available'
-                )
-            )
-        ]
-        
-        return StudyMap(
-            field='AI Service Unavailable',
-            map=knowledge_nodes
         )
     
     def _generate_legend_html(self) -> str:

@@ -74,15 +74,14 @@ Make the discovery path creative and personally meaningful."""
                     memory_link=pathway.get('memory_link', 'This connects to your interests and experiences')
                 ))
             
-            # Ensure we have exactly 2 pathways
-            while len(pathways) < 2:
-                pathways.append(self._generate_fallback_pathway(course_analysis, len(pathways)))
-            
+            if len(pathways) < 2:
+                raise ValueError("AI response did not return the required number of career pathways")
+
             return CareerPathwayResponse(pathways=pathways[:2])
             
         except Exception as e:
             self.log(f"Error generating career pathways: {str(e)}", "ERROR")
-            return self._generate_fallback_pathways(course_analysis, learning_profile)
+            raise
     
     async def analyze_career_fit(self, career_field: str, learning_profile: Dict[str, Any], user_memories: List[Dict]) -> Dict[str, Any]:
         """Analyze how well a specific career field fits the user's profile"""
@@ -115,7 +114,7 @@ Focus on realistic assessment and actionable guidance."""
             return self.extract_json_from_text(response_text)
         except Exception as e:
             self.log(f"Error analyzing career fit: {str(e)}", "ERROR")
-            return self._generate_fallback_career_fit(career_field)
+            raise
     
     async def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Main processing method for the Career Pathway Agent"""
@@ -138,29 +137,4 @@ Focus on realistic assessment and actionable guidance."""
         else:
             raise ValueError(f"Unknown action: {action}")
     
-    def _generate_fallback_pathway(self, course_analysis: CourseAnalysisResult, pathway_index: int) -> CareerPathway:
-        """Generate fallback career pathway"""
-        return CareerPathway(
-            type="AI Analysis Unavailable",
-            field_name="AI service unavailable",
-            description="AI career pathway analysis is currently unavailable. Please try again later.",
-            memory_link="AI service unavailable for career-memory connections."
-        )
-    
-    def _generate_fallback_pathways(self, course_analysis: CourseAnalysisResult, learning_profile: Dict[str, Any]) -> CareerPathwayResponse:
-        """Generate fallback career pathways when AI processing fails"""
-        pathways = [
-            self._generate_fallback_pathway(course_analysis, 0),
-            self._generate_fallback_pathway(course_analysis, 1)
-        ]
-        return CareerPathwayResponse(pathways=pathways)
-    
-    def _generate_fallback_career_fit(self, career_field: str) -> Dict[str, Any]:
-        """Generate fallback career fit analysis"""
-        return {
-            'fit_score': 0,
-            'strengths': ['AI analysis currently unavailable'],
-            'challenges': ['AI service unavailable'],
-            'development_suggestions': ['AI analysis currently unavailable. Please try again later.'],
-            'memory_connections': 'AI service unavailable for career-memory analysis.'
-        } 
+    # Removed fallback generation methods – rely on upstream error handling. 

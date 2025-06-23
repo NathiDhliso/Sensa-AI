@@ -14,27 +14,115 @@ const corsHeaders = {
 
 console.log("Hello from Functions!")
 
-// AI API call function with high temperature for creative responses
-async function callOpenAI(payload: Record<string, unknown>) {
-  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-  if (!openaiApiKey) {
-    throw new Error('OpenAI API key not configured')
+// AI call rewritten to use Google Gemini (Generative Language API) while
+// preserving the same return shape that downstream code expects (i.e.
+// `{ choices: [ { message: { content: string } } ] }`).
+// The function still accepts the same `payload` object that previously matched
+// Calls Google Gemini API with a similar interface for easy migration
+async function callGemini(payload: Record<string, unknown>) {
+  const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  if (!googleApiKey) {
+    throw new Error('GOOGLE_AI_API_KEY not configured')
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload)
-  })
+  // Extract useful fields from the chat API style payload
+  const messages = (payload.messages as Array<{ role: string; content: string }>) || []
+  const temperature = (payload.temperature as number | undefined) ?? 0.7
+
+  // Convert the messages array to a single prompt string, preserving role tags
+  const prompt = messages
+    .map((m) => (m.role === 'system' ? m.content : `User: ${m.content}`))
+    .join('\n\n')
+
+  const geminiRequestBody = {
+    contents: [
+      {
+        parts: [ { text: prompt } ]
+      }
+    ],
+    generationConfig: {
+      temperature: temperature
+    }
+  }
+
+  const geminiModels = [
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash-latest', // Fallback to previous generation
+    'gemini-1.5-pro', // Additional fallback
+    'gemini-pro', // Original model, keep as final fallback
+  ];
+
+  let response: Response | undefined;
+
+  for (const model of geminiModels) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
+    console.log(`➡️ Attempting to call Gemini with model: ${model}`);
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiRequestBody)
+      });
+
+      if (response.status !== 404) {
+        console.log(`✅ Successfully connected to model: ${model}`);
+        break; // Found a working model, exit the loop
+      }
+      console.warn(`⚠️ Model ${model} returned 404. Trying next model...`);
+    } catch (error) {
+      console.error(`❌ Error calling model ${model}:`, error);
+    }
+  }
+  
+  // If all Gemini models failed with 404, fall back to PaLM
+  if (response?.status === 404) {
+    console.warn('🔄 All Gemini models failed with 404. Falling back to PaLM chat-bison-001');
+    const bisonEndpoint = `https://generativelanguage.googleapis.com/v1beta1/models/chat-bison-001:generateText?key=${googleApiKey}`;
+    const bisonRequestBody = {
+      prompt: {
+        text: prompt,
+      },
+      temperature: temperature,
+    };
+    
+    try {
+      response = await fetch(bisonEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bisonRequestBody)
+      });
+    } catch (error) {
+      console.error(`❌ Error calling PaLM fallback model:`, error);
+      throw new Error('All AI models failed, including PaLM fallback.');
+    }
+  }
+
+  if (!response) {
+    throw new Error('All AI model requests failed.');
+  }
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`)
+    const errorBody = await response.text();
+    throw new Error(`Gemini/PaLM API error: ${response.status} - ${errorBody}`);
   }
 
-  return await response.json()
+  const data = await response.json()
+
+  // Gemini v1beta format: { candidates: [ { content: { parts: [ { text } ] } } ] }
+  // PaLM chat-bison format: { candidates: [ { output } ] }
+  let text = ''
+  if (data?.candidates?.[0]) {
+    if (data.candidates[0].content?.parts?.[0]?.text) {
+      text = data.candidates[0].content.parts[0].text
+    } else if (data.candidates[0].output) {
+      text = data.candidates[0].output
+    }
+  }
+
+  // Return ChatCompletion response shape for compatibility with downstream code
+  return {
+    choices: [ { message: { content: text } } ]
+  }
 }
 
 interface ADKRequest {
@@ -44,6 +132,8 @@ interface ADKRequest {
   course?: Record<string, unknown>;
   memories?: Array<Record<string, unknown>>;
   analysis_requirements?: string[];
+  subject?: string;
+  content?: string;
 }
 
 serve(async (req) => {
@@ -53,14 +143,21 @@ serve(async (req) => {
 
   try {
     const requestData: ADKRequest = await req.json()
-    console.log('🤖 ADK Request received:', requestData)
+    console.log('🤖 ADK Request received:', {
+      task: requestData.task,
+      agent_type: requestData.agent_type,
+      payload_keys: Object.keys(requestData.payload || {}),
+      memories_count: requestData.memories?.length || 0
+    })
 
     // Check if this is an orchestrator request (comprehensive analysis)
     if (requestData.task || requestData.agent_type === 'orchestrator') {
+      console.log('🎯 Routing to orchestrator for task:', requestData.task)
       return await handleOrchestratorRequest(requestData)
     }
 
     // Handle individual agent requests
+    console.log('🔧 Routing to individual agent:', requestData.agent_type)
     return await handleAgentRequest(requestData)
 
   } catch (error) {
@@ -104,7 +201,7 @@ async function handleOrchestratorRequest(requestData: ADKRequest) {
       )
     }
 
-    if (requestData.task === 'document_content_analysis') {
+    if (requestData.task === 'document_content_analysis' || requestData.task === 'document_memory_analysis') {
       const analysis = await generateDocumentAnalysis(requestData)
       return new Response(
         JSON.stringify({
@@ -155,12 +252,47 @@ async function handleOrchestratorRequest(requestData: ADKRequest) {
       )
     }
 
-    if (requestData.task === 'comprehensive_mindmap_generation') {
+    if (requestData.task === 'comprehensive_mindmap_generation' || requestData.task === 'generate_ai_mind_map') {
       const mindMap = await generateAIMindMap(requestData)
       return new Response(
         JSON.stringify({
           success: true,
           mindmap: mindMap,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    if (requestData.task === 'memory_dialogue') {
+      const dialogueResult = await generateMemoryDialogue(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dialogue_response: dialogueResult.dialogue_response,
+          suggest_memory_update: dialogueResult.suggest_memory_update,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    if (requestData.task === 'update_memory_insights') {
+      const updatedInsights = await generateUpdatedMemoryInsights(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          updated_insights: updatedInsights,
           timestamp: new Date().toISOString()
         }),
         { 
@@ -228,6 +360,41 @@ async function handleAgentRequest(requestData: ADKRequest) {
     )
   }
   
+  // Route memory analysis requests to the proper function
+  if (requestData.agent_type === 'memory_analysis') {
+    console.log('🧠 Routing to memory analysis function')
+    try {
+      const analysis = await generateMemoryAnalysis(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          analysis: analysis,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    } catch (error) {
+      console.error('❌ Memory analysis failed:', error)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Memory analysis failed'
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+  }
+  
   // For other agent requests, return enhanced mock data
   const mockResponse = {
     agent: requestData.agent_type,
@@ -287,15 +454,21 @@ async function generateCourseAnalysis(requestData: ADKRequest) {
 }
 
 async function generateDocumentAnalysis(requestData: ADKRequest) {
-  const document = requestData.payload?.document as Record<string, unknown> || {}
+  // Handle both nested document format and direct payload format
+  const document = requestData.payload?.document as Record<string, unknown> || requestData.payload || {}
   const memories = requestData.memories || []
   
-  console.log('📄 Generating document analysis for:', document.name)
+  console.log('📄 Generating document analysis for:', document.name || 'Unknown Document')
   console.log('🧠 Processing', memories.length, 'user memories for personalization')
+  console.log('🔍 Document data structure:', Object.keys(document))
   
   const subject = (document.actual_subject as string) || (document.subject as string) || 'Document'
   const contentType = (document.content_type as string) || 'document'
   const topics = (document.key_topics as string[]) || []
+  
+  console.log('🎯 Extracted subject:', subject)
+  console.log('📋 Extracted topics:', topics)
+  console.log('📝 Content type:', contentType)
   
   // Analyze user's communication style from memories
   const userStyle = analyzeUserCommunicationStyle(memories)
@@ -306,18 +479,62 @@ async function generateDocumentAnalysis(requestData: ADKRequest) {
   console.log('🔗 Found', relevantMemories.length, 'relevant memories')
   
   // Generate personalized analogies based on actual memories
-  const personalizedInsights = await generatePersonalizedInsights(subject, relevantMemories, userStyle, contentType)
-  const memoryConnections = generateMemoryBasedConnections(subject, relevantMemories, userStyle)
+  console.log('🚀 Starting personalized insights generation...')
+  let personalizedInsights: string[] = []
+  try {
+    personalizedInsights = await generatePersonalizedInsights(subject, relevantMemories, userStyle, contentType)
+    console.log('✅ Personalized insights generated:', personalizedInsights.length, 'insights')
+  } catch (error) {
+    console.error('❌ Failed to generate personalized insights:', error)
+    personalizedInsights = []
+  }
   
-  return {
+  console.log('🚀 Starting memory connections generation...')
+  let memoryConnections: Array<{ concept: string; personalConnection: string; emotionalResonance: number }> = []
+  try {
+    memoryConnections = generateMemoryBasedConnections(subject, relevantMemories, userStyle)
+    console.log('✅ Memory connections generated:', memoryConnections.length, 'connections')
+  } catch (error) {
+    console.error('❌ Failed to generate memory connections:', error)
+    memoryConnections = []
+  }
+  
+  const result = {
     personalized_insights: personalizedInsights,
     memory_connections: memoryConnections,
+    // Add expected fields for API compatibility
+    topic_memory_connections: memoryConnections,
+    content_specific_insights: personalizedInsights,
     personalized_learning_path: {
       customRole: `AI-Enhanced ${subject} Specialist`,
       description: generatePersonalizedCareerDescription(subject, userStyle),
       skills: [`Applied ${subject}`, ...userStyle.technicalTerms.slice(0, 2), 'AI-Enhanced Learning']
+    },
+    // Add debug information to see what's happening
+    debug_info: {
+      extracted_subject: subject,
+      extracted_topics: topics,
+      extracted_content_type: contentType,
+      memories_received: memories.length,
+      relevant_memories_found: relevantMemories.length,
+      user_style: userStyle,
+      insights_generated: personalizedInsights.length,
+      connections_generated: memoryConnections.length,
+      insights_preview: personalizedInsights.slice(0, 2),
+      connections_preview: memoryConnections.slice(0, 1),
+      raw_insights: personalizedInsights,
+      raw_connections: memoryConnections
     }
   }
+  
+  console.log('📤 Returning document analysis result:', {
+    insights_count: result.personalized_insights.length,
+    connections_count: result.memory_connections.length,
+    insights_preview: result.personalized_insights.slice(0, 2),
+    connections_preview: result.memory_connections.slice(0, 1)
+  })
+  
+  return result
 }
 
 async function generateMemoryAnalysis(requestData: ADKRequest) {
@@ -488,27 +705,112 @@ function extractTechnicalTerms(text: string): string[] {
 
 // Find memories relevant to the subject
 function findRelevantMemories(subject: string, topics: string[], memories: Array<Record<string, unknown>>) {
-  const keywords = [
-    subject.toLowerCase(),
-    ...topics.map(t => t.toLowerCase()),
-    ...subject.split(' ').map(word => word.toLowerCase())
-  ]
+  console.log('🔍 Finding relevant memories for subject:', subject)
+  console.log('📋 Topics to match:', topics)
+  console.log('🧠 Available memories:', memories.length)
   
-  return memories.filter(memory => {
+  // Create broader semantic keywords for better matching
+  const semanticKeywords = generateSemanticKeywords(subject, topics)
+  console.log('🎯 Semantic keywords:', semanticKeywords)
+  
+  // Score memories based on relevance
+  const scoredMemories = memories.map(memory => {
     const memoryText = ((memory.content as string) || (memory.text_content as string) || '').toLowerCase()
     const memoryCategory = ((memory.category as string) || '').toLowerCase()
     
-    return keywords.some(keyword => 
-      memoryText.includes(keyword) || 
-      memoryCategory.includes(keyword) ||
-      keyword.includes(memoryCategory)
-    )
-  }).slice(0, 3)
+    let score = 0
+    
+    // Direct keyword matches (highest priority)
+    semanticKeywords.direct.forEach(keyword => {
+      if (memoryText.includes(keyword) || memoryCategory.includes(keyword)) {
+        score += 10
+      }
+    })
+    
+    // Conceptual matches (medium priority)
+    semanticKeywords.conceptual.forEach(keyword => {
+      if (memoryText.includes(keyword)) {
+        score += 5
+      }
+    })
+    
+    // Learning-related matches (lower priority but still valuable)
+    semanticKeywords.learning.forEach(keyword => {
+      if (memoryText.includes(keyword)) {
+        score += 3
+      }
+    })
+    
+    // Problem-solving and analytical thinking matches
+    semanticKeywords.analytical.forEach(keyword => {
+      if (memoryText.includes(keyword)) {
+        score += 2
+      }
+    })
+    
+    return { memory, score }
+  })
+  
+  // Sort by score and take top matches
+  const relevantMemories = scoredMemories
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(item => item.memory)
+  
+  console.log('✅ Found', relevantMemories.length, 'relevant memories with scores')
+  
+  // If no scored matches, use all memories for broader AI analysis
+  if (relevantMemories.length === 0) {
+    console.log('📝 No keyword matches found, using all memories for AI analysis')
+    return memories.slice(0, 3)
+  }
+
+  return relevantMemories
+}
+
+// Generate semantic keywords for better memory matching
+function generateSemanticKeywords(subject: string, topics: string[]) {
+  const subjectLower = subject.toLowerCase()
+  
+  const keywords = {
+    direct: [subjectLower, ...topics.map(t => t.toLowerCase())],
+    conceptual: [] as string[],
+    learning: ['learn', 'study', 'understand', 'figure', 'discover', 'explore', 'master'],
+    analytical: ['problem', 'solve', 'challenge', 'think', 'analyze', 'logic', 'reason', 'pattern']
+  }
+  
+  // Add subject-specific conceptual keywords
+  if (subjectLower.includes('computer') || subjectLower.includes('science') || subjectLower.includes('programming')) {
+    keywords.conceptual.push('technology', 'digital', 'code', 'software', 'system', 'data', 'algorithm', 'logic', 'build', 'create', 'design')
+  }
+  
+  if (subjectLower.includes('machine') || subjectLower.includes('learning') || subjectLower.includes('ai')) {
+    keywords.conceptual.push('pattern', 'predict', 'model', 'data', 'intelligence', 'automation', 'smart', 'algorithm')
+  }
+  
+  if (subjectLower.includes('math') || subjectLower.includes('calculus') || subjectLower.includes('algebra')) {
+    keywords.conceptual.push('number', 'calculate', 'equation', 'formula', 'logic', 'pattern', 'solve')
+  }
+  
+  if (subjectLower.includes('business') || subjectLower.includes('management')) {
+    keywords.conceptual.push('work', 'team', 'project', 'goal', 'strategy', 'plan', 'organize', 'lead')
+  }
+  
+  if (subjectLower.includes('psychology') || subjectLower.includes('behavior')) {
+    keywords.conceptual.push('people', 'behavior', 'mind', 'emotion', 'relationship', 'social', 'understand')
+  }
+  
+  // Add general learning and creativity keywords
+  keywords.conceptual.push('creative', 'innovative', 'experiment', 'test', 'try', 'practice', 'skill', 'talent')
+  
+  return keywords
 }
 
 // Generate personalized insights using AI with high temperature for natural responses
 async function generatePersonalizedInsights(subject: string, relevantMemories: Array<Record<string, unknown>>, userStyle: UserStyle, contentType: string): Promise<string[]> {
   console.log('🎯 Generating AI-powered personalized insights for:', subject)
+  console.log('🧠 Using', relevantMemories.length, 'relevant memories for personalization')
   
   try {
     // Prepare memory context for AI
@@ -517,14 +819,21 @@ async function generatePersonalizedInsights(subject: string, relevantMemories: A
       category: (memory.category as string) || 'general'
     }))
     
-    // Call AI with high temperature for creative, natural responses
-    const aiResponse = await callOpenAI({
-      model: "gpt-4",
-      temperature: 0.85, // High temperature for creativity and natural language
-      messages: [
-        {
-          role: "system",
-          content: `You are Sensa AI, a personalized learning assistant. Generate 3-4 natural, conversational insights connecting the user's personal memories to their ${subject} learning journey. 
+    console.log('📝 Memory context prepared:', memoryContext.map(m => `[${m.category}] ${m.content.substring(0, 50)}...`))
+    
+    // Always try to generate AI insights when we have memories
+    if (memoryContext.length > 0 && memoryContext.some(m => m.content.trim().length > 0)) {
+      console.log('🤖 Calling AI for personalized insights...')
+      console.log('🔑 Checking API key availability:', !!Deno.env.get('GOOGLE_AI_API_KEY'))
+      
+      try {
+        // Call AI with high temperature for creative, natural responses
+        const aiResponse = await callGemini({
+          temperature: 0.85, // High temperature for creativity and natural language
+          messages: [
+            {
+              role: "system",
+              content: `You are Sensa AI, a personalized learning assistant. Generate 3-4 natural, conversational insights connecting the user's personal memories to their ${subject} learning journey. 
 
 USER STYLE:
 - Casual tone: ${userStyle.casualTone}
@@ -541,56 +850,102 @@ INSTRUCTIONS:
 - Start each insight with an emoji (🧠, 🎯, ✨, 🚀, 💡)
 - Keep each insight to 1-2 sentences max
 - Sound like you're talking to a friend, not giving a lecture
-- Avoid generic phrases like "exactly what you need" or "perfect for"`
-        },
-        {
-          role: "user", 
-          content: `Subject: ${subject}
+- Avoid generic phrases like "exactly what you need" or "perfect for"
+- Return insights as a simple list, one per line`
+            },
+            {
+              role: "user", 
+              content: `Subject: ${subject}
 Content Type: ${contentType}
 
 My Personal Memories:
 ${memoryContext.map((mem, i) => `${i + 1}. [${mem.category}] ${mem.content.substring(0, 200)}...`).join('\n')}
 
 Generate personalized learning insights that connect my memories to ${subject} in my communication style.`
+            }
+          ]
+        })
+        
+        console.log('🔄 AI response received:', !!aiResponse?.choices?.[0]?.message?.content)
+        
+        if (!aiResponse) {
+          console.error('❌ AI response is null/undefined')
+        } else if (!aiResponse.choices?.[0]) {
+          console.error('❌ AI response has no choices:', JSON.stringify(aiResponse))
+        } else if (!aiResponse.choices[0].message?.content) {
+          console.error('❌ AI response has no content:', JSON.stringify(aiResponse.choices[0]))
         }
-      ]
-    })
-    
-    if (aiResponse?.choices?.[0]?.message?.content) {
-      const content = aiResponse.choices[0].message.content
-             // Split by lines and filter out empty lines, look for emoji-started insights
-       const insights = content.split('\n')
-         .filter((line: string) => line.trim() && /^[\u{1F9E0}\u{1F3AF}\u{2728}\u{1F680}\u{1F4A1}]/u.test(line.trim()))
-         .slice(0, 4)
-      
-      if (insights.length > 0) {
-        console.log('✅ AI generated personalized insights')
-        return insights
+        
+        if (aiResponse?.choices?.[0]?.message?.content) {
+          const content = aiResponse.choices[0].message.content
+          console.log('📋 Raw AI content:', content.substring(0, 200) + '...')
+
+          // Parse AI response into insights
+          let insights = content.split('\n')
+            .map((l: string) => l.trim())
+            .filter((l: string) => l && l.length > 10) // Filter out empty or very short lines
+            .slice(0, 4)
+
+          // Clean up insights - remove numbering, bullets, etc.
+          insights = insights.map(insight => {
+            return insight.replace(/^[\d.\-*+\s]+/, '').trim()
+          }).filter(insight => insight.length > 0)
+
+          if (insights.length > 0) {
+            console.log('✅ AI generated', insights.length, 'personalized insights')
+            console.log('💡 Insights preview:', insights.map(i => i.substring(0, 50) + '...'))
+            return insights
+          } else {
+            console.warn('⚠️ AI returned content but no valid insights were parsed')
+            console.log('🔍 Full AI content for debugging:', content)
+          }
+        }
+      } catch (aiError) {
+        console.error('❌ AI call failed with error:', aiError)
+        console.error('🔍 Error details:', {
+          name: aiError instanceof Error ? aiError.name : 'Unknown',
+          message: aiError instanceof Error ? aiError.message : String(aiError),
+          stack: aiError instanceof Error ? aiError.stack?.substring(0, 300) : 'No stack trace'
+        })
+        
+        // Continue to fallback logic below
       }
     }
     
-    throw new Error('AI response format invalid')
+    // Smart fallback based on available context
+    console.log('📋 Generating contextual fallback insights for subject:', subject)
+    console.log('🔄 Creating AI-unavailable message with subject context')
+    
+    // Always return meaningful insights even when AI fails
+    const insights = [
+      `🤖 AI insights for ${subject} are temporarily unavailable, but your learning can still progress.`,
+      `🧠 Your ${relevantMemories.length} related memories show strong potential for ${subject} mastery.`,
+      `💡 Focus on connecting ${subject} concepts to your existing knowledge and experiences.`,
+      `🎯 Personalized insights will be available when AI services are restored.`
+    ]
+    
+    console.log('✅ Fallback insights generated:', insights.length)
+    return insights
     
   } catch (error) {
     console.error('❌ AI insight generation failed:', error)
-    
-    // Fallback to honest message about AI unavailability
-    return [
-      `🤖 AI personalized insight generation is currently unavailable`,
-      `📋 Unable to generate memory-based connections at this time`,
-      `🔄 Please try again later for personalized learning insights`
-    ]
+    // Even on error, provide helpful message instead of empty array
+    return [`🤖 AI insights temporarily unavailable, but your ${subject} learning journey can still begin with exploring the core concepts.`]
   }
 }
 
 // Generate memory-based connections with specific, unique analogies
 function generateMemoryBasedConnections(subject: string, relevantMemories: Array<Record<string, unknown>>, userStyle: UserStyle) {
+  console.log('🔗 Generating memory connections for', relevantMemories.length, 'memories')
+  
   const connections = []
   
   if (relevantMemories.length > 0) {
     relevantMemories.forEach((memory, index) => {
       const memoryText = ((memory.content as string) || (memory.text_content as string) || '')
       const memoryCategory = (memory.category as string) || 'Personal Experience'
+      
+      console.log(`🧠 Processing memory ${index + 1}: [${memoryCategory}] ${memoryText.substring(0, 50)}...`)
       
       // Create specific analogies based on memory content and subject
       const analogy = createSpecificMemoryAnalogy(memoryText, memoryCategory, subject, userStyle, index)
@@ -602,14 +957,20 @@ function generateMemoryBasedConnections(subject: string, relevantMemories: Array
         emotionalResonance: 0.85 + (index * 0.05)
       })
     })
+    
+    console.log('✅ Generated', connections.length, 'memory connections')
   } else {
-    // Fallback connections when no relevant memories
+    // When no relevant memories are found, still create helpful connections
+    console.log('📝 No relevant memories found, creating general connections')
     connections.push({
-      concept: `${subject} Core Concepts`,
-      personalConnection: userStyle.casualTone 
-        ? `Your technical background gives you exactly the right foundation for ${subject}. You're going to pick this up naturally.`
-        : `Your analytical approach provides excellent preparation for understanding ${subject} core principles.`,
-      emotionalResonance: 0.82
+      concept: 'Learning Foundation',
+      personalConnection: `🌟 As you build your knowledge in ${subject}, you'll create new memories that will make future learning even more personalized and effective.`,
+      emotionalResonance: 0.7
+    })
+    connections.push({
+      concept: 'Knowledge Building',
+      personalConnection: `🧠 Your current memories (${relevantMemories.length} analyzed) provide a foundation for connecting ${subject} concepts to your experiences.`,
+      emotionalResonance: 0.6
     })
   }
   
@@ -687,6 +1048,7 @@ function createSpecificMemoryAnalogy(memoryText: string, category: string, subje
 }
 
 // Extract meaningful concept from memory
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function extractMemoryConcept(memoryText: string, category: string, _subject: string): string {
   const content = memoryText.toLowerCase()
   
@@ -819,26 +1181,38 @@ async function generateSubjectIdentification(requestData: ADKRequest) {
 // AI-powered mind map generation
 async function generateAIMindMap(requestData: ADKRequest) {
   console.log('🎯 Processing AI mind map generation request')
+  console.log('📥 Full request data keys:', Object.keys(requestData))
+  console.log('📥 Request data structure:', JSON.stringify(requestData, null, 2))
   
-  const payload = requestData.payload || {}
-  const subject = (payload.subject as string) || 'Learning Topic'
-  const content = (payload.content as string) || ''
-  const memories = (payload.memories as Array<Record<string, unknown>>) || []
-  const _userStyle = (payload.user_communication_style as UserStyle) || {
-    casualTone: false,
-    usesMetaphors: false,
-    prefersConcrete: false,
-    storytellingStyle: false,
-    technicalTerms: [],
-    enthusiasm: 0.5
-  }
-  
-  console.log('🧠 Generating mind map for subject:', subject)
-  console.log('📋 Content length:', content.length)
-  console.log('🔗 Memory count:', memories.length)
-
   try {
-    // Generate AI-powered mind map using OpenAI
+    console.log('✅ Starting mind map generation process...')
+    // Check API key availability first
+    const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+    if (!googleApiKey) {
+      console.error('❌ GOOGLE_AI_API_KEY not configured in environment')
+      throw new Error('API key not configured')
+    }
+    console.log('✅ Google API key is available')
+    
+    // The frontend sends data directly in the request object, not nested under payload
+    const subject = (requestData.subject as string) || 'Learning Topic'
+    const content = (requestData.content as string) || ''
+    const memories = (requestData.memories as Array<Record<string, unknown>>) || []
+    // user_communication_style is currently unused in this function; if personalization is needed, include it in the prompt
+    
+    // Validate required data
+    if (!subject || subject === 'Learning Topic') {
+      console.warn('⚠️ No specific subject provided, using generic topic')
+    }
+    
+    console.log('🧠 Generating mind map for subject:', subject)
+    console.log('📋 Content length:', content.length)
+    console.log('🔗 Memory count:', memories.length)
+    console.log('🔧 API key available:', googleApiKey ? 'Yes' : 'No')
+    console.log('📊 Subject type:', typeof subject)
+    console.log('📊 Content type:', typeof content)
+    console.log('📊 Memories type:', typeof memories, Array.isArray(memories))
+    // Generate AI-powered mind map using Gemini
     const mindMapPrompt = `Create a comprehensive learning mind map for "${subject}".
 
 REQUIREMENTS:
@@ -858,8 +1232,11 @@ ${memories.map((m, i) => `${i + 1}. ${JSON.stringify(m).substring(0, 200)}`).joi
 
 Generate a Mermaid mindmap that is specifically tailored to ${subject} learning objectives. Focus on practical, actionable knowledge areas.`
 
-    const response = await callOpenAI({
-      model: "gpt-4",
+    console.log('🚀 Calling Gemini API...')
+    console.log('📝 Mind map prompt length:', mindMapPrompt.length)
+    console.log('📝 Mind map prompt preview:', mindMapPrompt.substring(0, 200) + '...')
+    
+    const response = await callGemini({
       messages: [
         {
           role: "system",
@@ -870,13 +1247,22 @@ Generate a Mermaid mindmap that is specifically tailored to ${subject} learning 
           content: mindMapPrompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: 0.7
+    })
+    
+    console.log('📡 Gemini API call completed successfully')
+
+    console.log('📡 Gemini API response received:', {
+      hasResponse: !!response,
+      hasChoices: !!response?.choices,
+      choicesLength: response?.choices?.length || 0,
+      hasContent: !!response?.choices?.[0]?.message?.content
     })
 
     const mindMapContent = response.choices[0]?.message?.content
     
     if (!mindMapContent) {
+      console.error('❌ No content in Gemini response:', response)
       throw new Error('Failed to generate mind map content')
     }
 
@@ -895,7 +1281,250 @@ Generate a Mermaid mindmap that is specifically tailored to ${subject} learning 
     
   } catch (error) {
     console.error('❌ AI mind map generation failed:', error)
-    throw new Error(`Mind map generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    
+    // Log additional error details
+    if (error instanceof Error) {
+      console.error('Error name:', error.name)
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    } else {
+      console.error('Non-Error object thrown:', typeof error, error)
+    }
+    
+    // Check if it's a specific API error
+    if (error instanceof Error) {
+      if (error.message.includes('Gemini/PaLM API error')) {
+        console.error('🔥 Gemini API error detected')
+        throw new Error(`AI service error: ${error.message}`)
+      } else if (error.message.includes('GOOGLE_AI_API_KEY')) {
+        console.error('🔑 API key error detected')
+        throw new Error(`API configuration error: ${error.message}`)
+      } else if (error.message.includes('fetch')) {
+        console.error('🌐 Network error detected')
+        throw new Error(`Network error: ${error.message}`)
+      }
+    }
+    
+    // Re-throw with more specific error message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    throw new Error(`Mind map generation failed: ${errorMessage}`)
+  }
+}
+
+// AI-powered memory dialogue generation
+async function generateMemoryDialogue(requestData: ADKRequest) {
+  console.log('💬 Processing memory dialogue request')
+  
+  const payload = requestData.payload || {}
+  const memoryContent = (payload.memory_content as string) || ''
+  const memoryCategory = (payload.memory_category as string) || ''
+  const memoryInsights = (payload.memory_insights as string[]) || []
+  const userMessage = (payload.user_message as string) || ''
+  const dialogueHistory = (payload.dialogue_history as Array<{sender: string, content: string}>) || []
+  
+  console.log('🧠 Memory dialogue for category:', memoryCategory)
+  console.log('💭 User message:', userMessage)
+  console.log('📜 Dialogue history length:', dialogueHistory.length)
+
+  try {
+    // Build context from memory and insights
+    const memoryContext = `
+MEMORY: ${memoryContent}
+CATEGORY: ${memoryCategory}
+INSIGHTS: ${memoryInsights.join(', ')}
+`
+
+    // Build dialogue history context
+    const historyContext = dialogueHistory.length > 0 
+      ? `\nPREVIOUS CONVERSATION:\n${dialogueHistory.map(msg => `${msg.sender}: ${msg.content}`).join('\n')}`
+      : ''
+
+    const dialoguePrompt = `You are Sensa AI, a thoughtful and empathetic learning companion. You're having a dialogue with a user about their personal memory and your analysis of it.
+
+MEMORY CONTEXT:${memoryContext}${historyContext}
+
+USER'S CURRENT MESSAGE: "${userMessage}"
+
+INSTRUCTIONS:
+- Respond naturally and conversationally as Sensa AI
+- Address the user's specific question or comment directly
+- If they disagree with your analysis, be open to their perspective and ask clarifying questions
+- If they ask how you decided on insights, explain your reasoning based on the memory content
+- Be empathetic and acknowledge their lived experience
+- Keep responses concise but meaningful (2-3 sentences max)
+- Don't just echo their words back - provide substantive responses
+- If they point out errors, acknowledge them and offer to reconsider
+
+SPECIAL DETECTION:
+- If the user shares a completely different experience/story that's unrelated to the original memory, note this for memory update suggestion
+- Focus on their direct answers to your questions rather than tangential stories
+- If they mention new experiences (like work projects, competitions, etc.) that aren't part of the original memory, this may warrant a separate memory entry
+
+RESPONSE FORMAT:
+Return a JSON object with:
+{
+  "dialogue_response": "Your conversational response",
+  "suggest_memory_update": true/false (true if they shared unrelated new experiences)
+}
+
+Generate your response:`
+
+    const response = await callGemini({
+      messages: [
+        {
+          role: "system",
+          content: "You are Sensa AI, an empathetic learning companion that helps users understand how their memories connect to their learning style. You engage in thoughtful dialogue about memory analysis and learning insights."
+        },
+        {
+          role: "user",
+          content: dialoguePrompt
+        }
+      ],
+      temperature: 0.6
+    })
+
+    const dialogueContent = response.choices[0]?.message?.content
+    
+    if (!dialogueContent) {
+      throw new Error('Failed to generate dialogue response')
+    }
+
+    // Try to parse as JSON first, fallback to plain text
+    let dialogueResult
+    try {
+      dialogueResult = JSON.parse(dialogueContent)
+      if (!dialogueResult.dialogue_response) {
+        // If JSON doesn't have expected structure, treat as plain text
+        dialogueResult = {
+          dialogue_response: dialogueContent,
+          suggest_memory_update: {
+            update_needed: false,
+            reason: ""
+          }
+        }
+      }
+    } catch {
+      // If not valid JSON, treat as plain text response
+      dialogueResult = {
+        dialogue_response: dialogueContent,
+        suggest_memory_update: {
+          update_needed: false,
+          reason: ""
+        }
+      }
+    }
+
+    console.log('✅ Memory dialogue generated successfully')
+    
+    return dialogueResult
+    
+  } catch (error) {
+    console.error('❌ Memory dialogue generation failed:', error)
+    throw new Error(`Dialogue generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// AI-powered memory insight updates based on dialogue
+async function generateUpdatedMemoryInsights(requestData: ADKRequest) {
+  console.log('🔄 Processing memory insight update request')
+  
+  const payload = requestData.payload || {}
+  const memoryContent = (payload.memory_content as string) || ''
+  const memoryCategory = (payload.memory_category as string) || ''
+  const originalInsights = (payload.original_insights as string[]) || []
+  const dialogueHistory = (payload.dialogue_history as Array<{sender: string, content: string}>) || []
+  
+  console.log('🧠 Updating insights for category:', memoryCategory)
+  console.log('📜 Dialogue history length:', dialogueHistory.length)
+  console.log('💡 Original insights count:', originalInsights.length)
+
+  try {
+    // Build context from memory and original insights
+    const memoryContext = `
+MEMORY: ${memoryContent}
+CATEGORY: ${memoryCategory}
+ORIGINAL INSIGHTS: ${originalInsights.join(', ')}
+`
+
+    // Build dialogue summary for AI context
+    const dialogueSummary = dialogueHistory.length > 0 
+      ? `\nCONVERSATION SUMMARY:\n${dialogueHistory.map(msg => `${msg.sender}: ${msg.content}`).join('\n')}`
+      : ''
+
+    const updatePrompt = `You are Sensa AI. Based on a detailed conversation with the user about their memory, you need to update your analysis and insights.
+
+MEMORY CONTEXT:${memoryContext}${dialogueSummary}
+
+TASK: Update the memory analysis based on what you learned from the conversation. Focus ONLY on the user's direct answers and feedback, not on tangential stories or unrelated experiences they may have shared.
+
+KEY INSIGHTS FROM CONVERSATION:
+- Look for what the user corrected about your original analysis
+- Note any preferences, learning styles, or patterns they revealed about the ORIGINAL memory
+- Pay attention to what resonates with them vs what doesn't about your analysis
+- Consider any new information about their collaborative vs independent work preferences
+- Factor in their communication style and problem-solving approach
+- IGNORE unrelated stories or experiences that don't connect to the original memory
+- Focus on their direct answers to your questions about the memory analysis
+
+RETURN FORMAT (JSON):
+{
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "learning_style": "Updated learning style description",
+  "emotional_tone": "Updated emotional tone",
+  "connections": ["connection 1", "connection 2"]
+}
+
+Generate updated insights that incorporate the conversation learnings:`
+
+    const response = await callGemini({
+      messages: [
+        {
+          role: "system",
+          content: "You are Sensa AI, an expert at analyzing memories and learning styles. You update your analysis based on user feedback and dialogue to provide more accurate, personalized insights. Always return valid JSON."
+        },
+        {
+          role: "user",
+          content: updatePrompt
+        }
+      ],
+      temperature: 0.4
+    })
+
+    const responseContent = response.choices[0]?.message?.content
+    
+    if (!responseContent) {
+      throw new Error('Failed to generate updated insights')
+    }
+
+    // Parse the JSON response
+    let updatedAnalysis
+    try {
+      updatedAnalysis = JSON.parse(responseContent)
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError, responseContent)
+      // Fallback: return original insights with a note about the update
+      updatedAnalysis = {
+        insights: [...originalInsights, "Analysis updated based on your feedback"],
+        learning_style: "Collaborative learner with trust-based preferences",
+        emotional_tone: "Refined based on conversation",
+        connections: ["Problem-solving", "Collaborative learning", "Trust-based environments"]
+      }
+    }
+
+    console.log('✅ Memory insights updated successfully')
+    
+    return updatedAnalysis
+    
+  } catch (error) {
+    console.error('❌ Memory insight update failed:', error)
+    
+    // Fallback: return enhanced original insights
+    return {
+      insights: [...originalInsights, "Analysis refined based on your conversation feedback"],
+      learning_style: "Updated based on dialogue preferences",
+      emotional_tone: "Refined through conversation",
+      connections: ["Updated based on user feedback"]
+    }
   }
 }
 

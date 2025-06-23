@@ -64,8 +64,7 @@ Focus on educational personalization potential."""
             )
         except Exception as e:
             self.log(f"Error analyzing memory: {str(e)}", "ERROR")
-            # Return fallback analysis
-            return self._generate_fallback_analysis(memory_text, category)
+            raise
     
     async def synthesize_learning_profile(self, memory_analyses: list) -> Dict[str, Any]:
         """Create a comprehensive learning profile from multiple memory analyses"""
@@ -103,7 +102,7 @@ Focus on actionable insights for personalized learning."""
             return self.extract_json_from_text(response_text)
         except Exception as e:
             self.log(f"Error synthesizing learning profile: {str(e)}", "ERROR")
-            return self._generate_fallback_profile()
+            raise
     
     async def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Main processing method for the Memory Analysis Agent"""
@@ -125,22 +124,4 @@ Focus on actionable insights for personalized learning."""
         else:
             raise ValueError(f"Unknown action: {action}")
     
-    def _generate_fallback_analysis(self, content: str, category: str) -> MemoryAnalysisResult:
-        """Generate fallback analysis when AI processing fails"""
-        return MemoryAnalysisResult(
-            themes=['AI Analysis Unavailable'],
-            emotional_tone='AI service temporarily unavailable',
-            learning_indicators=['AI analysis required'],
-            confidence=0.0,
-            insights='AI memory analysis is currently unavailable. Please try again later.'
-        )
-    
-    def _generate_fallback_profile(self) -> Dict[str, Any]:
-        """Generate fallback learning profile"""
-        return {
-            'dominant_learning_style': 'AI Analysis Unavailable',
-            'emotional_anchors': ['AI service unavailable'],
-            'cognitive_patterns': ['AI analysis required'],
-            'motivational_triggers': ['AI service unavailable'],
-            'study_recommendations': ['AI analysis currently unavailable. Please try again later.']
-        } 
+    # Fallback generation methods removed – rely on upstream error handling. 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSmartNavigation } from '../hooks/useAuth';
@@ -13,22 +13,16 @@ import {
   Star, 
   TrendingUp, 
   BookOpen, 
-  Sparkles, 
   Camera, 
   Music, 
-  Edit3, 
   Plus,
   ChevronRight,
-  Award,
-  Clock,
-  Users,
   Globe,
-  Search,
-  Filter,
-  Calendar,
-  Trash2,
-  ChevronDown,
-  ChevronUp
+  MessageCircle,
+  ArrowRight,
+  Edit,
+  Save,
+  X
 } from 'lucide-react';
 import { sensaBrandColors } from '../styles/brandColors';
 import { useMemoryStore, useUIStore } from '../stores';
@@ -39,6 +33,17 @@ const MemoryBank: React.FC = () => {
   const { goBack } = useSmartNavigation();
   const [selectedMemory, setSelectedMemory] = React.useState<string | null>(null);
   const [profileView, setProfileView] = React.useState<'memories' | 'profile' | 'connections'>('memories');
+  
+  // Dialogue functionality state
+  const [dialogueMemoryId, setDialogueMemoryId] = useState<string | null>(null);
+  const [dialogueInput, setDialogueInput] = useState('');
+  const [dialogueMessages, setDialogueMessages] = useState<Array<{id: string, sender: 'user' | 'sensa', content: string, timestamp: Date}>>([]);
+  const [isDialogueProcessing, setIsDialogueProcessing] = useState(false);
+
+  // Edit functionality state
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Zustand stores
   const { 
@@ -60,6 +65,20 @@ const MemoryBank: React.FC = () => {
   useEffect(() => {
     loadMemoryData();
   }, []);
+
+  // Preserve dialogue state during memory updates
+  useEffect(() => {
+    // This effect helps maintain dialogue state when memories are updated
+    if (dialogueMemoryId && dialogueMessages.length === 0) {
+      // Reinitialize dialogue if it was lost
+      setDialogueMessages([{
+        id: 'restored',
+        sender: 'sensa',
+        content: `Let's continue our conversation about your memory analysis. What would you like to explore?`,
+        timestamp: new Date()
+      }]);
+    }
+  }, [memories, dialogueMemoryId, dialogueMessages.length]);
 
   const loadMemoryData = async () => {
     try {
@@ -104,7 +123,14 @@ const MemoryBank: React.FC = () => {
         });
       } else {
         setMemories([]);
-        setLearningProfile(null);
+        setLearningProfile({
+          dominantStyle: 'N/A - Share memories to discover',
+          emotionalAnchors: ['Share memories to discover your emotional anchors'],
+          cognitivePatterns: ['Share memories to discover your cognitive patterns'],
+          preferredEnvironments: ['Share memories to discover your preferred environments'],
+          motivationalTriggers: ['Share memories to discover your motivational triggers'],
+          courseRecommendations: ['Share memories to get personalized course recommendations']
+        });
       }
     } catch (error) {
       console.error('Failed to load memory data:', error);
@@ -126,8 +152,9 @@ const MemoryBank: React.FC = () => {
       try {
         const { callEdgeFunction } = await import('../services/edgeFunctions');
         const analysis = await callEdgeFunction('adk-agents', {
-          task: 'analyze_memory',
+          agent_type: 'memory_analysis',
           payload: {
+            task: 'analyze_memory',
             memory_content: memory.memory,
             category: memory.category
           }
@@ -147,7 +174,13 @@ const MemoryBank: React.FC = () => {
           };
           
           // Update the memories array
-          setMemories(prev => prev.map(m => m.id === memory.id ? updatedMemory : m));
+          setMemories((prev: any) => {
+            if (!Array.isArray(prev)) {
+              console.warn('Memories is not an array, resetting to empty array');
+              return [updatedMemory];
+            }
+            return prev.map((m: any) => m.id === memory.id ? updatedMemory : m);
+          });
           
           console.log(`✅ Memory ${memory.id} analyzed successfully`);
         } else {
@@ -180,7 +213,7 @@ const MemoryBank: React.FC = () => {
     }
 
     // Analyze actual memories to generate profile
-    const styles = memories.map(m => m.learningStyle).filter(s => s !== 'Analysis pending');
+    const styles = (memories || []).map(m => m.learningStyle).filter(s => s !== 'Analysis pending');
     const dominantStyle = styles.length > 0 ? styles[0] : 'Visual-Kinesthetic Learner';
 
     return {
@@ -192,6 +225,320 @@ const MemoryBank: React.FC = () => {
       courseRecommendations: ['Computer Science', 'Psychology', 'Design Thinking']
     };
   };
+
+  // Handle dialogue message sending
+  const handleDialogueMessage = useCallback(async (memoryId: string, userMessage: string) => {
+    if (!userMessage.trim()) return;
+
+    // Check if user wants to end the conversation
+    const isDoneSignal = /\b(i'm done|im done|done|finished|that's it|thats it|end|finish)\b/i.test(userMessage.trim());
+    
+    if (isDoneSignal) {
+      // Add user message and trigger insight update
+      const userMsg = {
+        id: `user_${Date.now()}`,
+        sender: 'user' as const,
+        content: userMessage,
+        timestamp: new Date()
+      };
+      setDialogueMessages(prev => [...prev, userMsg]);
+      setDialogueInput('');
+      
+      // Add a closing message from Sensa
+      const closingMsg = {
+        id: `sensa_${Date.now()}`,
+        sender: 'sensa' as const,
+        content: "Perfect! Let me update your memory analysis based on what you've shared. I'll focus on your direct answers to refine the insights.",
+        timestamp: new Date()
+      };
+      setDialogueMessages(prev => [...prev, closingMsg]);
+      
+      // Trigger the insight update after a short delay
+      setTimeout(() => {
+        handleDialogueClose(memoryId);
+      }, 1500);
+      
+      return;
+    }
+
+    // Add user message
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      sender: 'user' as const,
+      content: userMessage,
+      timestamp: new Date()
+    };
+
+    setDialogueMessages(prev => [...prev, userMsg]);
+    setDialogueInput('');
+    setIsDialogueProcessing(true);
+
+    try {
+      // Find the memory being discussed
+      const currentMemory = Array.isArray(memories) ? memories.find(m => m.id === memoryId) : null;
+      
+      if (!currentMemory) {
+        throw new Error('Memory not found');
+      }
+
+      // Call AI backend for real dialogue response
+      const { callEdgeFunction } = await import('../services/edgeFunctions');
+      const response = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'memory_dialogue',
+        payload: {
+          memory_content: currentMemory.memory,
+          memory_category: currentMemory.category,
+          memory_insights: currentMemory.insights || [],
+          user_message: userMessage,
+          dialogue_history: dialogueMessages.map(msg => ({
+            sender: msg.sender,
+            content: msg.content
+          }))
+        }
+      });
+
+      let aiResponse = '';
+      
+      if (response && response.success && response.dialogue_response) {
+        let dialogueContent = response.dialogue_response;
+        
+        // Check if the response is a JSON string that needs parsing
+        if (typeof dialogueContent === 'string' && dialogueContent.trim().startsWith('```json')) {
+          try {
+            // Extract JSON from code block
+            const jsonMatch = dialogueContent.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+            if (jsonMatch) {
+              const parsedResponse = JSON.parse(jsonMatch[1]);
+              dialogueContent = parsedResponse.dialogue_response || dialogueContent;
+            }
+          } catch {
+            console.log('Could not parse JSON response, using as-is');
+          }
+        } else if (typeof dialogueContent === 'string' && dialogueContent.trim().startsWith('{')) {
+          try {
+            // Try to parse as direct JSON
+            const parsedResponse = JSON.parse(dialogueContent);
+            dialogueContent = parsedResponse.dialogue_response || dialogueContent;
+          } catch {
+            console.log('Could not parse JSON response, using as-is');
+          }
+        }
+        
+        aiResponse = dialogueContent;
+        
+        // Check if AI suggests updating the memory itself
+        if (response.suggest_memory_update?.update_needed) {
+          aiResponse += `\n\n💡 **Suggestion**: ${response.suggest_memory_update.reason} Would you like to create a new memory entry to capture these additional insights?`;
+        }
+      } else {
+        // If AI fails, show honest error message instead of fallback
+        throw new Error('AI dialogue service unavailable');
+      }
+
+      const aiMsg = {
+        id: `ai_${Date.now()}`,
+        sender: 'sensa' as const,
+        content: aiResponse,
+        timestamp: new Date()
+      };
+
+      setDialogueMessages(prev => [...prev, aiMsg]);
+    } catch (error) {
+      console.error('Dialogue error:', error);
+      const errorMsg = {
+        id: `error_${Date.now()}`,
+        sender: 'sensa' as const,
+        content: "I'm having trouble connecting to my AI dialogue system right now. Please try again in a moment, or refresh the page if the issue persists.",
+        timestamp: new Date()
+      };
+      setDialogueMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsDialogueProcessing(false);
+    }
+  }, [memories, dialogueMessages]);
+
+  // Handle dialogue close and update insights based on conversation
+  const handleDialogueClose = useCallback(async (memoryId: string) => {
+    if (dialogueMessages.length <= 1) {
+      // No meaningful conversation happened, just close
+      setDialogueMemoryId(null);
+      setDialogueMessages([]);
+      return;
+    }
+
+    try {
+      // Find the memory being discussed
+      const currentMemory = Array.isArray(memories) ? memories.find(m => m.id === memoryId) : null;
+      
+      if (!currentMemory) {
+        setDialogueMemoryId(null);
+        setDialogueMessages([]);
+        return;
+      }
+
+      // Call AI to generate updated insights based on dialogue
+      const { callEdgeFunction } = await import('../services/edgeFunctions');
+      const response = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'update_memory_insights',
+        payload: {
+          memory_content: currentMemory.memory,
+          memory_category: currentMemory.category,
+          original_insights: currentMemory.insights || [],
+          dialogue_history: dialogueMessages.map(msg => ({
+            sender: msg.sender,
+            content: msg.content
+          }))
+        }
+      });
+
+      if (response && response.success && response.updated_insights) {
+        // Extract insights from the new structured format
+        const insights = response.updated_insights.insights || [];
+        const extractedInsights = Array.isArray(insights) && insights.length > 0 && typeof insights[0] === 'object'
+          ? insights.map((item: any) => item.insight || item)
+          : insights;
+
+        // Update the memory with new insights
+        const updatedMemory = {
+          ...currentMemory,
+          insights: extractedInsights.length > 0 ? extractedInsights : currentMemory.insights,
+          learningStyle: response.updated_insights.learning_style || currentMemory.learningStyle,
+          emotionalTone: response.updated_insights.emotional_tone || currentMemory.emotionalTone,
+          connections: response.updated_insights.connections || currentMemory.connections
+        };
+
+        // Update the memories array
+        setMemories((prev: any) => {
+          if (!Array.isArray(prev)) {
+            return [updatedMemory];
+          }
+          return prev.map((m: any) => m.id === memoryId ? updatedMemory : m);
+        });
+
+        // Update in database
+        const { memoryService } = await import('../services/supabaseServices');
+        await memoryService.updateMemoryAnalysis(memoryId, {
+          insights: extractedInsights,
+          dominant_learning_style: response.updated_insights.learning_style,
+          emotional_tone: response.updated_insights.emotional_tone,
+          themes: response.updated_insights.connections
+        });
+
+        addNotification({
+          type: 'success',
+          title: 'Memory Analysis Updated',
+          message: 'Your memory insights have been refined based on our conversation.',
+          duration: 4000
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update memory insights:', error);
+      addNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Could not update memory insights. Your conversation has been saved.',
+        duration: 4000
+      });
+    } finally {
+      // Close the dialogue
+      setDialogueMemoryId(null);
+      setDialogueMessages([]);
+    }
+  }, [memories, dialogueMessages, addNotification, setMemories]);
+
+  // Handle memory editing
+  const handleEditMemory = useCallback((memoryId: string, currentContent: string) => {
+    setEditingMemoryId(memoryId);
+    setEditingContent(currentContent);
+  }, []);
+
+  const handleSaveEdit = useCallback(async (memoryId: string) => {
+    if (!editingContent.trim()) return;
+
+    setIsSavingEdit(true);
+    try {
+      // Update memory content in database
+      await memoryService.updateMemoryContent(memoryId, editingContent.trim());
+
+      // Update local memory
+      setMemories((prev: any) => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.map((m: any) => 
+          m.id === memoryId 
+            ? { ...m, memory: editingContent.trim() }
+            : m
+        );
+      });
+
+      // Reset edit state
+      setEditingMemoryId(null);
+      setEditingContent('');
+
+      addNotification({
+        type: 'success',
+        title: 'Memory Updated',
+        message: 'Your memory has been successfully updated.',
+        duration: 3000
+      });
+
+      // Re-analyze the updated memory
+      const { callEdgeFunction } = await import('../services/edgeFunctions');
+      const analysis = await callEdgeFunction('adk-agents', {
+        agent_type: 'memory_analysis',
+        payload: {
+          task: 'analyze_memory',
+          memory_content: editingContent.trim(),
+          category: Array.isArray(memories) ? 
+            memories.find((m: any) => m.id === memoryId)?.category || 'personal' : 'personal'
+        }
+      });
+
+      if (analysis && analysis.success) {
+        // Update memory with new analysis
+        await memoryService.updateMemoryAnalysis(memoryId, analysis.analysis);
+        
+        setMemories((prev: any) => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map((m: any) => 
+            m.id === memoryId 
+              ? { 
+                  ...m, 
+                  insights: analysis.analysis?.insights || m.insights,
+                  learningStyle: analysis.analysis?.dominant_learning_style || m.learningStyle,
+                  emotionalTone: analysis.analysis?.emotional_tone || m.emotionalTone,
+                  connections: analysis.analysis?.themes || m.connections
+                }
+              : m
+          );
+        });
+
+        addNotification({
+          type: 'info',
+          title: 'Analysis Updated',
+          message: 'Your memory has been re-analyzed with new insights.',
+          duration: 3000
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to update memory:', error);
+      addNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Could not update your memory. Please try again.',
+        duration: 4000
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }, [editingContent, memories, setMemories, addNotification]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMemoryId(null);
+    setEditingContent('');
+  }, []);
 
   const courseConnections = hasMemories() ? [
     {
@@ -329,7 +676,7 @@ const MemoryBank: React.FC = () => {
                   </span>
                 </div>
 
-                {hasMemories() ? (
+                {hasMemories() && Array.isArray(memories) ? (
                   memories.map((memory, index) => (
                     <motion.div
                       key={memory.id}
@@ -364,7 +711,52 @@ const MemoryBank: React.FC = () => {
                         <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${selectedMemory === memory.id ? 'rotate-90' : ''}`} />
                       </div>
 
-                      <p className="text-gray-700 text-sm mb-4 line-clamp-2">{memory.memory}</p>
+                      {editingMemoryId === memory.id ? (
+                        <div className="mb-4">
+                          <textarea
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none resize-none"
+                            rows={4}
+                            placeholder="Edit your memory..."
+                          />
+                          <div className="flex space-x-2 mt-2">
+                            <motion.button
+                              onClick={() => handleSaveEdit(memory.id)}
+                              disabled={isSavingEdit || !editingContent.trim()}
+                              className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <Save className="w-3 h-3" />
+                              <span>{isSavingEdit ? 'Saving...' : 'Save'}</span>
+                            </motion.button>
+                            <motion.button
+                              onClick={handleCancelEdit}
+                              disabled={isSavingEdit}
+                              className="flex items-center space-x-1 px-3 py-1 bg-gray-500 text-white rounded-lg text-xs hover:bg-gray-600 transition-colors disabled:opacity-50"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <X className="w-3 h-3" />
+                              <span>Cancel</span>
+                            </motion.button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative group mb-4">
+                          <p className="text-gray-700 text-sm line-clamp-2">{memory.memory}</p>
+                          <motion.button
+                            onClick={() => handleEditMemory(memory.id, memory.memory)}
+                            className="absolute top-0 right-0 p-1 bg-white border border-gray-200 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            title="Edit memory"
+                          >
+                            <Edit className="w-3 h-3 text-gray-600" />
+                          </motion.button>
+                        </div>
+                      )}
 
                       <div className="flex items-center space-x-4 text-xs text-gray-500 mb-4">
                         <span className="flex items-center space-x-1">
@@ -413,6 +805,149 @@ const MemoryBank: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+
+                              {/* Question Analysis Button */}
+                              <div className="border-t border-gray-100 pt-4">
+                                <motion.button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (dialogueMemoryId === memory.id) {
+                                      // When closing dialogue, update insights based on conversation
+                                      handleDialogueClose(memory.id);
+                                    } else {
+                                      setDialogueMemoryId(memory.id);
+                                      setDialogueMessages([{
+                                        id: 'initial',
+                                        sender: 'sensa',
+                                        content: `I analyzed your memory about ${memory.category.toLowerCase()} and found these insights. What part of my analysis resonates with you, or would you like to explore a different perspective?`,
+                                        timestamp: new Date()
+                                      }]);
+                                    }
+                                  }}
+                                  className={`w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                                    dialogueMemoryId === memory.id
+                                      ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white'
+                                      : 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 hover:from-purple-100 hover:to-indigo-100'
+                                  }`}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                  <span>{dialogueMemoryId === memory.id ? 'Close Dialogue' : 'Question This Analysis'}</span>
+                                </motion.button>
+                              </div>
+
+                              {/* Inline Dialogue Interface */}
+                              <AnimatePresence>
+                                {dialogueMemoryId === memory.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="border-t border-gray-100 pt-4 mt-4"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                  >
+                                    <div 
+                                      className="bg-gray-50 rounded-lg p-4 space-y-3"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <h5 className="font-medium text-gray-800 flex items-center">
+                                        <Brain className="w-4 h-4 mr-2 text-purple-600" />
+                                        Dialogue with Sensa AI
+                                      </h5>
+                                      
+                                      {/* Messages */}
+                                      <div 
+                                        className="max-h-40 overflow-y-auto space-y-2"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        {dialogueMessages.map((msg) => (
+                                          <div
+                                            key={msg.id}
+                                            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                                          >
+                                            <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                                              msg.sender === 'user'
+                                                ? 'bg-purple-500 text-white'
+                                                : 'bg-white border border-gray-200 text-gray-700'
+                                            }`}>
+                                              {msg.content}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {isDialogueProcessing && (
+                                          <div className="flex justify-start">
+                                            <div className="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm">
+                                              <motion.div
+                                                animate={{ opacity: [0.5, 1, 0.5] }}
+                                                transition={{ duration: 1.5, repeat: Infinity }}
+                                              >
+                                                Sensa is thinking...
+                                              </motion.div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Input */}
+                                      <div 
+                                        className="flex space-x-2"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        <input
+                                          type="text"
+                                          value={dialogueInput}
+                                          onChange={(e) => setDialogueInput(e.target.value)}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
+                                          onFocus={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
+                                          placeholder="Share your thoughts about this analysis..."
+                                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none"
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && dialogueInput.trim() && !isDialogueProcessing) {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              handleDialogueMessage(memory.id, dialogueInput.trim());
+                                            }
+                                          }}
+                                          disabled={isDialogueProcessing}
+                                        />
+                                        <motion.button
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDialogueMessage(memory.id, dialogueInput.trim());
+                                          }}
+                                          disabled={!dialogueInput.trim() || isDialogueProcessing}
+                                          className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          whileHover={{ scale: dialogueInput.trim() && !isDialogueProcessing ? 1.05 : 1 }}
+                                          whileTap={{ scale: dialogueInput.trim() && !isDialogueProcessing ? 0.95 : 1 }}
+                                        >
+                                          <ArrowRight className="w-4 h-4" />
+                                        </motion.button>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                           </motion.div>
                         )}
@@ -455,7 +990,7 @@ const MemoryBank: React.FC = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-indigo-700">Learning Insights</span>
                       <span className="font-bold text-indigo-800">
-                        {memories.reduce((acc, m) => acc + m.insights.length, 0)}
+                        {Array.isArray(memories) ? memories.reduce((acc, m) => acc + (m.insights?.length || 0), 0) : 0}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">

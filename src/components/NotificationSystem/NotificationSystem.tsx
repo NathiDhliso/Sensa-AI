@@ -1,8 +1,47 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { X, AlertCircle, Info, XCircle } from 'lucide-react';
 import { useUIStore } from '../../stores';
 import styles from '../../styles/components/NotificationSystem.module.css';
+
+interface AnimatedCheckmarkProps {
+  size?: number;
+  className?: string;
+}
+
+const AnimatedCheckmark: React.FC<AnimatedCheckmarkProps> = ({ size = 24, className = "" }) => {
+  return (
+    <motion.svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+    >
+      <motion.circle
+        cx="12"
+        cy="12"
+        r="10"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+      />
+      <motion.path
+        d="m9 12 2 2 4-4"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3, ease: "easeInOut" }}
+      />
+    </motion.svg>
+  );
+};
 
 const NotificationSystem: React.FC = () => {
   const { notifications, removeNotification } = useUIStore();
@@ -12,35 +51,20 @@ const NotificationSystem: React.FC = () => {
     notification => !(notification.title === 'Dashboard Updated' && notification.message === 'Your latest data has been loaded successfully')
   );
 
-  const getNotificationIcon = (type: NotificationType) => {
-    const baseClass = 'w-5 h-5 flex-shrink-0';
+  const getIcon = (type: string) => {
+    const iconClass = "w-5 h-5 flex-shrink-0";
     
     switch (type) {
       case 'success':
-        return <CheckCircle className={`${baseClass} text-green-500`} />;
+        return <AnimatedCheckmark size={20} className={iconClass} />;
       case 'error':
-        return <AlertCircle className={`${baseClass} text-red-500`} />;
+        return <XCircle className={iconClass} />;
       case 'warning':
-        return <AlertTriangle className={`${baseClass} text-yellow-500`} />;
+        return <AlertCircle className={iconClass} />;
       case 'info':
+        return <Info className={iconClass} />;
       default:
-        return <Info className={`${baseClass} text-blue-500`} />;
-    }
-  };
-
-  const getNotificationStyle = (type: NotificationType) => {
-    const baseClass = 'border-l-4 shadow-lg backdrop-blur-sm';
-    
-    switch (type) {
-      case 'success':
-        return `${baseClass} bg-green-50/90 border-green-400 text-green-800`;
-      case 'error':
-        return `${baseClass} bg-red-50/90 border-red-400 text-red-800`;
-      case 'warning':
-        return `${baseClass} bg-yellow-50/90 border-yellow-400 text-yellow-800`;
-      case 'info':
-      default:
-        return `${baseClass} bg-blue-50/90 border-blue-400 text-blue-800`;
+        return <Info className={iconClass} />;
     }
   };
 
@@ -116,7 +140,7 @@ const NotificationSystem: React.FC = () => {
             className={getNotificationClasses(notification.type)}
           >
             <div className={styles.notificationIcon}>
-              {getNotificationIcon(notification.type)}
+              {getIcon(notification.type)}
             </div>
             <div className={styles.notificationContent}>
               <h4 className={`${styles.notificationTitle} ${getTitleClass(notification.type)}`}>

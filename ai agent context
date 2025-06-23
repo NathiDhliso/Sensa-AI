@@ -1,0 +1,4 @@
+✅ NO hardcoded fallbacks when AI should be doing the work
+✅ Show honest "AI unavailable" messages when AI fails
+✅ Always use --use-api flag when deploying edge functions
+✅ Pure AI-powered responses only - no fake template content

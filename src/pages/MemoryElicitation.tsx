@@ -119,8 +119,9 @@ const MemoryElicitation: React.FC = () => {
       try {
         const { callEdgeFunction } = await import('../services/edgeFunctions');
         const analysis = await callEdgeFunction('adk-agents', {
-          task: 'analyze_memory',
+          agent_type: 'memory_analysis',
           payload: {
+            task: 'analyze_memory',
             memory_content: memory,
             category: category
           }
