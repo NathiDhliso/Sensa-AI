@@ -1338,48 +1338,65 @@ mindmap
       mindMapPrompt = promptParts.join('\n');
     } else {
       // Generic subject prompt
-      mindMapPrompt = `Create a comprehensive learning mind map for "${subject}".
+      mindMapPrompt = `Create a concise, well-organized mind map for "${subject}" based STRICTLY on the provided content.
 
-REQUIREMENTS:
+STRICT REQUIREMENTS:
 - Use Mermaid mindmap syntax
 - Create a circular clockwise structure starting at 12 o'clock
 - Include 4 main branches: Foundations (12 o'clock), Applications (3 o'clock), Assessment (6 o'clock), Advanced Topics (9 o'clock)
-- Make it specific to ${subject}, not generic
-- Include relevant subtopics for each branch
-- Use emojis sparingly and ensure they don't break syntax
-- Make it educational and practical
-- IMPORTANT: Keep node text simple - avoid special characters like quotes, parentheses in node labels
-- Each line should have proper indentation (2 spaces per level)
-- Ensure all nodes are properly closed with parentheses
+- IMPORTANT: Only include information directly from the provided content below
+- DO NOT add creative interpretations or external knowledge
+- Summarize and group related concepts concisely
+- Each main branch should have 2-4 sub-branches maximum
+- Keep node text short (3-5 words maximum per node)
+- Use simple, clear language without jargon unless it's in the source material
+- NO emojis or special formatting
+- Avoid redundancy - group similar concepts together
+- Focus on the most important concepts only
+- If a branch doesn't have content from the source material, omit it
 
-CONTENT CONTEXT:
-${contentStr.substring(0, 1000)}
+UPLOADED CONTENT TO ANALYZE:
+${contentStr.substring(0, 3000)}
 
-USER MEMORIES FOR PERSONALIZATION:
-${memories.map((m, i) => {
-  const memStr = JSON.stringify(m);
-  return `${i + 1}. ${memStr.substring(0, 200)}${memStr.length > 200 ? '...' : ''}`;
-}).join('\n')}
+CRITICAL INSTRUCTIONS:
+1. Extract ONLY information present in the uploaded content above
+2. Summarize aggressively - combine related ideas into single nodes
+3. Prioritize clarity over comprehensiveness
+4. If you're unsure about including something, leave it out
+5. Maximum 3 levels of hierarchy (root -> main branches -> sub-branches)
+6. Each main branch should represent a major theme from the content
+7. Group similar concepts together to avoid repetition
 
-EXAMPLE FORMAT:
+EXAMPLE FORMAT (adjust based on actual content):
 mindmap
-  root((Subject Name))
+  root((${subject}))
     Foundations
-      Core Concepts
-        Concept 1
-        Concept 2
-      Prerequisites
-        Prerequisite 1
-        Prerequisite 2
+      Core Concept Group
+        Key Term 1
+        Key Term 2
+      Essential Principles
+        Principle A
+        Principle B
     Applications
-      Practical Skills
-        Skill 1
-        Skill 2
-      Real World Use
+      Practical Uses
         Use Case 1
         Use Case 2
+      Implementation
+        Method 1
+        Method 2
+    Assessment
+      Evaluation Methods
+        Type 1
+        Type 2
+    Advanced Topics
+      Specialized Areas
+        Area 1
+        Area 2
+      Future Directions
+        Trend 1
+        Trend 2
 
-Generate a Mermaid mindmap that is specifically tailored to ${subject} learning objectives. Focus on practical, actionable knowledge areas. Follow the example format above.`
+Generate a mind map that ONLY uses information from the provided content. Be concise and focused.`
     }
 
     console.log('🚀 Calling Gemini API...')
@@ -1390,14 +1407,14 @@ Generate a Mermaid mindmap that is specifically tailored to ${subject} learning 
       messages: [
         {
           role: "system",
-          content: "You are an expert educational content creator specializing in mind maps. Create detailed, subject-specific learning mind maps using Mermaid syntax. Always start with 'mindmap' and use proper Mermaid mindmap format."
+          content: "You are a precise content summarizer specializing in educational mind maps. Create concise, content-based mind maps using Mermaid syntax. Extract and organize ONLY information present in the provided content. Avoid adding external knowledge or creative interpretations. Focus on clear summarization and logical grouping. Always start with 'mindmap' and use proper Mermaid mindmap format."
         },
         {
           role: "user",
           content: mindMapPrompt
         }
       ],
-      temperature: 0.7
+      temperature: 0.4
     })
     
     console.log('📡 Gemini API call completed successfully')
