@@ -20,8 +20,16 @@ console.log("Hello from Functions!")
 // The function still accepts the same `payload` object that previously matched
 // Calls Google Gemini API with a similar interface for easy migration
 async function callGemini(payload: Record<string, unknown>) {
+  console.log('🎯 callGemini function started')
   const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  console.log('🔑 Google API Key check:', {
+    exists: !!googleApiKey,
+    length: googleApiKey?.length || 0,
+    firstChars: googleApiKey ? googleApiKey.substring(0, 10) + '...' : 'NOT SET'
+  })
+  
   if (!googleApiKey) {
+    console.error('❌ GOOGLE_AI_API_KEY not found in environment')
     throw new Error('GOOGLE_AI_API_KEY not configured')
   }
 
@@ -137,11 +145,19 @@ interface ADKRequest {
 }
 
 serve(async (req) => {
+  console.log('🚀 ADK Edge Function started')
+  console.log('📝 Request method:', req.method)
+  console.log('🔑 Environment check:', {
+    hasGoogleKey: !!Deno.env.get('GOOGLE_AI_API_KEY'),
+    googleKeyLength: Deno.env.get('GOOGLE_AI_API_KEY')?.length || 0
+  })
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log('📥 Parsing request body...')
     const requestData: ADKRequest = await req.json()
     console.log('🤖 ADK Request received:', {
       task: requestData.task,
@@ -162,11 +178,17 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ ADK agents error:', error)
+    console.error('📊 Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    })
     
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to process ADK request'
+        error: error instanceof Error ? error.message : 'Failed to process ADK request',
+        details: error instanceof Error ? error.stack : undefined
       }),
       { 
         status: 500,
@@ -1196,7 +1218,18 @@ async function generateAIMindMap(requestData: ADKRequest) {
     
     // The frontend sends data directly in the request object, not nested under payload
     const subject = (requestData.subject as string) || 'Learning Topic'
-    const content = (requestData.content as string) || ''
+    // Handle content that might be an object (syllabus array) or string
+    let content = ''
+    const rawContent = requestData.content
+    if (rawContent) {
+      if (typeof rawContent === 'string') {
+        content = rawContent
+      } else if (Array.isArray(rawContent)) {
+        content = (rawContent as string[]).join('\n')
+      } else if (typeof rawContent === 'object') {
+        content = JSON.stringify(rawContent)
+      }
+    }
     const memories = (requestData.memories as Array<Record<string, unknown>>) || []
     // user_communication_style is currently unused in this function; if personalization is needed, include it in the prompt
     
@@ -1213,7 +1246,106 @@ async function generateAIMindMap(requestData: ADKRequest) {
     console.log('📊 Content type:', typeof content)
     console.log('📊 Memories type:', typeof memories, Array.isArray(memories))
     // Generate AI-powered mind map using Gemini
-    const mindMapPrompt = `Create a comprehensive learning mind map for "${subject}".
+    // Detect if this is certification content
+    const contentStr = content ? (typeof content === 'string' ? content : String(content)) : ''
+    const isCertificationContent = contentStr.toLowerCase().includes('az-') || 
+                                 contentStr.includes('%') || 
+                                 contentStr.toLowerCase().includes('exam') ||
+                                 contentStr.toLowerCase().includes('manage') && contentStr.toLowerCase().includes('azure')
+
+    let mindMapPrompt = ''
+    
+    if (isCertificationContent) {
+      // Certification-specific prompt
+      mindMapPrompt = `Create a certification-focused mind map for "${subject}" with CLOCKWISE POSITIONING starting at 12 o'clock.
+
+CERTIFICATION REQUIREMENTS:
+- Use Mermaid mindmap syntax with proper clockwise positioning
+- Structure around the 5 EXACT exam domains from the AZ-104 content
+- Position domains CLOCKWISE starting at 12 o'clock: Domain1(12), Domain2(2:30), Domain3(5), Domain4(7:30), Domain5(10)
+- Each main domain MUST include its exam weight percentage
+- Create clear hierarchy: Domain → Skill Groups → Specific Tasks → Personal Anchors
+- IMPORTANT: Keep node text simple - avoid special characters and long text
+
+EXAM CONTENT TO ANALYZE:
+${contentStr.substring(0, 2000)}
+
+REQUIRED CLOCKWISE STRUCTURE FOR AZ-104:
+mindmap
+  root((Mastering Azure Administration AZ-104))
+    )Manage Azure identities and governance 20-25%(
+      )Manage Microsoft Entra users and groups(
+        Create users and groups
+        Manage user properties
+        Manage licenses
+        Personal Anchor
+          Lab Practice
+          Real World Use
+      )Manage access to Azure resources(
+        Built-in Azure roles
+        Assign roles at scopes
+        Personal Anchor
+          Principle of Least Privilege
+          Access Troubleshooting
+      )Manage subscriptions and governance(
+        Azure Policy
+        Resource locks
+        Tags and cost management
+    )Implement and manage storage 15-20%(
+      )Configure storage access(
+        Storage firewalls
+        SAS tokens
+        Access keys
+        Personal Anchor
+          Security Best Practices
+      )Manage storage accounts(
+        Create and configure
+        Redundancy options
+        Encryption
+    )Deploy and manage compute 20-25%(
+      )Automate deployment(
+        ARM templates
+        Bicep files
+        Personal Anchor
+          Infrastructure as Code
+      )Virtual machines(
+        Create and configure
+        Disk encryption
+        Scaling and availability
+    )Virtual networking 15-20%(
+      )Configure virtual networks(
+        VNets and subnets
+        Network peering
+        Personal Anchor
+          Network Design
+      )Secure access(
+        NSGs and ASGs
+        Azure Bastion
+        Private endpoints
+    )Monitor and maintain 10-15%(
+      )Monitor resources(
+        Azure Monitor
+        Log Analytics
+        Alerts and metrics
+        Personal Anchor
+          Monitoring Strategy
+      )Backup and recovery(
+        Recovery Services vault
+        Azure Backup
+        Site Recovery
+
+CRITICAL INSTRUCTIONS:
+1. Follow the EXACT clockwise positioning shown above
+2. Each domain must be positioned as: )Domain Name Percentage(
+3. Include ALL 5 domains with their percentages
+4. Group skills logically under each domain
+5. Add Personal Anchor nodes for practical application
+6. Keep node names short and clear
+
+Generate the mindmap following this EXACT structure and positioning.`
+    } else {
+      // Generic subject prompt
+      mindMapPrompt = `Create a comprehensive learning mind map for "${subject}".
 
 REQUIREMENTS:
 - Use Mermaid mindmap syntax
@@ -1221,16 +1353,41 @@ REQUIREMENTS:
 - Include 4 main branches: Foundations (12 o'clock), Applications (3 o'clock), Assessment (6 o'clock), Advanced Topics (9 o'clock)
 - Make it specific to ${subject}, not generic
 - Include relevant subtopics for each branch
-- Use emojis for visual appeal
+- Use emojis sparingly and ensure they don't break syntax
 - Make it educational and practical
+- IMPORTANT: Keep node text simple - avoid special characters like quotes, parentheses in node labels
+- Each line should have proper indentation (2 spaces per level)
+- Ensure all nodes are properly closed with parentheses
 
 CONTENT CONTEXT:
-${content ? content.substring(0, 1000) : 'No specific content provided'}
+${contentStr.substring(0, 1000)}
 
 USER MEMORIES FOR PERSONALIZATION:
-${memories.map((m, i) => `${i + 1}. ${JSON.stringify(m).substring(0, 200)}`).join('\n')}
+${memories.map((m, i) => {
+  const memStr = JSON.stringify(m);
+  return `${i + 1}. ${memStr.substring(0, 200)}${memStr.length > 200 ? '...' : ''}`;
+}).join('\n')}
 
-Generate a Mermaid mindmap that is specifically tailored to ${subject} learning objectives. Focus on practical, actionable knowledge areas.`
+EXAMPLE FORMAT:
+mindmap
+  root((Subject Name))
+    Foundations
+      Core Concepts
+        Concept 1
+        Concept 2
+      Prerequisites
+        Prerequisite 1
+        Prerequisite 2
+    Applications
+      Practical Skills
+        Skill 1
+        Skill 2
+      Real World Use
+        Use Case 1
+        Use Case 2
+
+Generate a Mermaid mindmap that is specifically tailored to ${subject} learning objectives. Focus on practical, actionable knowledge areas. Follow the example format above.`
+    }
 
     console.log('🚀 Calling Gemini API...')
     console.log('📝 Mind map prompt length:', mindMapPrompt.length)

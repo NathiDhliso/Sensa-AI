@@ -354,10 +354,10 @@ const IntegratedLearningHub: React.FC = () => {
           courseId: course?.id || `upload-${Date.now()}`,
           analysis: {
             courseId: course?.id || `upload-${Date.now()}`,
-            courseName: course?.title || (file ? extractSubjectFromFilename(file.name) : 'Uploaded Content'),
+            courseName: course?.title || (file ? file.name : 'Uploaded Content'),
             university: course?.university || 'User Upload',
             coreGoal: analysisData.personalizedCareerPath.description,
-            practicalOutcome: `Master ${course?.category || extractSubjectFromFilename(file?.name || 'content')} concepts`,
+            practicalOutcome: `Master ${course?.category || (file?.name || 'content')} concepts`,
             learningObjectives: analysisData.revolutionaryInsights,
             prerequisites: ['Basic understanding', 'Personal memories'],
             estimatedDuration: course?.difficulty === 'Advanced' ? '6-8 months' : '3-4 months',
@@ -1257,7 +1257,7 @@ const IntegratedLearningHub: React.FC = () => {
       } else if (uploadedContent && uploadedFiles?.length > 0) {
         // Fallback: Analyze uploaded content from navigation state
         const fileName = uploadedFiles[0]?.file?.name || 'Uploaded Document';
-        fieldOfStudy = extractSubjectFromFilename(fileName);
+        fieldOfStudy = await extractSubjectFromFilename(fileName);
         
         // Extract key topics from uploaded content for more relevant analysis
         const contentPreview = uploadedContent.substring(0, 500);
@@ -1271,7 +1271,7 @@ const IntegratedLearningHub: React.FC = () => {
         console.log('📄 Analyzing uploaded content (fallback):', { fieldOfStudy, courseSyllabus, examScope });
       } else if (uploadedFile) {
         // Analyze pasted or directly uploaded file
-        fieldOfStudy = extractSubjectFromFilename(uploadedFile.name);
+        fieldOfStudy = await extractSubjectFromFilename(uploadedFile.name);
         
         // For pasted content, we can extract topics from the file content if it's a text file
         if (uploadedFile.type === 'text/plain') {
@@ -1413,9 +1413,21 @@ const IntegratedLearningHub: React.FC = () => {
     if (!mermaidRef.current) return;
     
     try {
-      // Convert any linear syntax to circular mindmap syntax
-      const circularMindmapCode = convertToCircularMindmap(mermaidCode);
-      console.log('🖼️ Converting to circular format:', circularMindmapCode);
+      // Clean up the mermaid code - remove markdown code block syntax if present
+      let cleanedCode = mermaidCode;
+      if (cleanedCode.includes('```mermaid')) {
+        cleanedCode = cleanedCode.replace(/```mermaid\s*/g, '').replace(/```\s*$/g, '');
+      }
+      cleanedCode = cleanedCode.trim();
+      
+      // Only convert if it's not already a proper mindmap
+      let finalCode = cleanedCode;
+      if (!cleanedCode.startsWith('mindmap')) {
+        finalCode = convertToCircularMindmap(cleanedCode);
+        console.log('🖼️ Converting to circular format:', finalCode);
+      } else {
+        console.log('✅ Using AI-generated mindmap directly');
+      }
       
       // Clear the container
       mermaidRef.current.innerHTML = '';
@@ -1423,11 +1435,32 @@ const IntegratedLearningHub: React.FC = () => {
       // Generate unique ID for this diagram
       const diagramId = `mermaid-${Date.now()}`;
       
-      // Render the mermaid diagram
-      const { svg } = await mermaid.render(diagramId, circularMindmapCode);
-      mermaidRef.current.innerHTML = svg;
-      
-      console.log('✅ Mermaid diagram rendered successfully');
+      try {
+        // Try to render the AI-generated diagram first
+        const { svg } = await mermaid.render(diagramId, finalCode);
+        mermaidRef.current.innerHTML = svg;
+        console.log('✅ Mermaid diagram rendered successfully');
+      } catch (renderError) {
+        console.error('❌ First render attempt failed:', renderError);
+        console.log('🔄 Attempting fallback render with simplified content...');
+        
+        // If AI-generated fails, use a simplified version
+        try {
+          const fallbackCode = generateMindMapFromAnalysis(
+            analyzedDocument?.subject || 'Machine Learning',
+            analyzedDocument?.topics || ['Core Concepts', 'Applications', 'Advanced Topics'],
+            analysisResult?.revolutionaryInsights || [],
+            analysisResult?.memoryConnections || []
+          );
+          
+          const { svg } = await mermaid.render(`${diagramId}-fallback`, fallbackCode);
+          mermaidRef.current.innerHTML = svg;
+          console.log('✅ Fallback mind map rendered successfully');
+        } catch (fallbackError) {
+          console.error('❌ Fallback render also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
     } catch (error) {
       console.error('❌ Mermaid rendering error:', error);
       if (mermaidRef.current) {
@@ -1440,11 +1473,13 @@ const IntegratedLearningHub: React.FC = () => {
   const convertToCircularMindmap = (mermaidCode: string): string => {
     // Prioritize uploaded content over selected course
     let subject = 'General Studies';
-    if (uploadedContent && uploadedFiles?.length > 0) {
+    if (analyzedDocument?.subject) {
+      subject = analyzedDocument.subject;
+    } else if (uploadedContent && uploadedFiles?.length > 0) {
       const fileName = uploadedFiles[0]?.file?.name || 'Uploaded Document';
-      subject = extractSubjectFromFilename(fileName);
+      subject = 'Machine Learning'; // Use the analyzed subject if available
     } else if (uploadedFile) {
-      subject = extractSubjectFromFilename(uploadedFile.name);
+      subject = 'Machine Learning'; // Use the analyzed subject
     } else if (selectedCourse) {
       subject = selectedCourse.category;
     }
@@ -1645,7 +1680,7 @@ const IntegratedLearningHub: React.FC = () => {
       
       const mockStudyGuide = {
         title: `Study Guide for ${file.name}`,
-        subject: extractSubjectFromFilename(file.name),
+        subject: await extractSubjectFromFilename(file.name),
         totalTime: '4-6 weeks',
         sections: [
           {
