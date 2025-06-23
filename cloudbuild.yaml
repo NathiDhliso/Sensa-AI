@@ -3,9 +3,17 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--no-cache'
+      - '--build-arg'
+      - 'VITE_SUPABASE_URL=${_VITE_SUPABASE_URL}'
+      - '--build-arg'
+      - 'VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}'
       - '-t'
       - 'africa-south1-docker.pkg.dev/$PROJECT_ID/sensa-ai-repo/sensa-ai-frontend:$BUILD_ID'
       - '.'
+      - '-f'
+      - Dockerfile
+    id: Build
 
   # 2. Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
