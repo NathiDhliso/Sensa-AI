@@ -50,6 +50,7 @@ images:
 options:
   substitutionOption: ALLOW_LOOSE
   logging: CLOUD_LOGGING_ONLY
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
 
 # Timeout for the build
 timeout: '1600s'
