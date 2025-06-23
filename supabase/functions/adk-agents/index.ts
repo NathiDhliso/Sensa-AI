@@ -1414,7 +1414,7 @@ Generate a mind map that ONLY uses information from the provided content. Be con
           content: mindMapPrompt
         }
       ],
-      temperature: 0.4
+      temperature: 0.2
     })
     
     console.log('📡 Gemini API call completed successfully')
@@ -1654,7 +1654,7 @@ Generate updated insights that incorporate the conversation learnings:`
           content: updatePrompt
         }
       ],
-      temperature: 0.4
+      temperature: 0.2
     })
 
     const responseContent = response.choices[0]?.message?.content
