@@ -10,12 +10,12 @@ import {
   Node,
   Edge,
   Connection,
-
   MarkerType,
   BackgroundVariant,
   Panel,
   useReactFlow,
   ConnectionMode,
+  type NodeTypes,
 } from '@xyflow/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -30,8 +30,8 @@ import SimpleAdvancedNode, { SimpleAdvancedNodeData as AdvancedNodeData } from '
 import '@xyflow/react/dist/style.css';
 
 // Register node types
-const nodeTypes = {
-  advanced: SimpleAdvancedNode,
+const nodeTypes: NodeTypes = {
+  advanced: SimpleAdvancedNode as any,
 };
 
 // History System
@@ -58,8 +58,8 @@ interface MindMapEditorProps {
 export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSave, onClose }) => {
   
   // Core States
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<any>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<any>>([]);
   const { fitView, setCenter } = useReactFlow();
   
   // History System
@@ -101,7 +101,14 @@ export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSav
   });
   
   // Edge Styling
-  const [edgeStyle, setEdgeStyle] = useState({
+  type EdgeStyleState = {
+    stroke: string;
+    strokeWidth: number;
+    strokeDasharray: string;
+    markerEnd: { type: MarkerType; color: string };
+  };
+  
+  const [edgeStyle, setEdgeStyle] = useState<EdgeStyleState>({
     stroke: '#374151',
     strokeWidth: 2,
     strokeDasharray: 'none',
@@ -214,7 +221,11 @@ export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSav
     const newEdge: Edge = {
       ...params,
       id: `edge-${Date.now()}`,
-      style: edgeStyle,
+      style: {
+        stroke: edgeStyle.stroke,
+        strokeWidth: edgeStyle.strokeWidth,
+        strokeDasharray: edgeStyle.strokeDasharray,
+      },
       markerEnd: edgeStyle.markerEnd,
     };
     setEdges((eds) => addEdge(newEdge, eds));
@@ -357,7 +368,7 @@ export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSav
       reader.readAsText(file);
     };
     input.click();
-  }, [mermaidParser, setNodes, setEdges, saveToHistory]);
+  }, [setNodes, setEdges, saveToHistory]);
   
   const exportToMermaid = useCallback(() => {
     try {

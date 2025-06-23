@@ -19,18 +19,25 @@ RUN npm run build
 # Production stage with Nginx
 FROM nginx:alpine
 
-# Copy built app to nginx
+# Install gettext for envsubst
+RUN apk update && apk add --no-cache gettext
+
+# Copy the build output from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy the Nginx config template and the startup script
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY start-nginx.sh /usr/local/bin/start-nginx.sh
 
-# Expose port 80
+# Make the startup script executable
+RUN chmod +x /usr/local/bin/start-nginx.sh
+
+# Expose port 80 - Nginx will listen on the PORT env var, but this is good practice
 EXPOSE 80
 
-# Health check
+# Healthcheck can now use the PORT variable
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:80/ || exit 1
+  CMD curl -f "http://localhost:${PORT:-80}/" || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# Run the startup script
+CMD ["start-nginx.sh"] 

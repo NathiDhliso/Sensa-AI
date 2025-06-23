@@ -39,7 +39,7 @@ http {
         image/svg+xml;
 
     server {
-        listen 80;
+        listen ${PORT};
         server_name _;
         root /usr/share/nginx/html;
         index index.html;
