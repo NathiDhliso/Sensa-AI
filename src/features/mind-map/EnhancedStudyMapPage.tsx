@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -1711,45 +1711,61 @@ const IntegratedLearningHub: React.FC = () => {
 
   const generateStudyGuide = async (file: File) => {
     setIsLoading(true);
+    setStudyGuide(null); // Clear previous guide
     try {
-      // Simulate study guide generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const mockStudyGuide = {
-        title: `Study Guide for ${file.name}`,
-        subject: await extractSubjectFromFilename(file.name),
-        totalTime: '4-6 weeks',
-        sections: [
-          {
-            title: 'Foundational Concepts',
-            topics: ['Core definitions', 'Basic principles', 'Historical context'],
-            priority: 'high',
-            estimatedTime: '1-2 weeks'
+      const fileContent = await file.text();
+      const subject = await extractSubjectFromFilename(file.name, fileContent);
+
+      // Call ADK orchestrator for document analysis to get study guide
+      const adkResponse = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'document_content_analysis',
+        payload: {
+          document: {
+            name: file.name,
+            content: fileContent,
+            content_type: 'exam_past_paper',
+            actual_subject: subject,
           },
-          {
-            title: 'Application & Analysis',
-            topics: ['Problem-solving methods', 'Case studies', 'Critical thinking'],
-            priority: 'high',
-            estimatedTime: '2-3 weeks'
-          },
-          {
-            title: 'Advanced Topics',
-            topics: ['Complex theories', 'Integration', 'Current research'],
-            priority: 'medium',
-            estimatedTime: '1-2 weeks'
-          },
-          {
-            title: 'Exam Preparation',
-            topics: ['Past paper analysis', 'Time management', 'Exam strategies'],
-            priority: 'high',
-            estimatedTime: '1 week'
-          }
-        ]
-      };
-      
-      setStudyGuide(mockStudyGuide);
+        },
+        analysis_requirements: ['study_guide', 'study_recommendations'],
+      });
+
+      if (adkResponse?.success && adkResponse?.analysis?.study_recommendations) {
+        const recommendations = adkResponse.analysis.study_recommendations as any[];
+        
+        const newStudyGuide = {
+          title: `AI-Generated Study Guide for ${file.name}`,
+          subject: subject,
+          totalTime: '4-6 weeks', // This can be made dynamic later
+          sections: recommendations.map(rec => ({
+            title: rec.title || 'Unnamed Section',
+            topics: rec.topics || [],
+            priority: rec.priority || 'medium',
+            estimatedTime: rec.estimatedTime || '1-2 weeks',
+          })),
+        };
+        setStudyGuide(newStudyGuide);
+      } else {
+        // Fallback if ADK fails or returns unexpected structure
+        throw new Error('AI analysis did not return a valid study guide.');
+      }
     } catch (error) {
       console.error('Study guide generation error:', error);
+      // Set a fallback study guide to show the error
+      setStudyGuide({
+        title: 'Error Generating Study Guide',
+        subject: file.name,
+        totalTime: 'N/A',
+        sections: [
+          {
+            title: 'AI Service Unavailable',
+            topics: ['The AI agent failed to generate a study guide.', 'Please try again later or check the console for details.'],
+            priority: 'high',
+            estimatedTime: 'now',
+          },
+        ],
+      });
     } finally {
       setIsLoading(false);
     }
@@ -1774,13 +1790,11 @@ const IntegratedLearningHub: React.FC = () => {
         if (!user) throw new Error('User not authenticated');
         
         const subjectAnalysis = await callEdgeFunction('adk-agents', {
-          agent_type: 'course_intel',
-          payload: {
-            task: 'subject_identification',
-            filename: filename,
-            content_preview: content?.substring(0, 500) || '',
-            analysis_type: 'intelligent_subject_extraction'
-          }
+          agent_type: 'orchestrator',
+          task: 'subject_identification',
+          filename: filename,
+          content_preview: content?.substring(0, 500) || '',
+          analysis_type: 'intelligent_subject_extraction'
         });
         
         if (subjectAnalysis?.success && subjectAnalysis?.analysis?.identified_subject) {

@@ -265,7 +265,7 @@ export const memoryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('memories')
       .insert({
         user_id: user.id,
@@ -290,7 +290,7 @@ export const memoryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('memories')
       .select('*')
       .eq('user_id', user.id)
@@ -306,7 +306,7 @@ export const memoryService = {
   },
 
   async updateMemoryAnalysis(memoryId: string, sensaAnalysis: any) {
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('memories')
       .update({ sensa_analysis: sensaAnalysis })
       .eq('id', memoryId)
@@ -321,7 +321,7 @@ export const memoryService = {
   },
 
   async updateMemoryContent(memoryId: string, textContent: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('memories')
       .update({ text_content: textContent })
       .eq('id', memoryId)
@@ -454,7 +454,7 @@ export const courseAnalysisService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('course_analyses')
       .insert({
         user_id: user.id,
@@ -478,7 +478,7 @@ export const courseAnalysisService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('course_analyses')
       .select(`
         *,
@@ -554,7 +554,7 @@ export const userService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('users')
       .update({ learning_profile: learningProfile })
       .eq('auth_id', user.id)
@@ -572,7 +572,7 @@ export const userService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from('users')
       .select('*')
       .eq('auth_id', user.id)
@@ -583,5 +583,132 @@ export const userService = {
       throw error;
     }
     return data;
+  },
+};
+
+// New: Services for previously unused tables
+// These helpers are deliberately lightweight so that other parts
+// of the application can start utilising the data structures
+// without a large refactor. All functions include basic runtime
+// checks mirroring the patterns used elsewhere in this file.
+
+// Memory-to-memory links (reference / prerequisite relationships)
+export const memoryLinkService = {
+  async upsertLink(fromId: string | number, toId: string | number, linkType: string = 'related') {
+    const { data, error } = await supabase!
+      .from('memory_links')
+      .upsert({ from_id: fromId, to_id: toId, link_type: linkType });
+    if (error) handleSupabaseError(error, 'upsert memory link');
+    return data;
+  },
+
+  async getLinks(memoryId: string | number) {
+    const { data, error } = await supabase!
+      .from('memory_links')
+      .select('*')
+      // match either side of the relationship
+      .or(`from_id.eq.${memoryId},to_id.eq.${memoryId}`);
+    if (error) handleSupabaseError(error, 'get memory links');
+    return data || [];
+  },
+};
+
+// Dialogue sessions (persisted chat history)
+export const dialogueSessionService = {
+  async startSession(title: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('dialogue_sessions')
+      .insert({ user_id: user.id, title, started_at: new Date().toISOString() })
+      .select()
+      .single();
+    if (error) handleSupabaseError(error, 'start dialogue session');
+    return data;
+  },
+
+  async endSession(sessionId: string | number) {
+    const { error } = await supabase!
+      .from('dialogue_sessions')
+      .update({ ended_at: new Date().toISOString() })
+      .eq('id', sessionId);
+    if (error) handleSupabaseError(error, 'end dialogue session');
+  },
+
+  async listSessions() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('dialogue_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('started_at', { ascending: false });
+    if (error) handleSupabaseError(error, 'list dialogue sessions');
+    return data || [];
+  },
+};
+
+// Study maps generated from Mermaid mind-maps
+export const studyMapService = {
+  async saveStudyMap(title: string, mermaidText: string, id?: string | number) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const payload: any = { title, mermaid_text: mermaidText, user_id: user.id, updated_at: new Date().toISOString() };
+    if (id) payload.id = id;
+
+    const { data, error } = await supabase!
+      .from('study_maps')
+      .upsert(payload)
+      .select()
+      .single();
+    if (error) handleSupabaseError(error, 'save study map');
+    return data;
+  },
+
+  async listStudyMaps() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('study_maps')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+    if (error) handleSupabaseError(error, 'list study maps');
+    return data || [];
+  },
+};
+
+// Per-user preferences (theme, tts, etc.)
+export const preferenceService = {
+  async getPreferences() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('user_preferences')
+      .select('prefs')
+      .eq('user_id', user.id)
+      .single();
+    if (error && error.code !== 'PGRST116') { // 116 = no rows returned
+      handleSupabaseError(error, 'get user preferences');
+    }
+    return data?.prefs ?? {};
+  },
+
+  async updatePreferences(prefs: Record<string, unknown>) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('user_preferences')
+      .upsert({ user_id: user.id, prefs, updated_at: new Date().toISOString() })
+      .select('prefs')
+      .single();
+    if (error) handleSupabaseError(error, 'update user preferences');
+    return data?.prefs;
   },
 };

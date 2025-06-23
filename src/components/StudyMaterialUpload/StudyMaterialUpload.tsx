@@ -177,16 +177,38 @@ const StudyMaterialUpload: React.FC = () => {
       const adkResponse = await orchestrateAgents({
         agent_type: 'orchestrator',
         task: 'document_content_analysis',
-        document: {
-          name: fileName,
-          content: pastPaperContent,
-          content_type: 'exam_past_paper'
+        payload: {
+          document: {
+            name: fileName,
+            content: pastPaperContent,
+            content_type: 'exam_past_paper',
+            actual_subject: subject
+          }
         },
         analysis_requirements: ['study_guide']
       } as any);
 
       if (adkResponse?.analysis?.study_guide) {
         return adkResponse.analysis.study_guide as string;
+      }
+
+      // Build guide from study_recommendations if provided
+      if (Array.isArray(adkResponse?.analysis?.study_recommendations)) {
+        const recs = adkResponse.analysis.study_recommendations as Array<any>;
+
+        const sectionsMarkdown = recs.map((rec: any) => {
+          const title = rec.title || rec.section || 'Section';
+          const priority = rec.priority || 'medium';
+          const time = rec.estimatedTime || rec.time || '1 week';
+          const topicsArr: string[] = rec.topics || rec.key_topics || [];
+          const topicsStr = topicsArr.length ? topicsArr.join(', ') : 'Topic outline TBD';
+          return `
+${title} (${priority} priority)
++- Time: ${time}
++- Topics: ${topicsStr}`;
+        }).join('\n\n');
+
+        return `STUDY GUIDE: Study Guide for ${fileName}\nSubject: ${subject}\nTotal Time: 4-6 weeks\n\nSECTIONS:\n${sectionsMarkdown}`;
       }
     } catch (error) {
       console.error('ADK study guide generation failed, falling back:', error);

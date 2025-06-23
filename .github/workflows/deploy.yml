@@ -33,7 +33,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
 
-    # Add permissions for Workload Identity Federation
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -42,7 +41,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # CHANGE: Switched from Service Account Key to Workload Identity Federation
       - name: Authenticate to Google Cloud
         id: auth
         uses: 'google-github-actions/auth@v2'
