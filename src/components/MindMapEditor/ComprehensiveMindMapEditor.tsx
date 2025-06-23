@@ -10,7 +10,7 @@ import {
   Node,
   Edge,
   Connection,
-  NodeTypes,
+
   MarkerType,
   BackgroundVariant,
   Panel,
@@ -20,10 +20,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download, Palette, Square, Circle, Diamond, Trash2, Plus, RotateCcw, FileText, Image, Code, X,
-  AlignRight, ZoomIn, ZoomOut, Move,
-  Layers, Settings, Save, FolderOpen, Copy, Scissors, Clipboard, RotateCw, Maximize, Link,
-  Search, Eye, EyeOff, Grid, List, MousePointer, Pen, Eraser, Highlighter, Focus,
-  ChevronDown, ChevronRight, Share2, Users, MessageCircle, Tag, Upload, History
+  Move, RotateCw, Maximize,
+  Search, Grid, MousePointer, Pen, Eraser, Highlighter,
+  Upload
 } from 'lucide-react';
 import { toPng, toSvg } from 'html-to-image';
 import { parseMermaidMindMap, validateParsedMindMap } from './OfficialMermaidParser';
@@ -50,16 +49,18 @@ interface SearchResult {
 }
 
 // Comprehensive Mind Map Editor Component
-export const ComprehensiveMindMapEditor: React.FC<{
-  initialData?: any;
-  onSave?: (data: any) => void;
+interface MindMapEditorProps {
+  initialData?: unknown;
+  onSave?: (data: unknown) => void;
   onClose?: () => void;
-}> = ({ initialData, onSave, onClose }) => {
+}
+
+export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSave, onClose }) => {
   
   // Core States
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitView, zoomIn, zoomOut, setCenter, getZoom } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
   
   // History System
   const [history, setHistory] = useState<HistoryState[]>([]);
