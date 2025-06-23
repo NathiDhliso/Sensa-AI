@@ -1,14 +1,36 @@
 name: Deploy Frontend to Cloud Run
 
-# This workflow is triggered on pushes to the main branch
 on:
   push:
     branches:
       - main
 
 jobs:
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
   build-and-deploy:
     name: Build and Deploy
+    needs: test
     runs-on: ubuntu-latest
 
     permissions:
@@ -32,76 +54,3 @@ jobs:
         run: |
           gcloud builds submit --config cloudbuild.yaml \
             --substitutions=_VITE_SUPABASE_URL='${{ secrets.VITE_SUPABASE_URL }}',_VITE_SUPABASE_ANON_KEY='${{ secrets.VITE_SUPABASE_ANON_KEY }}'
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run tests
-      run: npm test -- --coverage --watchAll=false
-
-    - name: Build application
-      run: npm run build
-      env:
-        NODE_ENV: production
-
-    - name: Configure Docker for GCR
-      run: gcloud auth configure-docker
-
-    - name: Build Docker image
-      run: |
-        docker build -t gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA \
-                     -t gcr.io/$PROJECT_ID/$SERVICE_NAME:latest .
-
-    - name: Push Docker image
-      run: |
-        docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA
-        docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:latest
-
-    - name: Deploy to Cloud Run
-      run: |
-        gcloud run deploy $SERVICE_NAME \
-          --image gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA \
-          --region $REGION \
-          --platform managed \
-          --allow-unauthenticated \
-          --port 80 \
-          --memory 1Gi \
-          --cpu 1 \
-          --max-instances 10 \
-          --set-env-vars NODE_ENV=production,VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }},VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-
-    - name: Get service URL
-      run: |
-        SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region $REGION --format 'value(status.url)')
-        echo "Service deployed at: $SERVICE_URL"
-        echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
-
-    - name: Run health check
-      run: |
-        sleep 30
-        curl -f $SERVICE_URL/health || exit 1
-
-  notify:
-    name: Notify deployment status
-    runs-on: ubuntu-latest
-    needs: build-and-deploy
-    if: always()
-    
-    steps:
-    - name: Deployment Success
-      if: needs.build-and-deploy.result == 'success'
-      run: |
-        echo "✅ Sensa AI successfully deployed to GCP Cloud Run!"
-        echo "🚀 Service URL: ${{ env.SERVICE_URL }}"
-        
-    - name: Deployment Failed
-      if: needs.build-and-deploy.result == 'failure'
-      run: |
-        echo "❌ Deployment failed. Check the logs for details."
-        exit 1 
