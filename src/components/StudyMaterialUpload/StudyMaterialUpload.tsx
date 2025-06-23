@@ -6,6 +6,7 @@ import { ArrowLeft, Upload, FileText, Image, File as FileIcon, X, CheckCircle, A
 import { sensaBrandColors } from '../../styles/brandColors';
 import { useUIStore } from '../../stores';
 import styles from '../../styles/components/StudyMaterialUpload.module.css';
+import { orchestrateAgents } from '../../services/edgeFunctions';
 
 interface UploadedFile {
   id: string;
@@ -107,9 +108,9 @@ const StudyMaterialUpload: React.FC = () => {
       const extractedContent = await extractContentFromFile(uploadedFile.file);
       
       // If it's a past paper, generate study guide
-      let generatedStudyGuide;
+      let generatedStudyGuide: string | undefined;
       if (uploadedFile.type === 'past_paper') {
-        generatedStudyGuide = await generateStudyGuideFromPastPaper(extractedContent, uploadedFile.file.name);
+        generatedStudyGuide = await generateStudyGuideFromPastPaper(extractedContent, uploadedFile.file.name) as string;
       }
 
       // Update file with extracted content
@@ -170,70 +171,31 @@ const StudyMaterialUpload: React.FC = () => {
   };
 
   const generateStudyGuideFromPastPaper = async (pastPaperContent: string, fileName: string): Promise<string> => {
-    // Generate more detailed study guide based on file name
     const subject = fileName.split('.')[0].replace(/[_-]/g, ' ');
-    
-    return `# Generated Study Guide for ${subject}
 
-## Exam Analysis Summary
-Based on detailed analysis of the past paper, here are the key topics to focus on:
+    try {
+      const adkResponse = await orchestrateAgents({
+        agent_type: 'orchestrator',
+        task: 'document_content_analysis',
+        document: {
+          name: fileName,
+          content: pastPaperContent,
+          content_type: 'exam_past_paper'
+        },
+        analysis_requirements: ['study_guide']
+      } as any);
 
-### High Priority Topics (60% of exam weight)
-1. **${subject} Fundamentals** - These appeared in 4 questions worth 30 marks
-   - Core principles and definitions
-   - Basic frameworks and methodologies
-   - Essential terminology
+      if (adkResponse?.analysis?.study_guide) {
+        return adkResponse.analysis.study_guide as string;
+      }
+    } catch (error) {
+      console.error('ADK study guide generation failed, falling back:', error);
+    }
 
-2. **Practical Applications** - These appeared in 3 questions worth 25 marks
-   - Real-world case studies
-   - Problem-solving techniques
-   - Implementation strategies
+    // Fallback template if AI unavailable
+    return `# Study Guide for ${subject}
 
-3. **Critical Analysis** - These appeared in 2 questions worth 15 marks
-   - Comparative evaluation
-   - Strengths and limitations assessment
-   - Contextual application
-
-### Medium Priority Topics (30% of exam weight)
-1. **Theoretical Frameworks** - These appeared in 2 questions worth 15 marks
-   - Key models and theories
-   - Historical development
-   - Current paradigms
-
-2. **Research Methods** - These appeared in 1 question worth 10 marks
-   - Data collection techniques
-   - Analysis approaches
-   - Validity and reliability considerations
-
-### Low Priority Topics (10% of exam weight)
-1. **Historical Context** - These appeared in 1 question worth 5 marks
-   - Evolution of the field
-   - Influential figures
-   - Paradigm shifts
-
-2. **Future Trends** - These appeared in 1 question worth 5 marks
-   - Emerging developments
-   - Potential applications
-   - Industry predictions
-
-## Recommended Study Strategy
-1. Allocate 60% of your study time to high priority topics
-2. Create flashcards for key definitions and concepts
-3. Practice answering past paper questions under timed conditions
-4. Form study groups to discuss complex topics
-5. Create mind maps to visualize relationships between concepts
-
-## Question Pattern Analysis
-- Short answer questions: 40% of the paper
-- Essay questions: 35% of the paper
-- Case study analysis: 25% of the paper
-
-## Time Management Recommendation
-- Short answer questions: 1 minute per mark
-- Essay questions: 1.5 minutes per mark
-- Case study questions: 2 minutes per mark
-
-This study guide was generated based on comprehensive analysis of past exam patterns and question frequencies.`;
+AI services are currently unavailable. A detailed guide will be generated once connectivity is restored.`;
   };
 
   const removeFile = (fileId: string) => {
