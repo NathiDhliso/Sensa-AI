@@ -6,27 +6,28 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 // Development mode flag
 const isDevelopment = import.meta.env.DEV
 
-console.log('🔍 Environment check:');
-console.log('   - isDevelopment:', isDevelopment);
-console.log('   - VITE_SUPABASE_URL exists:', !!supabaseUrl);
-console.log('   - VITE_SUPABASE_ANON_KEY exists:', !!supabaseAnonKey);
-console.log('   - URL length:', supabaseUrl?.length || 0);
-console.log('   - Key length:', supabaseAnonKey?.length || 0);
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  if (isDevelopment) {
-    console.warn('⚠️ Supabase environment variables missing - running in development mode')
-    console.warn('   Please check your .env file for:')
-    console.warn('   - VITE_SUPABASE_URL')
-    console.warn('   - VITE_SUPABASE_ANON_KEY')
-  } else {
-    throw new Error('Missing Supabase environment variables')
+if (isDevelopment) {
+  console.log('🔍 Environment check');
+  console.log('   - VITE_SUPABASE_URL exists:', !!supabaseUrl);
+  console.log('   - VITE_SUPABASE_ANON_KEY exists:', !!supabaseAnonKey);
+  console.log('   - URL length:', supabaseUrl?.length || 0);
+  console.log('   - Key length:', supabaseAnonKey?.length || 0);
+  // For safety, only log the first 8 chars of the anon key
+  if (supabaseAnonKey) {
+    console.log('   - Key preview:', supabaseAnonKey.slice(0, 8) + '…');
   }
 }
 
-// Log connection details for debugging (remove in production)
-console.log('🔍 Supabase URL:', supabaseUrl)
-console.log('🔑 Supabase Key exists:', !!supabaseAnonKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+  if (isDevelopment) {
+    console.warn('⚠️ Supabase environment variables missing - running in development mode');
+    console.warn('   Please check your .env file for:');
+    console.warn('   - VITE_SUPABASE_URL');
+    console.warn('   - VITE_SUPABASE_ANON_KEY');
+  } else {
+    throw new Error('Missing Supabase environment variables');
+  }
+}
 
 // Test connection to Supabase
 const testConnection = async () => {
