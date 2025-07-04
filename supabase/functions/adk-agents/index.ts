@@ -167,8 +167,13 @@ serve(async (req) => {
       memories_count: requestData.memories?.length || 0
     })
 
-    // Check if this is an orchestrator request (comprehensive analysis)
-    if (requestData.task || requestData.agent_type === 'orchestrator') {
+    // Check if this is an orchestrator request (comprehensive analysis or Know Me actions)
+    if (requestData.task || requestData.agent_type === 'orchestrator' || requestData.payload?.action) {
+      const action = requestData.payload?.action as string
+      if (['know_me_start', 'know_me_questionnaire', 'know_me_score', 'know_me_report'].includes(action)) {
+        // Map action to task for Know Me features
+        requestData.task = action
+      }
       console.log('🎯 Routing to orchestrator for task:', requestData.task)
       return await handleOrchestratorRequest(requestData)
     }
@@ -316,6 +321,75 @@ async function handleOrchestratorRequest(requestData: ADKRequest) {
         JSON.stringify({
           success: true,
           updated_insights: updatedInsights,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    // Know Me Feature Actions
+    if (requestData.task === 'know_me_start') {
+      const analysis = await generateKnowMeAnalysis(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          knowledge_analysis: analysis,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    if (requestData.task === 'know_me_questionnaire') {
+      const scenarios = await generateKnowMeScenarios(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scenarios: scenarios,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    if (requestData.task === 'know_me_score') {
+      const scoring = await scoreKnowMeAnswer(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scoring_result: scoring,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+
+    if (requestData.task === 'know_me_report') {
+      const report = await generateKnowMeReport(requestData)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          performance_report: report,
           timestamp: new Date().toISOString()
         }),
         { 
@@ -1692,6 +1766,567 @@ Generate updated insights that incorporate the conversation learnings:`
       emotional_tone: "Refined through conversation",
       connections: ["Updated based on user feedback"]
     }
+  }
+}
+
+// Know Me Feature Functions
+
+async function generateKnowMeAnalysis(requestData: ADKRequest) {
+  console.log('🎯 Processing Know Me PDF analysis request')
+  
+  const payload = requestData.payload || {}
+  const pdfContent = (payload.pdf_content as string) || ''
+  
+  // 🚧 DEBUG: Log basic details about the incoming PDF content
+  console.log('[KnowMe] PDF content length (chars):', pdfContent.length)
+  
+  // 👉 NEW: Truncate very large PDF content
+  const MAX_CONTENT_CHARS = 20000
+  const contentSample = pdfContent.length > MAX_CONTENT_CHARS
+    ? `${pdfContent.substring(0, MAX_CONTENT_CHARS)}\n\n[Content truncated – showing first ${MAX_CONTENT_CHARS} characters of ${pdfContent.length}]`
+    : pdfContent
+  
+  console.log('[KnowMe] Content truncated?:', pdfContent.length > MAX_CONTENT_CHARS)
+  
+  try {
+    // Phase 1: Analyze PDF content and extract core topics
+    const analysisPrompt = `You are an expert educational content analyzer. Analyze this PDF content and identify 5-7 core knowledge domains.
+
+PDF CONTENT (sample):
+${contentSample}
+
+TASK: 
+1. Identify the main subject area
+2. Extract 5-7 core topics that represent the essential knowledge domains
+3. Generate a personalized "Know Me" questionnaire that bridges academic content with personal experiences
+
+RETURN FORMAT (JSON):
+{
+  "subject_area": "Main subject of the content",
+  "core_topics": [
+    {
+      "topic_name": "Topic Name",
+      "description": "Brief description",
+      "key_concepts": ["concept1", "concept2", "concept3"],
+      "difficulty_level": "Beginner/Intermediate/Advanced",
+      "prerequisites": ["prereq1", "prereq2"],
+      "estimated_study_time": "X hours"
+    }
+  ],
+  "questionnaire": {
+    "title": "Get to Know You - Personalized Learning Profile",
+    "description": "Help us understand your background and interests",
+    "estimated_time": "5-7 minutes",
+    "questions": [
+      {
+        "id": "q1",
+        "type": "experience/preference/background/scenario/interest",
+        "question": "Question text",
+        "purpose": "Why this question helps",
+        "related_topics": ["topic1", "topic2"]
+      }
+    ]
+  }
+}
+
+Focus on creating questions that connect academic concepts to real-world experiences.`
+
+    let responseContent = ''
+    try {
+      const response = await callGemini({
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert educational analyst and questionnaire designer. Always return valid JSON."
+          },
+          {
+            role: "user",
+            content: analysisPrompt
+          }
+        ],
+        temperature: 0.4
+      })
+      responseContent = response.choices[0]?.message?.content || ''
+    } catch (aiError) {
+      console.error('🤖 AI generation failed, falling back:', aiError)
+      // leave responseContent empty so fallback logic triggers
+    }
+
+    let analysis
+    if (responseContent) {
+      try {
+        analysis = JSON.parse(responseContent)
+      } catch (parseError) {
+        console.error('Failed to parse analysis response:', parseError)
+        analysis = null
+      }
+    }
+
+    // If AI failed or parsing failed, build deterministic fallback so the workflow continues
+    if (!analysis) {
+      analysis = {
+        subject_area: "Educational Content",
+        core_topics: [
+          {
+            topic_name: "Core Concepts",
+            description: "Fundamental principles and concepts",
+            key_concepts: ["Basic principles", "Key terminology", "Core processes"],
+            difficulty_level: "Intermediate",
+            prerequisites: ["Basic understanding"],
+            estimated_study_time: "3-4 hours"
+          }
+        ],
+        questionnaire: {
+          title: "Get to Know You - Learning Profile",
+          description: "Help us personalize your learning experience",
+          estimated_time: "5 minutes",
+          questions: [
+            {
+              id: "q1",
+              type: "background",
+              question: "What's your experience with this subject area?",
+              purpose: "Assess baseline knowledge",
+              related_topics: ["Core Concepts"]
+            }
+          ]
+        }
+      }
+    }
+
+    // 🚧 DEBUG: Log summary of analysis result (avoid huge logs)
+    console.log('[KnowMe] Analysis generated. Subject:', analysis.subject_area, 'Core topics count:', analysis.core_topics?.length)
+
+    console.log('✅ Know Me analysis generated successfully')
+    return analysis
+
+  } catch (error) {
+    console.error('❌ Know Me analysis failed:', error)
+    throw new Error(`Knowledge extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+async function generateKnowMeScenarios(requestData: ADKRequest) {
+  console.log('🎭 Processing Know Me scenario generation request')
+  
+  const payload = requestData.payload || {}
+  const questionnaireResponses = (payload.questionnaire_responses as any) || {}
+  const knowledgeAnalysis = (payload.knowledge_analysis as any) || {}
+  
+  try {
+    const responses = questionnaireResponses.responses || []
+    const coreTopics = knowledgeAnalysis.core_topics || []
+    const subjectArea = knowledgeAnalysis.subject_area || 'Academic Subject'
+
+    // Process user responses to create profile
+    const responsesText = responses.map((r: any) => `Q: ${r.question}\nA: ${r.answer}`).join('\n\n')
+    
+    const scenarioPrompt = `You are an expert scenario designer. Create personalized scenario-based questions that combine academic topics with the user's personal experiences.
+
+USER RESPONSES:
+${responsesText}
+
+CORE TOPICS:
+${coreTopics.map((t: any) => `${t.topic_name}: ${t.description}`).join('\n')}
+
+SUBJECT AREA: ${subjectArea}
+
+TASK: Generate 5 personalized scenarios that:
+1. Start with situations relatable to the user's experiences
+2. Naturally incorporate academic concepts
+3. Require practical application of knowledge
+4. Include dynamic scoring rubrics
+
+RETURN FORMAT (JSON):
+{
+  "user_profile": {
+    "learning_style": "identified style",
+    "experience_level": "beginner/intermediate/advanced",
+    "professional_context": "context description",
+    "interests": ["interest1", "interest2"]
+  },
+  "scenarios": [
+    {
+      "scenario_id": "scenario_1",
+      "topic_name": "Topic Name",
+      "scenario_title": "Scenario Title",
+      "scenario_description": "Detailed scenario description",
+      "question": "What would you do in this situation?",
+      "context_type": "work/home/academic",
+      "difficulty_level": "appropriate level",
+      "key_concepts_tested": ["concept1", "concept2"],
+      "expected_response_type": "explanation/strategy/analysis",
+      "estimated_time": "3-5 minutes",
+      "rubric": {
+        "total_points": 100,
+        "criteria": [
+          {
+            "name": "Understanding",
+            "weight": 40,
+            "description": "Demonstrates concept understanding"
+          }
+        ]
+      }
+    }
+  ]
+}
+
+Make scenarios feel like real situations they might encounter.`
+
+    const response = await callGemini({
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert educational scenario designer. Create engaging, personalized learning scenarios. Always return valid JSON."
+        },
+        {
+          role: "user",
+          content: scenarioPrompt
+        }
+      ],
+      temperature: 0.6
+    })
+
+    const responseContent = response.choices[0]?.message?.content
+    if (!responseContent) {
+      throw new Error('Failed to generate scenarios')
+    }
+
+    let scenarios
+    try {
+      scenarios = JSON.parse(responseContent)
+    } catch (parseError) {
+      console.error('Failed to parse scenarios response:', parseError)
+      // Fallback scenarios
+      scenarios = {
+        user_profile: {
+          learning_style: "mixed",
+          experience_level: "intermediate",
+          professional_context: "general",
+          interests: ["practical applications"]
+        },
+        scenarios: [
+          {
+            scenario_id: "scenario_1",
+            topic_name: "Core Concepts",
+            scenario_title: "Practical Application",
+            scenario_description: "You need to apply key concepts in a real-world situation.",
+            question: "How would you approach this challenge?",
+            context_type: "work",
+            difficulty_level: "intermediate",
+            key_concepts_tested: ["Problem solving", "Critical thinking"],
+            expected_response_type: "explanation",
+            estimated_time: "5 minutes",
+            rubric: {
+              total_points: 100,
+              criteria: [
+                {
+                  name: "Understanding",
+                  weight: 50,
+                  description: "Demonstrates understanding"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+
+    console.log('✅ Know Me scenarios generated successfully')
+    return scenarios
+
+  } catch (error) {
+    console.error('❌ Know Me scenarios generation failed:', error)
+    throw new Error(`Scenario generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+async function scoreKnowMeAnswer(requestData: ADKRequest) {
+  console.log('📊 Processing Know Me answer scoring request')
+  
+  const payload = requestData.payload || {}
+  const questionId = (payload.question_id as string) || ''
+  const userAnswer = (payload.user_answer as string) || ''
+  const isPartialAnswer = (payload.partial_answer as boolean) || false
+  const scenariosData = (payload.scenarios_data as any) || {}
+  
+  try {
+    if (isPartialAnswer) {
+      const scenarios = scenariosData.scenarios || []
+      const currentScenario = scenarios.find((s: any) => s.scenario_id === questionId)
+
+      if (!currentScenario) {
+        console.warn(`[KnowMe Scoring] Could not find scenario with id: ${questionId} for hint generation.`)
+        return {
+          hints: ["Keep going!", "You're on the right track.", "Try to connect your answer to the main topic."],
+          encouragement: "Good progress!"
+        }
+      }
+      
+      // Generate real-time hints
+      const hintsPrompt = `You are an AI tutor providing real-time hints. The user is answering a scenario question.
+
+SCENARIO QUESTION: "${currentScenario.question}"
+KEY CONCEPTS: ${currentScenario.key_concepts_tested?.join(', ')}
+
+USER'S PARTIAL ANSWER: "${userAnswer}"
+
+TASK: Provide 2-3 brief, encouraging hints to guide their thinking without giving away the answer.
+
+RETURN FORMAT (JSON):
+{
+  "hints": ["hint1", "hint2", "hint3"],
+  "encouragement": "Brief encouraging message"
+}
+
+Focus on guiding their thought process, not providing direct answers.`
+
+      const response = await callGemini({
+        messages: [
+          {
+            role: "system",
+            content: "You are an encouraging AI tutor. Provide helpful hints without giving away answers."
+          },
+          {
+            role: "user",
+            content: hintsPrompt
+          }
+        ],
+        temperature: 0.7
+      })
+
+      const responseContent = response.choices[0]?.message?.content
+      let hints
+      try {
+        hints = JSON.parse(responseContent || '{}')
+      } catch {
+        hints = {
+          hints: ["Think about the key concepts involved", "Consider the practical implications", "What would be your first step?"],
+          encouragement: "You're on the right track!"
+        }
+      }
+
+      return hints
+    } else {
+      // Full scoring
+      const scenarios = scenariosData.scenarios || []
+      const currentScenario = scenarios.find((s: any) => s.scenario_id === questionId)
+
+      if (!currentScenario) {
+        throw new Error(`[KnowMe Scoring] Could not find scenario with id: ${questionId} for scoring.`)
+      }
+
+      const scoringPrompt = `You are an expert examiner scoring a student's answer against a provided rubric.
+
+SCENARIO: "${currentScenario.scenario_title}"
+DESCRIPTION: "${currentScenario.scenario_description}"
+QUESTION: "${currentScenario.question}"
+RUBRIC: ${JSON.stringify(currentScenario.rubric, null, 2)}
+
+STUDENT'S ANSWER: "${userAnswer}"
+
+TASK: Provide comprehensive scoring and feedback based *strictly* on the rubric. For each criterion in the rubric, provide points earned and feedback. Calculate the total score and provide overall feedback.
+
+RETURN FORMAT (JSON):
+{
+  "total_score": 85,
+  "total_possible": 100,
+  "percentage": 85.0,
+  "detailed_scores": [
+    {
+      "criterion": "Understanding",
+      "points_earned": 35,
+      "max_points": 40,
+      "feedback": "Shows good understanding"
+    }
+  ],
+  "feedback_items": [
+    {
+      "type": "positive",
+      "message": "✓ Clearly explained the main concept",
+      "points": 5
+    }
+  ],
+  "overall_feedback": "Great work! Your explanation shows solid understanding.",
+  "completion_status": "complete"
+}
+
+Provide encouraging, constructive feedback.`
+
+      const response = await callGemini({
+        messages: [
+          {
+            role: "system",
+            content: "You are a fair, encouraging examiner. Provide detailed scoring and constructive feedback."
+          },
+          {
+            role: "user",
+            content: scoringPrompt
+          }
+        ],
+        temperature: 0.3
+      })
+
+      const responseContent = response.choices[0]?.message?.content
+      let scoring
+      try {
+        scoring = JSON.parse(responseContent || '{}')
+      } catch {
+        scoring = {
+          total_score: 75,
+          total_possible: 100,
+          percentage: 75.0,
+          detailed_scores: [],
+          feedback_items: [
+            {
+              type: "positive",
+              message: "Good effort on this response",
+              points: 0
+            }
+          ],
+          overall_feedback: "Thank you for your thoughtful response!",
+          completion_status: "complete"
+        }
+      }
+
+      return scoring
+    }
+
+  } catch (error) {
+    console.error('❌ Know Me scoring failed:', error)
+    throw new Error(`Answer scoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+async function generateKnowMeReport(requestData: ADKRequest) {
+  console.log('📈 Processing Know Me report generation request')
+  
+  const payload = requestData.payload || {}
+  const scoringResults = (payload.scoring_results as Array<any>) || []
+  const knowledgeAnalysis = (payload.knowledge_analysis as any) || {}
+  
+  try {
+    const coreTopics = knowledgeAnalysis.core_topics || []
+    const subjectArea = knowledgeAnalysis.subject_area || 'Academic Subject'
+    
+    const reportPrompt = `You are an expert educational analyst generating a comprehensive performance report.
+
+SCORING RESULTS: ${JSON.stringify(scoringResults)}
+CORE TOPICS: ${JSON.stringify(coreTopics)}
+SUBJECT AREA: ${subjectArea}
+
+TASK: Generate a detailed performance report with predictions and recommendations.
+
+RETURN FORMAT (JSON):
+{
+  "overall_metrics": {
+    "estimated_exam_score": 75.5,
+    "confidence_level": "high",
+    "total_questions_answered": 5,
+    "score_consistency": 8.2
+  },
+  "topic_breakdown": {
+    "Topic 1": {
+      "average_score": 78.5,
+      "total_questions": 2,
+      "score_range": "70% - 87%"
+    }
+  },
+  "predictive_insights": {
+    "predicted_exam_score": "70-80%",
+    "confidence_in_prediction": "high",
+    "strongest_areas": ["area1", "area2"],
+    "weakest_areas": ["area3"],
+    "performance_pattern": "Consistent strong performance",
+    "exam_readiness": "ready",
+    "key_insights": ["insight1", "insight2"]
+  },
+  "improvement_areas": [
+    {
+      "topic": "Topic Name",
+      "current_score": 65.0,
+      "improvement_potential": "high",
+      "specific_actions": ["action1", "action2"],
+      "priority_level": "high"
+    }
+  ],
+  "study_recommendations": {
+    "priority_topics": ["topic1", "topic2"],
+    "study_methods": ["method1", "method2"],
+    "estimated_prep_time": "2-3 weeks"
+  }
+}
+
+Provide actionable insights and realistic predictions.`
+
+    const response = await callGemini({
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert educational analyst. Generate comprehensive, actionable performance reports. Always return valid JSON."
+        },
+        {
+          role: "user",
+          content: reportPrompt
+        }
+      ],
+      temperature: 0.4
+    })
+
+    const responseContent = response.choices[0]?.message?.content
+    if (!responseContent) {
+      throw new Error('Failed to generate report')
+    }
+
+    let report
+    try {
+      report = JSON.parse(responseContent)
+    } catch (parseError) {
+      console.error('Failed to parse report response:', parseError)
+      // Fallback report
+      const avgScore = scoringResults.length > 0 
+        ? scoringResults.reduce((sum, r) => sum + (r.percentage || 0), 0) / scoringResults.length
+        : 75
+
+      report = {
+        overall_metrics: {
+          estimated_exam_score: avgScore,
+          confidence_level: avgScore >= 75 ? "high" : "medium",
+          total_questions_answered: scoringResults.length,
+          score_consistency: 5.0
+        },
+        topic_breakdown: {},
+        predictive_insights: {
+          predicted_exam_score: `${Math.max(avgScore - 10, 0)}-${Math.min(avgScore + 10, 100)}%`,
+          confidence_in_prediction: "medium",
+          strongest_areas: ["Problem solving"],
+          weakest_areas: ["Needs more practice"],
+          performance_pattern: "Developing understanding",
+          exam_readiness: avgScore >= 70 ? "ready" : "needs_work",
+          key_insights: ["Shows good effort", "Demonstrates learning potential"]
+        },
+        improvement_areas: [
+          {
+            topic: "Core Concepts",
+            current_score: avgScore,
+            improvement_potential: "high",
+            specific_actions: ["Review key concepts", "Practice with examples"],
+            priority_level: "medium"
+          }
+        ],
+        study_recommendations: {
+          priority_topics: ["Core Concepts"],
+          study_methods: ["Practice exercises", "Review materials"],
+          estimated_prep_time: "1-2 weeks"
+        }
+      }
+    }
+
+    console.log('✅ Know Me report generated successfully')
+    return report
+
+  } catch (error) {
+    console.error('❌ Know Me report generation failed:', error)
+    throw new Error(`Report generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 

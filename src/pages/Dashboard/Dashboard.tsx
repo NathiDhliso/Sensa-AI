@@ -738,7 +738,7 @@ const Dashboard: React.FC = () => {
                 <h3 className={styles.cardTitle}>Ready to Grow?</h3>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Share Memories Button */}
                 <motion.button
                   className="group relative bg-gradient-to-br from-rose-50 to-orange-50 hover:from-rose-100 hover:to-orange-100 border-2 border-rose-200 hover:border-rose-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden min-h-0 max-h-full"
@@ -761,6 +761,30 @@ const Dashboard: React.FC = () => {
                   </h3>
                   <div className="absolute opacity-60 group-hover:opacity-100 transition-opacity duration-300 overflow-hidden" style={{ bottom: 'clamp(0.4rem, 1.5vw, 0.6rem)', right: 'clamp(0.4rem, 1.5vw, 0.6rem)' }}>
                     <ArrowRight className="text-rose-600 flex-shrink-0" style={{ width: 'clamp(0.9rem, 2.5vw, 1.1rem)', height: 'clamp(0.9rem, 2.5vw, 1.1rem)' }} />
+                  </div>
+                </motion.button>
+
+                {/* Know Me Button */}
+                <motion.button
+                  className="group relative bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border-2 border-indigo-200 hover:border-indigo-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden min-h-0"
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate('/know-me')}
+                >
+                  <div 
+                    className="rounded-2xl shadow-lg mb-1 group-hover:scale-110 transition-transform duration-300 flex-shrink-0"
+                    style={{ 
+                      background: 'linear-gradient(to right, #6366f1, #8b5cf6)',
+                      padding: 'clamp(0.4rem, 1.5vw, 0.6rem)'
+                    }}
+                  >
+                    <Target className="text-white flex-shrink-0" style={{ width: 'clamp(1.25rem, 4.5vw, 1.75rem)', height: 'clamp(1.25rem, 4.5vw, 1.75rem)' }} />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-center leading-tight flex-shrink-0 overflow-hidden" style={{ fontSize: 'clamp(0.7rem, 2.5vw, 0.9rem)' }}>
+                    Know Me
+                  </h3>
+                  <div className="absolute opacity-60 group-hover:opacity-100 transition-opacity duration-300" style={{ bottom: 'clamp(0.4rem, 1.5vw, 0.6rem)', right: 'clamp(0.4rem, 1.5vw, 0.6rem)' }}>
+                    <ArrowRight className="text-indigo-600 flex-shrink-0" style={{ width: 'clamp(0.9rem, 2.5vw, 1.1rem)', height: 'clamp(0.9rem, 2.5vw, 1.1rem)' }} />
                   </div>
                 </motion.button>
 

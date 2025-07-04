@@ -12,6 +12,7 @@ import MemoryBank from './pages/MemoryBank';
 import SensaDialogue from './pages/SensaDialogue';
 import StudyMaterialUpload from './components/StudyMaterialUpload/StudyMaterialUpload';
 import EnhancedStudyMap from './pages/EnhancedStudyMap';
+import KnowMePage from './pages/KnowMePage';
 import NotificationSystem from './components/NotificationSystem/NotificationSystem';
 
 function App() {
@@ -66,6 +67,11 @@ function App() {
           <Route path="/study-upload" element={
             <ProtectedRoute>
               <StudyMaterialUpload />
+            </ProtectedRoute>
+          } />
+          <Route path="/know-me" element={
+            <ProtectedRoute>
+              <KnowMePage />
             </ProtectedRoute>
           } />
           {/* Legacy routes redirecting to integrated learning hub */}
