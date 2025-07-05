@@ -9,14 +9,15 @@ export default defineConfig({
     exclude: /node_modules/,
   })],
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    include: ['lucide-react', 'framer-motion', '@supabase/supabase-js'],
+    force: true
   },
   server: {
     // Fix WebSocket connection issues
-    port: 5173,
+    port: 5175,
     host: true,
     hmr: {
-      port: 5173,
+      port: 5175,
     }
   },
   // Fix module resolution
@@ -31,14 +32,15 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          supabase: ['@supabase/supabase-js']
+          supabase: ['@supabase/supabase-js'],
+          icons: ['lucide-react'],
+          animation: ['framer-motion']
         }
       }
     }
   },
-  // This `define` block makes environment variables available in your client-side code
+  // Environment variables
   define: {
-    'process.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
-    'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY)
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   }
 });

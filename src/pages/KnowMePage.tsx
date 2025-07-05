@@ -14,13 +14,21 @@ import {
   Star,
   TrendingUp,
   Calendar,
-  Award,
   AlertCircle,
+  BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { callEdgeFunction } from '../services/edgeFunctions';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import * as pdfjsLib from 'pdfjs-dist';
 
-// Types
+// Configure the worker — using CDN to avoid bundler issues
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+// Enhanced Types for Problem-Based Learning
 interface KnowMePhase {
   id: string;
   title: string;
@@ -29,32 +37,41 @@ interface KnowMePhase {
   status: 'pending' | 'active' | 'completed';
 }
 
-interface CoreTopic {
-  topic_name: string;
-  description: string;
-  key_concepts: string[];
-  difficulty_level: string;
-  prerequisites: string[];
-  estimated_study_time: string;
+interface ProblemSolutionAnalysis {
+  solution_id: string;
+  technical_solution: string;
+  underlying_problem: string;
+  problem_category: string;
+  abstracted_problem: string;
+  life_connection: string;
+  complexity_level: string;
 }
 
-interface Question {
-  id: string;
-  type: string;
-  question: string;
-  purpose: string;
-  related_topics: string[];
+interface KnowMeQuestion {
+  question_id: string;
+  related_solution_id: string;
+  question_text: string;
+  question_purpose: string;
+  expected_insights: string[];
+  follow_up_prompts: string[];
+}
+
+interface LearningObjective {
+  objective: string;
+  problem_focus: string;
+  real_world_application: string;
 }
 
 interface Scenario {
   scenario_id: string;
-  topic_name: string;
+  related_problem_id: string;
   scenario_title: string;
   scenario_description: string;
+  core_problem: string;
   question: string;
   context_type: string;
   difficulty_level: string;
-  key_concepts_tested: string[];
+  problem_indicators: string[];
   expected_response_type: string;
   estimated_time: string;
   rubric?: any;
@@ -73,15 +90,17 @@ interface ScoringResult {
 
 interface PerformanceReport {
   overall_metrics: {
-    estimated_exam_score: number;
+    problem_solving_score: number;
     confidence_level: string;
-    total_questions_answered: number;
+    scenarios_completed: number;
+    consistency_rating: number;
   };
-  topic_breakdown: Record<string, any>;
+  problem_category_breakdown: Record<string, any>;
   predictive_insights: {
-    predicted_exam_score: string;
-    strongest_areas: string[];
-    weakest_areas: string[];
+    predicted_exam_performance: string;
+    strongest_problem_areas: string[];
+    areas_needing_focus: string[];
+    problem_solving_pattern: string;
     exam_readiness: string;
     key_insights: string[];
   };
@@ -95,18 +114,19 @@ const KnowMePage: React.FC = () => {
   // Phase management
   const [currentPhase, setCurrentPhase] = useState(0);
   const [phases, setPhases] = useState<KnowMePhase[]>([
-    { id: 'upload', title: 'Upload Material', description: 'Upload your study PDF', icon: Upload, status: 'active' },
-    { id: 'questionnaire', title: 'Know Me Questions', description: 'Tell us about yourself', icon: Brain, status: 'pending' },
-    { id: 'scenarios', title: 'Scenario Questions', description: 'Apply your knowledge', icon: Target, status: 'pending' },
-    { id: 'report', title: 'Performance Report', description: 'Your personalized insights', icon: BarChart3, status: 'pending' }
+    { id: 'upload', title: 'Upload Material', description: 'Upload your exam PDF', icon: Upload, status: 'active' },
+    { id: 'questionnaire', title: 'Know Me Questions', description: 'Share your experiences', icon: Brain, status: 'pending' },
+    { id: 'scenarios', title: 'Problem Scenarios', description: 'Apply your knowledge', icon: Target, status: 'pending' },
+    { id: 'report', title: 'Performance Report', description: 'Your insights', icon: BarChart3, status: 'pending' }
   ]);
 
-  // Phase 1: PDF Upload
+  // Phase 1: PDF Upload and Problem-Solution Analysis
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [extractedText, setExtractedText] = useState('');
   const [knowledgeAnalysis, setKnowledgeAnalysis] = useState<any>(null);
-  const [coreTopics, setCoreTopics] = useState<CoreTopic[]>([]);
-  const [questionnaire, setQuestionnaire] = useState<any>(null);
+  const [problemSolutionAnalysis, setProblemSolutionAnalysis] = useState<ProblemSolutionAnalysis[]>([]);
+  const [knowMeQuestions, setKnowMeQuestions] = useState<KnowMeQuestion[]>([]);
+  const [learningObjectives, setLearningObjectives] = useState<LearningObjective[]>([]);
 
   // Phase 2: Questionnaire
   const [questionnaireResponses, setQuestionnaireResponses] = useState<Record<string, string>>({});
@@ -142,7 +162,7 @@ const KnowMePage: React.FC = () => {
     }
   };
 
-  // Phase 1: PDF Upload and Analysis
+  // Phase 1: PDF Upload and Problem-Solution Analysis
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || file.type !== 'application/pdf') {
@@ -155,39 +175,56 @@ const KnowMePage: React.FC = () => {
     setError(null);
 
     try {
-      // Extract text from PDF (simplified - in real implementation, use PDF.js or similar)
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // For demo purposes, we'll simulate PDF text extraction
-      const simulatedText = `
-        This is a sample study material about ${file.name.replace('.pdf', '')}. 
-        It covers various topics including fundamental concepts, practical applications, 
-        and advanced techniques. The material is designed for intermediate to advanced learners 
-        and includes real-world examples and case studies.
-      `;
-      
-      setExtractedText(simulatedText);
+      // Extract text from the uploaded PDF using pdfjs-dist
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-      // Call Knowledge Extraction Agent
+      let extractedTextCombined = '';
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = (textContent.items as any[]).map(item => item.str).join(' ');
+        extractedTextCombined += pageText + '\n';
+        // Limit to first ~20k chars to avoid oversize payloads
+        if (extractedTextCombined.length > 20000) {
+          extractedTextCombined = extractedTextCombined.substring(0, 20000);
+          break;
+        }
+      }
+
+      setExtractedText(extractedTextCombined);
+
+      // Call Enhanced Knowledge Extraction Agent with real extracted text
+      console.log('🔍 Calling edge function with payload:', {
+        action: 'know_me_start',
+        pdf_content: extractedTextCombined.substring(0, 100) + '...',
+        user_id: user?.id || 'demo-user'
+      });
+
       const knowledgeResult = await callEdgeFunction('adk-agents', {
         payload: {
           action: 'know_me_start',
-          pdf_content: simulatedText,
+          pdf_content: extractedTextCombined,
           user_id: user?.id || 'demo-user'
         }
       });
 
+      console.log('📥 Edge function response:', knowledgeResult);
+
       if (knowledgeResult.success) {
+        console.log('✅ Analysis successful:', knowledgeResult.knowledge_analysis);
         setKnowledgeAnalysis(knowledgeResult.knowledge_analysis);
-        setCoreTopics(knowledgeResult.knowledge_analysis?.core_topics || []);
-        setQuestionnaire(knowledgeResult.knowledge_analysis?.questionnaire);
+        setProblemSolutionAnalysis(knowledgeResult.knowledge_analysis?.problem_solution_analysis || []);
+        setKnowMeQuestions(knowledgeResult.knowledge_analysis?.know_me_questions || []);
+        setLearningObjectives(knowledgeResult.knowledge_analysis?.learning_objectives || []);
         moveToNextPhase();
       } else {
+        console.error('❌ Analysis failed:', knowledgeResult.error);
         throw new Error(knowledgeResult.error || 'Failed to analyze PDF');
       }
 
     } catch (err) {
+      console.error('💥 Upload error:', err);
       setError(`Failed to process PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
@@ -210,7 +247,7 @@ const KnowMePage: React.FC = () => {
       const responses = Object.entries(questionnaireResponses).map(([questionId, answer]) => ({
         question_id: questionId,
         answer: answer,
-        question: questionnaire?.questions?.find((q: Question) => q.id === questionId)?.question || ''
+        question: knowMeQuestions?.find((q: KnowMeQuestion) => q.question_id === questionId)?.question_text || ''
       }));
 
       const scenarioResult = await callEdgeFunction('adk-agents', {
@@ -342,10 +379,9 @@ const KnowMePage: React.FC = () => {
     }
   };
 
-  // Voice recording functionality (placeholder for future Eleven Labs integration)
+  // Voice recording functionality (placeholder for future integration)
   const toggleRecording = () => {
     setIsRecording(!isRecording);
-    // TODO: Integrate with Eleven Labs voice-to-text
   };
 
   const renderPhaseIndicator = () => (
@@ -395,71 +431,97 @@ const KnowMePage: React.FC = () => {
       className="max-w-2xl mx-auto"
     >
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Study Material</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Study Material</h2>
         <p className="text-gray-600 text-lg">
-          Upload a PDF of your course material or exam guide to get started with personalized preparation
+          Upload your exam papers or study materials to begin the problem-based learning analysis
         </p>
       </div>
 
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors">
+      <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Upload PDF Document
+          </h3>
+          <p className="text-gray-600 mb-4">
+            Choose an exam paper or study material to analyze
+          </p>
+          
         <input
-          ref={fileInputRef}
           type="file"
           accept=".pdf"
           onChange={handleFileUpload}
           className="hidden"
-        />
-        
-        {uploadedFile ? (
-          <div className="space-y-4">
-            <FileText className="mx-auto text-green-500" size={48} />
-            <div>
-              <p className="font-medium text-gray-900">{uploadedFile.name}</p>
-              <p className="text-sm text-gray-500">
-                {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-              </p>
-            </div>
-            {loading && (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500"></div>
-                <span className="text-sm text-gray-600">Analyzing PDF content...</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <Upload className="mx-auto text-gray-400" size={48} />
-            <div>
+            id="file-upload"
+            disabled={loading}
+          />
+          
+          <label
+            htmlFor="file-upload"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+          >
+            {loading ? 'Processing...' : 'Choose File'}
+          </label>
+
+          {/* Test Button */}
+          <div className="mt-4">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-              >
-                Choose PDF File
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const testResult = await callEdgeFunction('adk-agents', {
+                    payload: {
+                      action: 'know_me_start',
+                      pdf_content: 'Test content about network configuration and VNet peering',
+                      user_id: 'test-user'
+                    }
+                  });
+                  console.log('🧪 Test result:', testResult);
+                  alert('Test completed - check console for results');
+                } catch (error) {
+                  console.error('🧪 Test error:', error);
+                  alert('Test failed - check console for error details');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="ml-4 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Test Edge Function
               </button>
-              <p className="text-sm text-gray-500 mt-2">
-                Supported format: PDF (max 50MB)
-              </p>
+          </div>
+        </div>
+
+        {uploadedFile && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+              <span className="text-green-800">
+                Uploaded: {uploadedFile.name}
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {coreTopics.length > 0 && (
+      {/* Analysis Results Preview */}
+      {problemSolutionAnalysis && problemSolutionAnalysis.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6"
+          className="mt-8 bg-white rounded-lg shadow-lg p-6"
         >
-          <h3 className="font-semibold text-green-800 mb-4">
-            ✓ Identified {coreTopics.length} Core Topics:
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+            Problem-Solution Analysis Preview
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {coreTopics.map((topic, index) => (
-              <div key={index} className="bg-white p-3 rounded border">
-                <h4 className="font-medium text-gray-900">{topic.topic_name}</h4>
-                <p className="text-sm text-gray-600">{topic.description}</p>
-                <span className="inline-block mt-2 px-2 py-1 bg-gray-100 text-xs rounded">
-                  {topic.difficulty_level}
+          <div className="space-y-4">
+            {problemSolutionAnalysis.slice(0, 3).map((analysis, index) => (
+              <div key={index} className="border-l-4 border-indigo-500 pl-4">
+                <h4 className="font-medium text-gray-900">{analysis.technical_solution}</h4>
+                <p className="text-sm text-gray-600 mt-1">{analysis.underlying_problem}</p>
+                <p className="text-sm text-purple-600 mt-1 italic">{analysis.life_connection}</p>
+                <span className="inline-block mt-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">
+                  {analysis.problem_category}
                 </span>
               </div>
             ))}
@@ -470,12 +532,12 @@ const KnowMePage: React.FC = () => {
   );
 
   const renderPhase2Questionnaire = () => {
-    if (!questionnaire?.questions) return null;
+    if (!knowMeQuestions || knowMeQuestions.length === 0) return null;
 
-    const questions: Question[] = questionnaire.questions;
+    const questions: KnowMeQuestion[] = knowMeQuestions;
     const currentQuestion = questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === questions.length - 1;
-    const allQuestionsAnswered = questions.every(q => questionnaireResponses[q.id]);
+    const allQuestionsAnswered = questions.every(q => questionnaireResponses[q.question_id]);
 
     return (
       <motion.div
@@ -484,10 +546,10 @@ const KnowMePage: React.FC = () => {
         className="max-w-3xl mx-auto"
       >
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">{questionnaire.title}</h2>
-          <p className="text-gray-600 text-lg">{questionnaire.description}</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Know Me Questions</h2>
+          <p className="text-gray-600 text-lg">Help us understand your problem-solving approach through personal experiences</p>
           <div className="mt-4 text-sm text-gray-500">
-            Question {currentQuestionIndex + 1} of {questions.length} • {questionnaire.estimated_time}
+            Question {currentQuestionIndex + 1} of {questions.length} • 5-7 minutes
           </div>
         </div>
 
@@ -495,18 +557,18 @@ const KnowMePage: React.FC = () => {
           <div className="mb-6">
             <div className="flex items-center text-sm text-gray-500 mb-3">
               <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-                {currentQuestion.type}
+                Life Experience
               </span>
-              <span className="ml-2">{currentQuestion.purpose}</span>
+              <span className="ml-2">{currentQuestion.question_purpose}</span>
             </div>
             
             <h3 className="text-xl font-medium text-gray-900 mb-4">
-              {currentQuestion.question}
+              {currentQuestion.question_text}
             </h3>
 
             <textarea
-              value={questionnaireResponses[currentQuestion.id] || ''}
-              onChange={(e) => handleQuestionnaireResponse(currentQuestion.id, e.target.value)}
+              value={questionnaireResponses[currentQuestion.question_id] || ''}
+              onChange={(e) => handleQuestionnaireResponse(currentQuestion.question_id, e.target.value)}
               placeholder="Share your thoughts and experiences..."
               className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
@@ -527,7 +589,7 @@ const KnowMePage: React.FC = () => {
                   key={index}
                   className={`w-3 h-3 rounded-full ${
                     index === currentQuestionIndex ? 'bg-indigo-500' :
-                    questionnaireResponses[questions[index].id] ? 'bg-green-500' :
+                    questionnaireResponses[questions[index].question_id] ? 'bg-green-500' :
                     'bg-gray-200'
                   }`}
                 />
@@ -545,7 +607,7 @@ const KnowMePage: React.FC = () => {
             ) : (
               <button
                 onClick={() => setCurrentQuestionIndex(Math.min(questions.length - 1, currentQuestionIndex + 1))}
-                disabled={!questionnaireResponses[currentQuestion.id]}
+                disabled={!questionnaireResponses[currentQuestion.question_id]}
                 className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
               >
                 Next
@@ -572,9 +634,9 @@ const KnowMePage: React.FC = () => {
         className="max-w-4xl mx-auto"
       >
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Scenario-Based Questions</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Problem-Based Scenarios</h2>
           <p className="text-gray-600 text-lg">
-            Apply your knowledge to real-world scenarios based on your personal experiences
+            Apply your problem-solving skills to real-world scenarios based on your personal experiences
           </p>
           <div className="mt-4 text-sm text-gray-500">
             Scenario {currentScenarioIndex + 1} of {scenarios.length}
@@ -587,7 +649,7 @@ const KnowMePage: React.FC = () => {
             <div className="mb-6">
               <div className="flex items-center space-x-2 mb-4">
                 <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-sm">
-                  {currentScenario.topic_name}
+                  {currentScenario.core_problem}
                 </span>
                 <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm">
                   {currentScenario.difficulty_level}
@@ -614,6 +676,18 @@ const KnowMePage: React.FC = () => {
                 {currentScenario.question}
               </p>
 
+              {/* Problem Indicators */}
+              <div className="mb-6">
+                <h5 className="font-medium text-gray-900 mb-2">Key Indicators:</h5>
+                <div className="flex flex-wrap gap-2">
+                  {currentScenario.problem_indicators.map((indicator, index) => (
+                    <span key={index} className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm">
+                      {indicator}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               {/* Answer Input */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -639,16 +713,15 @@ const KnowMePage: React.FC = () => {
                 <textarea
                   value={currentAnswer}
                   onChange={(e) => handleScenarioAnswer(currentScenario.scenario_id, e.target.value)}
-                  placeholder="Explain your approach, reasoning, and solution..."
-                  className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                  disabled={hasResult}
+                  placeholder="Focus on identifying the core problem and explaining your approach..."
+                  className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 />
 
                 {!hasResult && (
                   <button
                     onClick={() => submitScenarioAnswer(currentScenario.scenario_id)}
-                    disabled={currentAnswer.length < 50 || loading}
-                    className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium transition-colors"
+                    disabled={!currentAnswer.trim() || loading}
+                    className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors"
                   >
                     {loading ? 'Scoring...' : 'Submit Answer'}
                   </button>
@@ -659,120 +732,72 @@ const KnowMePage: React.FC = () => {
             {/* Scoring Results */}
             {hasResult && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="border-t pt-6"
+                className="mt-6 bg-green-50 border border-green-200 rounded-lg p-6"
               >
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-green-800">Score Results</h4>
-                    <div className="flex items-center space-x-2">
-                      <Star className="text-yellow-500" size={20} />
-                      <span className="text-2xl font-bold text-green-700">
-                        {scoringResult.percentage}%
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <p className="text-green-700 mb-3">
-                    {scoringResult.overall_feedback}
-                  </p>
+                <h4 className="font-semibold text-green-800 mb-4">
+                  ✓ Scored: {scoringResult.percentage}% ({scoringResult.total_score}/{scoringResult.total_possible})
+                </h4>
+                <p className="text-gray-700 mb-4">{scoringResult.overall_feedback}</p>
 
                   <div className="space-y-2">
-                    {scoringResult.feedback_items?.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center space-x-2 text-sm">
-                        {item.type === 'positive' && <CheckCircle className="text-green-500" size={16} />}
-                        {item.type === 'bonus' && <Star className="text-yellow-500" size={16} />}
-                        {item.type === 'missing' && <AlertCircle className="text-orange-500" size={16} />}
-                        <span className={
-                          item.type === 'positive' ? 'text-green-700' :
-                          item.type === 'bonus' ? 'text-yellow-700' :
-                          'text-orange-700'
-                        }>
-                          {item.message}
-                        </span>
+                  {scoringResult.feedback_items.map((item: any, index: number) => (
+                    <div key={index} className={`flex items-start space-x-2 ${
+                      item.type === 'positive' ? 'text-green-700' : 'text-blue-700'
+                    }`}>
+                      <span className="text-sm">{item.message}</span>
                       </div>
                     ))}
-                  </div>
                 </div>
 
-                {currentScenarioIndex < scenarios.length - 1 ? (
+                {currentScenarioIndex < scenarios.length - 1 && (
                   <button
                     onClick={() => setCurrentScenarioIndex(currentScenarioIndex + 1)}
-                    className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 px-6 rounded-lg font-medium transition-colors"
+                    className="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
                   >
-                    Next Scenario →
-                  </button>
-                ) : (
-                  <button
-                    onClick={generateFinalReport}
-                    disabled={loading}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-medium transition-colors"
-                  >
-                    {loading ? 'Generating Report...' : 'View Performance Report'}
+                    Next Scenario
                   </button>
                 )}
               </motion.div>
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Progress */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Progress</h3>
-              <div className="space-y-2">
-                {scenarios.map((scenario, index) => (
-                  <div
-                    key={scenario.scenario_id}
-                    className={`flex items-center space-x-2 p-2 rounded ${
-                      index === currentScenarioIndex ? 'bg-indigo-50 border border-indigo-200' :
-                      scoringResults[scenario.scenario_id] ? 'bg-green-50' :
-                      'bg-gray-50'
-                    }`}
-                  >
-                    <div className={`w-3 h-3 rounded-full ${
-                      scoringResults[scenario.scenario_id] ? 'bg-green-500' :
-                      index === currentScenarioIndex ? 'bg-indigo-500' :
-                      'bg-gray-300'
-                    }`} />
-                    <span className="text-sm font-medium truncate">
-                      {scenario.topic_name}
-                    </span>
+          {/* Hints Panel */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <Lightbulb className="mr-2" size={20} />
+              Real-time Hints
+            </h4>
+            
+            {realTimeHints.length > 0 ? (
+              <div className="space-y-3">
+                {realTimeHints.map((hint, index) => (
+                  <div key={index} className="bg-blue-50 border border-blue-200 rounded p-3">
+                    <p className="text-sm text-blue-800">{hint}</p>
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Real-time Hints */}
-            {realTimeHints.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
-              >
-                <div className="flex items-center space-x-2 mb-3">
-                  <Lightbulb className="text-yellow-600" size={20} />
-                  <h3 className="font-semibold text-yellow-800">Live Hints</h3>
-                </div>
-                <div className="space-y-2">
-                  {realTimeHints.map((hint, index) => (
-                    <p key={index} className="text-sm text-yellow-700">
-                      {hint}
-                    </p>
-                  ))}
-                </div>
-              </motion.div>
+            ) : (
+              <p className="text-gray-500 text-sm">
+                Start typing your response to get personalized hints...
+              </p>
             )}
 
-            {/* Key Concepts */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Key Concepts</h3>
+            {/* Progress */}
+            <div className="mt-6">
+              <h5 className="font-medium text-gray-900 mb-2">Progress</h5>
               <div className="space-y-2">
-                {currentScenario.key_concepts_tested?.map((concept, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full" />
-                    <span className="text-sm text-gray-700">{concept}</span>
+                {scenarios.map((scenario, index) => (
+                  <div key={scenario.scenario_id} className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      index === currentScenarioIndex ? 'bg-indigo-500' :
+                      scoringResults[scenario.scenario_id] ? 'bg-green-500' :
+                      'bg-gray-200'
+                    }`} />
+                    <span className="text-sm text-gray-600">
+                      Scenario {index + 1}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -786,7 +811,9 @@ const KnowMePage: React.FC = () => {
   const renderPhase4Report = () => {
     if (!performanceReport) return null;
 
-    const { overall_metrics, topic_breakdown, predictive_insights, improvement_areas, study_recommendations } = performanceReport;
+    const metrics = performanceReport.overall_metrics;
+    const insights = performanceReport.predictive_insights;
+    const categoryBreakdown = performanceReport.problem_category_breakdown;
 
     return (
       <motion.div
@@ -795,229 +822,243 @@ const KnowMePage: React.FC = () => {
         className="max-w-6xl mx-auto"
       >
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Your Performance Report</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Performance Report</h2>
           <p className="text-gray-600 text-lg">
-            Personalized insights and recommendations for your exam preparation
+            Your personalized problem-solving assessment and recommendations
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Overall Performance */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Overall Metrics */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <TrendingUp className="mr-2 text-indigo-500" />
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="mr-2" size={20} />
                 Overall Performance
               </h3>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="space-y-4">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-indigo-600">
-                    {overall_metrics.estimated_exam_score}%
+                  {metrics.problem_solving_score}%
                   </div>
-                  <div className="text-sm text-gray-600">Estimated Score</div>
+                <div className="text-sm text-gray-500">Problem-Solving Score</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">
-                    {overall_metrics.confidence_level}
+              
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {metrics.scenarios_completed}
                   </div>
-                  <div className="text-sm text-gray-600">Confidence</div>
+                  <div className="text-xs text-gray-500">Scenarios Completed</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600">
-                    {overall_metrics.total_questions_answered}
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {metrics.consistency_rating}/10
                   </div>
-                  <div className="text-sm text-gray-600">Questions</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-600">
-                    {predictive_insights.exam_readiness}
-                  </div>
-                  <div className="text-sm text-gray-600">Readiness</div>
+                  <div className="text-xs text-gray-500">Consistency</div>
                 </div>
               </div>
 
-              <div className="border-t pt-6">
-                <h4 className="font-semibold text-gray-900 mb-3">Predicted Exam Score Range</h4>
-                <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded">
-                  <p className="text-indigo-800 font-medium">
-                    {predictive_insights.predicted_exam_score}
-                  </p>
+                <div className="text-center">
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                  metrics.confidence_level === 'high' ? 'bg-green-100 text-green-800' :
+                  metrics.confidence_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {metrics.confidence_level.toUpperCase()} CONFIDENCE
+                </span>
+                  </div>
+                </div>
+              </div>
+
+          {/* Predictive Insights */}
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-lg p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <TrendingUp className="mr-2" size={20} />
+              Predictive Insights
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Exam Readiness</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Predicted Performance:</span>
+                    <span className="font-medium">{insights.predicted_exam_performance}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Readiness Status:</span>
+                    <span className={`font-medium ${
+                      insights.exam_readiness === 'ready' ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {insights.exam_readiness.toUpperCase()}
+                    </span>
                 </div>
               </div>
             </div>
 
-            {/* Topic Breakdown */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Topic Performance</h3>
-              <div className="space-y-4">
-                {Object.entries(topic_breakdown).map(([topic, data]: [string, any]) => (
-                  <div key={topic} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-900">{topic}</h4>
-                      <span className="text-lg font-bold text-indigo-600">
-                        {data.average_score}%
-                      </span>
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Problem-Solving Pattern</h4>
+                <p className="text-sm text-gray-600">{insights.problem_solving_pattern}</p>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-indigo-500 h-2 rounded-full"
-                        style={{ width: `${data.average_score}%` }}
-                      />
                     </div>
-                    <p className="text-sm text-gray-600 mt-2">
-                      {data.total_questions} questions • Range: {data.score_range}
-                    </p>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Strongest Areas</h4>
+                <div className="space-y-1">
+                  {insights.strongest_problem_areas.map((area, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Star className="text-green-500" size={16} />
+                      <span className="text-sm text-gray-700">{area}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Key Insights */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Key Insights</h3>
-              <div className="space-y-3">
-                {predictive_insights.key_insights?.map((insight, index) => (
-                  <div key={index} className="flex items-start space-x-2">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full mt-2 flex-shrink-0" />
-                    <p className="text-gray-700">{insight}</p>
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Focus Areas</h4>
+                <div className="space-y-1">
+                  {insights.areas_needing_focus.map((area, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <AlertCircle className="text-yellow-500" size={16} />
+                      <span className="text-sm text-gray-700">{area}</span>
                   </div>
                 ))}
+                </div>
+              </div>
               </div>
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Strengths & Weaknesses */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="font-bold text-gray-900 mb-4">Strengths & Areas to Improve</h3>
-              
-              <div className="mb-4">
-                <h4 className="font-medium text-green-700 mb-2 flex items-center">
-                  <Award className="mr-1" size={16} />
-                  Strongest Areas
-                </h4>
-                <div className="space-y-1">
-                  {predictive_insights.strongest_areas?.map((area, index) => (
-                    <div key={index} className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
-                      {area}
+        {/* Problem Category Breakdown */}
+        <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+            <Target className="mr-2" size={20} />
+            Problem Category Performance
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(categoryBreakdown).map(([category, data]: [string, any]) => (
+              <div key={category} className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-2">{category}</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Average Score:</span>
+                    <span className="font-medium">{data.average_score}%</span>
                     </div>
-                  ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Scenarios:</span>
+                    <span className="font-medium">{data.scenarios_completed}</span>
                 </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Readiness:</span>
+                    <span className={`font-medium ${
+                      data.real_world_readiness === 'high' ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {data.real_world_readiness.toUpperCase()}
+                    </span>
               </div>
-
-              <div>
-                <h4 className="font-medium text-orange-700 mb-2 flex items-center">
-                  <Target className="mr-1" size={16} />
-                  Areas to Improve
-                </h4>
-                <div className="space-y-1">
-                  {predictive_insights.weakest_areas?.map((area, index) => (
-                    <div key={index} className="text-sm text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                      {area}
+                </div>
                     </div>
                   ))}
-                </div>
               </div>
             </div>
 
             {/* Study Recommendations */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center">
-                <Calendar className="mr-2" />
-                Study Plan
+        <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+            <BookOpen className="mr-2" size={20} />
+            Study Recommendations
               </h3>
               
-              {improvement_areas?.map((area, index) => (
-                <div key={index} className="mb-4 p-3 bg-gray-50 rounded">
-                  <h4 className="font-medium text-gray-900 text-sm">{area.topic}</h4>
-                  <p className="text-xs text-gray-600 mb-2">
-                    Priority: {area.priority_level} • {area.estimated_improvement_time}
-                  </p>
-                  <div className="space-y-1">
-                    {area.specific_actions?.slice(0, 2).map((action: string, i: number) => (
-                      <p key={i} className="text-xs text-gray-700">• {action}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium text-gray-900 mb-2">Priority Problems</h4>
+              <div className="space-y-2">
+                {performanceReport.study_recommendations.priority_problems.map((problem: string, index: number) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full" />
+                    <span className="text-sm text-gray-700">{problem}</span>
+                  </div>
                     ))}
                   </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium text-gray-900 mb-2">Recommended Approaches</h4>
+              <div className="space-y-2">
+                {performanceReport.study_recommendations.recommended_approaches.map((approach: string, index: number) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm text-gray-700">{approach}</span>
                 </div>
               ))}
             </div>
-
-            {/* Actions */}
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-6 text-white">
-              <h3 className="font-bold mb-4">Next Steps</h3>
-              <div className="space-y-3">
-                <button className="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white py-2 px-4 rounded transition-colors">
-                  Download Full Report
-                </button>
-                <button className="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white py-2 px-4 rounded transition-colors">
-                  Create Study Schedule
-                </button>
-                <button className="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white py-2 px-4 rounded transition-colors">
-                  Take Another Assessment
-                </button>
               </div>
             </div>
+
+          <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Calendar className="text-indigo-600" size={20} />
+              <span className="font-medium text-indigo-900">
+                Estimated Prep Time: {performanceReport.study_recommendations.estimated_prep_time}
+              </span>
+            </div>
+            <p className="text-sm text-indigo-700 mt-2">
+              Focus Areas: {performanceReport.study_recommendations.focus_areas}
+            </p>
           </div>
         </div>
       </motion.div>
     );
   };
 
+  const renderCurrentPhase = () => {
+    switch (currentPhase) {
+      case 0:
+        return renderPhase1Upload();
+      case 1:
+        return renderPhase2Questionnaire();
+      case 2:
+        return renderPhase3Scenarios();
+      case 3:
+        return renderPhase4Report();
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Know Me Assessment
+            Enhanced Know Me Feature
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Transform any PDF into a personalized exam preparation experience. 
-            Our AI analyzes your study material and creates scenarios based on your personal experiences.
+          <p className="text-xl text-gray-600">
+            Problem-based learning through personal experience connections
           </p>
         </div>
 
-        {/* Phase Indicator */}
         {renderPhaseIndicator()}
 
-        {/* Error Display */}
-        <AnimatePresence>
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-2xl mx-auto mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2"
-            >
-              <AlertCircle className="text-red-500 flex-shrink-0" size={20} />
-              <div className="text-red-700">
-                <p className="font-medium">Error</p>
-                <p className="text-sm">{error}</p>
+            className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4"
+          >
+            <div className="flex items-center">
+              <AlertCircle className="text-red-500 mr-2" size={20} />
+              <span className="text-red-800">{error}</span>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="ml-auto text-red-500 hover:text-red-700"
-              >
-                ×
-              </button>
             </motion.div>
           )}
-        </AnimatePresence>
 
-        {/* Phase Content */}
         <AnimatePresence mode="wait">
-          {currentPhase === 0 && renderPhase1Upload()}
-          {currentPhase === 1 && renderPhase2Questionnaire()}
-          {currentPhase === 2 && renderPhase3Scenarios()}
-          {currentPhase === 3 && renderPhase4Report()}
+          {renderCurrentPhase()}
         </AnimatePresence>
-
-        {/* Footer */}
-        <div className="text-center mt-12 text-gray-500 text-sm">
-          <p>Powered by Sensa AI • Privacy-focused personalized learning</p>
-        </div>
       </div>
     </div>
   );

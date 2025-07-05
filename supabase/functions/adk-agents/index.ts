@@ -1788,48 +1788,82 @@ async function generateKnowMeAnalysis(requestData: ADKRequest) {
   
   console.log('[KnowMe] Content truncated?:', pdfContent.length > MAX_CONTENT_CHARS)
   
+  // Check if Google AI API key is available
+  const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  console.log('[KnowMe] Google AI API Key status:', {
+    exists: !!googleApiKey,
+    length: googleApiKey?.length || 0
+  })
+  
   try {
-    // Phase 1: Analyze PDF content and extract core topics
-    const analysisPrompt = `You are an expert educational content analyzer. Analyze this PDF content and identify 5-7 core knowledge domains.
+    let analysis
+    
+    if (googleApiKey) {
+      // Enhanced Phase 1: Analyze PDF content using problem-solution-question methodology
+      const analysisPrompt = `You are an expert educational content analyzer specializing in problem-solution extraction from exam materials. Your task is to analyze exam papers and identify underlying problems that solutions address.
+
+METHODOLOGY:
+1. Identify technical solutions/actions in the exam content
+2. Extract the underlying problems these solutions resolve
+3. Create life-experience questions that connect to these problems
+4. Focus on learning from problems, not memorizing solutions
+
+ANALYSIS FRAMEWORK:
+- Look for technical implementations, configurations, or procedures
+- Identify what core problem each solution addresses
+- Abstract the problem to universal human experiences
+- Create questions that explore similar problem-solving in personal contexts
 
 PDF CONTENT (sample):
 ${contentSample}
 
 TASK: 
-1. Identify the main subject area
-2. Extract 5-7 core topics that represent the essential knowledge domains
-3. Generate a personalized "Know Me" questionnaire that bridges academic content with personal experiences
+1. Identify technical solutions/actions in the exam content
+2. Extract the underlying problems each solution addresses
+3. Create problem-solution mappings with life experience connections
+4. Generate personalized "Know Me" questions based on these problems
 
 RETURN FORMAT (JSON):
 {
   "subject_area": "Main subject of the content",
-  "core_topics": [
+  "document_type": "exam_paper/study_guide/certification_material",
+  "problem_solution_analysis": [
     {
-      "topic_name": "Topic Name",
-      "description": "Brief description",
-      "key_concepts": ["concept1", "concept2", "concept3"],
-      "difficulty_level": "Beginner/Intermediate/Advanced",
-      "prerequisites": ["prereq1", "prereq2"],
-      "estimated_study_time": "X hours"
+      "solution_id": "sol_1",
+      "technical_solution": "Detailed description of what the solution does",
+      "underlying_problem": "The core problem this solution addresses",
+      "problem_category": "communication/security/integration/performance/management",
+      "abstracted_problem": "Universal human problem this represents",
+      "life_connection": "How this problem manifests in daily life",
+      "complexity_level": "basic/intermediate/advanced"
     }
   ],
-  "questionnaire": {
-    "title": "Get to Know You - Personalized Learning Profile",
-    "description": "Help us understand your background and interests",
-    "estimated_time": "5-7 minutes",
-    "questions": [
-      {
-        "id": "q1",
-        "type": "experience/preference/background/scenario/interest",
-        "question": "Question text",
-        "purpose": "Why this question helps",
-        "related_topics": ["topic1", "topic2"]
-      }
-    ]
-  }
+  "know_me_questions": [
+    {
+      "question_id": "q1",
+      "related_solution_id": "sol_1",
+      "question_text": "Life experience question that connects to the problem",
+      "question_purpose": "Why this question reveals problem-solving approach",
+      "expected_insights": ["insight1", "insight2"],
+      "follow_up_prompts": ["prompt1", "prompt2"]
+    }
+  ],
+  "learning_objectives": [
+    {
+      "objective": "What the student should learn",
+      "problem_focus": "The problem-solving skill being developed",
+      "real_world_application": "How this applies beyond academics"
+    }
+  ]
 }
 
-Focus on creating questions that connect academic concepts to real-world experiences.`
+EXAMPLE (VNet Peering):
+- Technical Solution: "Configure VNet peering between VNet-Sales and VNet-Marketing"
+- Underlying Problem: "Enable secure communication between isolated environments"
+- Abstracted Problem: "Creating bridges between separate groups while maintaining boundaries"
+- Life Question: "Tell me about a time you helped two different groups collaborate while respecting their boundaries"
+
+Focus on extracting problems, not memorizing solutions. Create questions that explore similar problem-solving in personal contexts.`
 
     let responseContent = ''
     try {
@@ -1848,53 +1882,90 @@ Focus on creating questions that connect academic concepts to real-world experie
       })
       responseContent = response.choices[0]?.message?.content || ''
     } catch (aiError) {
-      console.error('🤖 AI generation failed, falling back:', aiError)
+        console.error('🤖 AI generation failed:', aiError)
       // leave responseContent empty so fallback logic triggers
     }
 
-    let analysis
     if (responseContent) {
       try {
-        analysis = JSON.parse(responseContent)
+        let cleaned = responseContent.trim()
+        // Remove ```json or ``` fences if present
+        if (cleaned.startsWith('```')) {
+          cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+        }
+        analysis = JSON.parse(cleaned)
       } catch (parseError) {
-        console.error('Failed to parse analysis response:', parseError)
+        console.error('Failed to parse analysis response:', parseError, responseContent.substring(0, 200))
         analysis = null
       }
+    } else {
+      console.warn('⚠️ Google AI API key not available, using fallback analysis')
+      }
+    } else {
+      console.warn('⚠️ Google AI API key not available, using fallback analysis')
     }
 
-    // If AI failed or parsing failed, build deterministic fallback so the workflow continues
+    // If AI failed, API key missing, or parsing failed, build deterministic fallback
     if (!analysis) {
+      console.log('🔄 Using fallback analysis due to AI unavailability')
       analysis = {
-        subject_area: "Educational Content",
-        core_topics: [
+        subject_area: "Technical Study Material",
+        document_type: "exam_paper",
+        problem_solution_analysis: [
           {
-            topic_name: "Core Concepts",
-            description: "Fundamental principles and concepts",
-            key_concepts: ["Basic principles", "Key terminology", "Core processes"],
-            difficulty_level: "Intermediate",
-            prerequisites: ["Basic understanding"],
-            estimated_study_time: "3-4 hours"
+            solution_id: "sol_1",
+            technical_solution: "Network configuration and connectivity setup",
+            underlying_problem: "Need to establish secure communication between isolated systems",
+            problem_category: "communication",
+            abstracted_problem: "Building bridges between separate groups while maintaining security",
+            life_connection: "Times when you needed to help different teams collaborate while respecting boundaries",
+            complexity_level: "intermediate"
+          },
+          {
+            solution_id: "sol_2",
+            technical_solution: "Security policy implementation and access control",
+            underlying_problem: "Need to protect resources while enabling appropriate access",
+            problem_category: "security",
+            abstracted_problem: "Balancing openness with protection in relationships or systems",
+            life_connection: "Situations where you had to set boundaries while remaining accessible",
+            complexity_level: "intermediate"
           }
         ],
-        questionnaire: {
-          title: "Get to Know You - Learning Profile",
-          description: "Help us personalize your learning experience",
-          estimated_time: "5 minutes",
-          questions: [
-            {
-              id: "q1",
-              type: "background",
-              question: "What's your experience with this subject area?",
-              purpose: "Assess baseline knowledge",
-              related_topics: ["Core Concepts"]
-            }
-          ]
-        }
+        know_me_questions: [
+          {
+            question_id: "q1",
+            related_solution_id: "sol_1",
+            question_text: "Tell me about a time when you had to help two different groups (teams, departments, or communities) work together while respecting their individual boundaries and ways of doing things.",
+            question_purpose: "Understand your approach to facilitating collaboration across boundaries",
+            expected_insights: ["Collaboration skills", "Boundary management", "Communication approach"],
+            follow_up_prompts: ["What challenges did you face?", "How did you ensure both groups felt respected?"]
+          },
+          {
+            question_id: "q2",
+            related_solution_id: "sol_2",
+            question_text: "Describe a situation where you had to balance being open and accessible with protecting something important (information, resources, or relationships).",
+            question_purpose: "Explore your approach to security and access management",
+            expected_insights: ["Risk assessment", "Trust building", "Decision making"],
+            follow_up_prompts: ["How did you decide who to trust?", "What factors influenced your decisions?"]
+          }
+        ],
+        learning_objectives: [
+          {
+            objective: "Develop problem-solving skills through experience-based learning",
+            problem_focus: "Connecting personal experiences to technical challenges",
+            real_world_application: "Enhanced ability to tackle complex problems using past experiences"
+          },
+          {
+            objective: "Build bridge-thinking between technical and interpersonal skills",
+            problem_focus: "Understanding how technical solutions mirror human relationship dynamics",
+            real_world_application: "Better system design through understanding human needs"
+          }
+        ]
       }
     }
 
     // 🚧 DEBUG: Log summary of analysis result (avoid huge logs)
-    console.log('[KnowMe] Analysis generated. Subject:', analysis.subject_area, 'Core topics count:', analysis.core_topics?.length)
+    console.log('[KnowMe] Analysis generated. Subject:', analysis.subject_area, 'Problems identified:', analysis.problem_solution_analysis?.length || 0)
 
     console.log('✅ Know Me analysis generated successfully')
     return analysis
@@ -1914,55 +1985,70 @@ async function generateKnowMeScenarios(requestData: ADKRequest) {
   
   try {
     const responses = questionnaireResponses.responses || []
-    const coreTopics = knowledgeAnalysis.core_topics || []
+    const problemSolutionAnalysis = knowledgeAnalysis.problem_solution_analysis || []
+    const knowMeQuestions = knowledgeAnalysis.know_me_questions || []
     const subjectArea = knowledgeAnalysis.subject_area || 'Academic Subject'
 
     // Process user responses to create profile
     const responsesText = responses.map((r: any) => `Q: ${r.question}\nA: ${r.answer}`).join('\n\n')
     
-    const scenarioPrompt = `You are an expert scenario designer. Create personalized scenario-based questions that combine academic topics with the user's personal experiences.
+    const scenarioPrompt = `You are an expert scenario designer specializing in problem-based learning. Create personalized scenarios that test understanding of underlying problems, not memorization of solutions.
 
 USER RESPONSES:
 ${responsesText}
 
-CORE TOPICS:
-${coreTopics.map((t: any) => `${t.topic_name}: ${t.description}`).join('\n')}
+PROBLEM-SOLUTION ANALYSIS:
+${problemSolutionAnalysis.map((ps: any) => `Problem: ${ps.underlying_problem}\nSolution: ${ps.technical_solution}\nLife Connection: ${ps.life_connection}`).join('\n\n')}
+
+KNOW ME QUESTIONS ASKED:
+${knowMeQuestions.map((q: any) => `${q.question_text}`).join('\n')}
 
 SUBJECT AREA: ${subjectArea}
 
-TASK: Generate 5 personalized scenarios that:
-1. Start with situations relatable to the user's experiences
-2. Naturally incorporate academic concepts
-3. Require practical application of knowledge
-4. Include dynamic scoring rubrics
+TASK: Generate 3-5 personalized scenarios that:
+1. Present real-world problems similar to those the user described in their responses
+2. Test understanding of underlying problems, not solution memorization
+3. Connect to the user's personal experiences and problem-solving approaches
+4. Include rubrics that evaluate problem identification and reasoning
 
 RETURN FORMAT (JSON):
 {
   "user_profile": {
-    "learning_style": "identified style",
+    "problem_solving_style": "identified approach from responses",
     "experience_level": "beginner/intermediate/advanced",
-    "professional_context": "context description",
-    "interests": ["interest1", "interest2"]
+    "preferred_contexts": ["work", "personal", "academic"],
+    "communication_style": "direct/collaborative/analytical"
   },
   "scenarios": [
     {
       "scenario_id": "scenario_1",
-      "topic_name": "Topic Name",
-      "scenario_title": "Scenario Title",
-      "scenario_description": "Detailed scenario description",
-      "question": "What would you do in this situation?",
-      "context_type": "work/home/academic",
+      "related_problem_id": "sol_1",
+      "scenario_title": "Problem-focused scenario title",
+      "scenario_description": "Real-world situation that mirrors the underlying problem",
+      "core_problem": "The fundamental problem being tested",
+      "question": "How would you approach this problem? What's really going on here?",
+      "context_type": "work/personal/community",
       "difficulty_level": "appropriate level",
-      "key_concepts_tested": ["concept1", "concept2"],
-      "expected_response_type": "explanation/strategy/analysis",
-      "estimated_time": "3-5 minutes",
+      "problem_indicators": ["clue1", "clue2"],
+      "expected_response_type": "problem_analysis/strategy/reasoning",
+      "estimated_time": "5-7 minutes",
       "rubric": {
         "total_points": 100,
         "criteria": [
           {
-            "name": "Understanding",
+            "name": "Problem Identification",
             "weight": 40,
-            "description": "Demonstrates concept understanding"
+            "description": "Identifies the core problem, not just symptoms"
+          },
+          {
+            "name": "Solution Reasoning",
+            "weight": 35,
+            "description": "Explains why their approach addresses the root problem"
+          },
+          {
+            "name": "Experience Connection",
+            "weight": 25,
+            "description": "Connects to similar problems they've solved"
           }
         ]
       }
@@ -1970,7 +2056,7 @@ RETURN FORMAT (JSON):
   ]
 }
 
-Make scenarios feel like real situations they might encounter.`
+Focus on testing problem understanding through scenarios that mirror their life experiences.`
 
     const response = await callGemini({
       messages: [
@@ -1999,30 +2085,41 @@ Make scenarios feel like real situations they might encounter.`
       // Fallback scenarios
       scenarios = {
         user_profile: {
-          learning_style: "mixed",
+          problem_solving_style: "systematic",
           experience_level: "intermediate",
-          professional_context: "general",
-          interests: ["practical applications"]
+          preferred_contexts: ["work", "personal"],
+          communication_style: "collaborative"
         },
         scenarios: [
           {
             scenario_id: "scenario_1",
-            topic_name: "Core Concepts",
-            scenario_title: "Practical Application",
-            scenario_description: "You need to apply key concepts in a real-world situation.",
-            question: "How would you approach this challenge?",
+            related_problem_id: "sol_1",
+            scenario_title: "Bridging Different Perspectives",
+            scenario_description: "You're working on a project where two teams have different approaches and need to collaborate effectively while maintaining their distinct strengths.",
+            core_problem: "Creating effective collaboration between different groups while respecting boundaries",
+            question: "How would you approach this problem? What's really going on here?",
             context_type: "work",
             difficulty_level: "intermediate",
-            key_concepts_tested: ["Problem solving", "Critical thinking"],
-            expected_response_type: "explanation",
-            estimated_time: "5 minutes",
+            problem_indicators: ["Communication barriers", "Different working styles", "Shared goals"],
+            expected_response_type: "problem_analysis",
+            estimated_time: "5-7 minutes",
             rubric: {
               total_points: 100,
               criteria: [
                 {
-                  name: "Understanding",
-                  weight: 50,
-                  description: "Demonstrates understanding"
+                  name: "Problem Identification",
+                  weight: 40,
+                  description: "Identifies the core problem, not just symptoms"
+                },
+                {
+                  name: "Solution Reasoning",
+                  weight: 35,
+                  description: "Explains why their approach addresses the root problem"
+                },
+                {
+                  name: "Experience Connection",
+                  weight: 25,
+                  description: "Connects to similar problems they've solved"
                 }
               ]
             }
@@ -2193,7 +2290,34 @@ Provide encouraging, constructive feedback.`
 
   } catch (error) {
     console.error('❌ Know Me scoring failed:', error)
-    throw new Error(`Answer scoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    // Graceful fallback to avoid 500 errors and provide helpful response when AI service is unavailable
+    if (isPartialAnswer) {
+      return {
+        hints: [
+          "Think about the scenario's core problem first",
+          "Connect your real-life experience to at least one problem indicator",
+          "Outline your very first step toward a solution"
+        ],
+        encouragement: "Great start – keep refining your reasoning!"
+      }
+    }
+
+    // Fallback for full scoring when AI is unavailable
+    return {
+      total_score: 0,
+      total_possible: 100,
+      percentage: 0,
+      detailed_scores: [],
+      feedback_items: [
+        {
+          type: "neutral",
+          message: "🤖 AI scoring is temporarily unavailable. Focus on clearly identifying the problem and explaining your reasoning.",
+          points: 0
+        }
+      ],
+      overall_feedback: "AI unavailable – manual review suggested.",
+      completion_status: "incomplete"
+    }
   }
 }
 
@@ -2205,58 +2329,63 @@ async function generateKnowMeReport(requestData: ADKRequest) {
   const knowledgeAnalysis = (payload.knowledge_analysis as any) || {}
   
   try {
-    const coreTopics = knowledgeAnalysis.core_topics || []
+    const problemSolutionAnalysis = knowledgeAnalysis.problem_solution_analysis || []
+    const learningObjectives = knowledgeAnalysis.learning_objectives || []
     const subjectArea = knowledgeAnalysis.subject_area || 'Academic Subject'
     
-    const reportPrompt = `You are an expert educational analyst generating a comprehensive performance report.
+    const reportPrompt = `You are an expert educational analyst generating a comprehensive performance report based on problem-solving assessment.
 
 SCORING RESULTS: ${JSON.stringify(scoringResults)}
-CORE TOPICS: ${JSON.stringify(coreTopics)}
+PROBLEM-SOLUTION ANALYSIS: ${JSON.stringify(problemSolutionAnalysis)}
+LEARNING OBJECTIVES: ${JSON.stringify(learningObjectives)}
 SUBJECT AREA: ${subjectArea}
 
-TASK: Generate a detailed performance report with predictions and recommendations.
+TASK: Generate a detailed performance report focusing on problem-solving abilities and real-world application readiness.
 
 RETURN FORMAT (JSON):
 {
   "overall_metrics": {
-    "estimated_exam_score": 75.5,
+    "problem_solving_score": 75.5,
     "confidence_level": "high",
-    "total_questions_answered": 5,
-    "score_consistency": 8.2
+    "scenarios_completed": 5,
+    "consistency_rating": 8.2
   },
-  "topic_breakdown": {
-    "Topic 1": {
+  "problem_category_breakdown": {
+    "Communication Problems": {
       "average_score": 78.5,
-      "total_questions": 2,
-      "score_range": "70% - 87%"
+      "scenarios_completed": 2,
+      "score_range": "70% - 87%",
+      "real_world_readiness": "high"
     }
   },
   "predictive_insights": {
-    "predicted_exam_score": "70-80%",
+    "predicted_exam_performance": "70-80%",
     "confidence_in_prediction": "high",
-    "strongest_areas": ["area1", "area2"],
-    "weakest_areas": ["area3"],
-    "performance_pattern": "Consistent strong performance",
+    "strongest_problem_areas": ["area1", "area2"],
+    "areas_needing_focus": ["area3"],
+    "problem_solving_pattern": "Systematic approach with good experience connections",
     "exam_readiness": "ready",
     "key_insights": ["insight1", "insight2"]
   },
   "improvement_areas": [
     {
-      "topic": "Topic Name",
+      "problem_category": "Problem Category",
       "current_score": 65.0,
       "improvement_potential": "high",
       "specific_actions": ["action1", "action2"],
-      "priority_level": "high"
+      "priority_level": "high",
+      "life_experience_connections": ["connection1", "connection2"]
     }
   ],
   "study_recommendations": {
-    "priority_topics": ["topic1", "topic2"],
-    "study_methods": ["method1", "method2"],
-    "estimated_prep_time": "2-3 weeks"
+    "priority_problems": ["problem1", "problem2"],
+    "recommended_approaches": ["experience-based learning", "scenario practice"],
+    "estimated_prep_time": "2-3 weeks",
+    "focus_areas": "Problem identification and solution reasoning"
   }
 }
 
-Provide actionable insights and realistic predictions.`
+Focus on problem-solving abilities and how well they connect academic concepts to real-world experiences.`
 
     const response = await callGemini({
       messages: [
@@ -2277,9 +2406,84 @@ Provide actionable insights and realistic predictions.`
       throw new Error('Failed to generate report')
     }
 
-    let report
+    // If no scoring results, return deterministic feedback immediately
+    if (scoringResults.length === 0) {
+      console.warn('[KnowMe] No scoring results supplied – returning generic fallback report')
+      return {
+        overall_metrics: {
+          problem_solving_score: null,
+          confidence_level: "low",
+          scenarios_completed: 0,
+          consistency_rating: 0
+        },
+        predictive_insights: {
+          exam_readiness: "insufficient data",
+          predicted_exam_performance: "N/A",
+          strongest_problem_areas: [],
+          areas_needing_focus: ["Complete at least one scenario"],
+          problem_solving_pattern: "N/A",
+          confidence_in_prediction: "low",
+          key_insights: ["No scenarios were completed; finish a scenario for a detailed report"]
+        }
+      }
+    }
+
     try {
-      report = JSON.parse(responseContent)
+      let cleaned = responseContent.trim()
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+      }
+      let report = JSON.parse(cleaned)
+
+      // If no overall_metrics, use default values
+      if (!report.overall_metrics) {
+        report.overall_metrics = {
+          problem_solving_score: null,
+          confidence_level: "low",
+          scenarios_completed: 0,
+          consistency_rating: 0
+        }
+      }
+
+      // If no predictive_insights, use default values
+      if (!report.predictive_insights) {
+        report.predictive_insights = {
+          exam_readiness: "insufficient data",
+          predicted_exam_performance: "N/A",
+          strongest_problem_areas: [],
+          areas_needing_focus: ["Complete at least one scenario"],
+          problem_solving_pattern: "N/A",
+          confidence_in_prediction: "low",
+          key_insights: ["No scenarios were completed; finish a scenario for a detailed report"]
+        }
+      }
+
+      // If no improvement_areas, use default values
+      if (!report.improvement_areas) {
+        report.improvement_areas = [
+          {
+            problem_category: "Core Problem Solving",
+            current_score: null,
+            improvement_potential: "insufficient data",
+            specific_actions: [],
+            priority_level: "low",
+            life_experience_connections: []
+          }
+        ]
+      }
+
+      // If no study_recommendations, use default values
+      if (!report.study_recommendations) {
+        report.study_recommendations = {
+          priority_problems: [],
+          recommended_approaches: [],
+          estimated_prep_time: "insufficient data",
+          focus_areas: "insufficient data"
+        }
+      }
+
+      console.log('✅ Know Me report generated successfully')
+      return report
     } catch (parseError) {
       console.error('Failed to parse report response:', parseError)
       // Fallback report
@@ -2287,42 +2491,48 @@ Provide actionable insights and realistic predictions.`
         ? scoringResults.reduce((sum, r) => sum + (r.percentage || 0), 0) / scoringResults.length
         : 75
 
-      report = {
+      return {
         overall_metrics: {
-          estimated_exam_score: avgScore,
+          problem_solving_score: avgScore,
           confidence_level: avgScore >= 75 ? "high" : "medium",
-          total_questions_answered: scoringResults.length,
-          score_consistency: 5.0
+          scenarios_completed: scoringResults.length,
+          consistency_rating: 5.0
         },
-        topic_breakdown: {},
+        problem_category_breakdown: {
+          "General Problem Solving": {
+            average_score: avgScore,
+            scenarios_completed: scoringResults.length,
+            score_range: `${Math.max(avgScore - 10, 0)}% - ${Math.min(avgScore + 10, 100)}%`,
+            real_world_readiness: avgScore >= 70 ? "high" : "medium"
+          }
+        },
         predictive_insights: {
-          predicted_exam_score: `${Math.max(avgScore - 10, 0)}-${Math.min(avgScore + 10, 100)}%`,
+          predicted_exam_performance: `${Math.max(avgScore - 10, 0)}-${Math.min(avgScore + 10, 100)}%`,
           confidence_in_prediction: "medium",
-          strongest_areas: ["Problem solving"],
-          weakest_areas: ["Needs more practice"],
-          performance_pattern: "Developing understanding",
+          strongest_problem_areas: ["Experience-based reasoning"],
+          areas_needing_focus: ["Problem identification"],
+          problem_solving_pattern: "Developing systematic approach",
           exam_readiness: avgScore >= 70 ? "ready" : "needs_work",
           key_insights: ["Shows good effort", "Demonstrates learning potential"]
         },
         improvement_areas: [
           {
-            topic: "Core Concepts",
+            problem_category: "Core Problem Solving",
             current_score: avgScore,
             improvement_potential: "high",
-            specific_actions: ["Review key concepts", "Practice with examples"],
-            priority_level: "medium"
+            specific_actions: ["Practice problem identification", "Connect more life experiences"],
+            priority_level: "medium",
+            life_experience_connections: ["Work scenarios", "Personal challenges"]
           }
         ],
         study_recommendations: {
-          priority_topics: ["Core Concepts"],
-          study_methods: ["Practice exercises", "Review materials"],
-          estimated_prep_time: "1-2 weeks"
+          priority_problems: ["Problem identification", "Solution reasoning"],
+          recommended_approaches: ["Experience-based learning", "Scenario practice"],
+          estimated_prep_time: "1-2 weeks",
+          focus_areas: "Problem identification and solution reasoning"
         }
       }
     }
-
-    console.log('✅ Know Me report generated successfully')
-    return report
 
   } catch (error) {
     console.error('❌ Know Me report generation failed:', error)

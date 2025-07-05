@@ -1,84 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-// Development mode flag
-const isDevelopment = import.meta.env.DEV
-
-if (isDevelopment) {
-  console.log('🔍 Environment check');
-  console.log('   - VITE_SUPABASE_URL exists:', !!supabaseUrl);
-  console.log('   - VITE_SUPABASE_ANON_KEY exists:', !!supabaseAnonKey);
-  console.log('   - URL length:', supabaseUrl?.length || 0);
-  console.log('   - Key length:', supabaseAnonKey?.length || 0);
-  // For safety, only log the first 8 chars of the anon key
-  if (supabaseAnonKey) {
-    console.log('   - Key preview:', supabaseAnonKey.slice(0, 8) + '…');
-  }
-}
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  if (isDevelopment) {
-    console.warn('⚠️ Supabase environment variables missing - running in development mode');
-    console.warn('   Please check your .env file for:');
-    console.warn('   - VITE_SUPABASE_URL');
-    console.warn('   - VITE_SUPABASE_ANON_KEY');
-  } else {
-    throw new Error('Missing Supabase environment variables');
-  }
-}
-
-// Test connection to Supabase
-const testConnection = async () => {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.log('🔧 Running in development mode without Supabase')
-    return false
-  }
-  
-  try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${supabaseAnonKey}`
-      }
-    })
-    
-    console.log('🌐 Supabase connection test:', response.status, response.statusText)
-    
-    if (!response.ok) {
-      console.error('❌ Supabase connection failed:', response.status, response.statusText)
-      if (response.status === 404) {
-        console.error('🚨 Supabase project not found - may be deleted or paused')
-        console.error('📝 Please check your Supabase dashboard or create a new project')
-      }
-      return false
-    }
-    
-    console.log('✅ Supabase connection successful')
-    return true
-  } catch (error) {
-    console.error('💥 Supabase connection error:', error)
-    return false
-  }
-}
-
-// Run connection test
-testConnection()
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
 
 // Create Supabase client with error handling
-export const supabase = supabaseUrl && supabaseAnonKey ? 
-  createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true
-    }
-  }) : null
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
 
 // Development mode helper
 export const isSupabaseConnected = () => {
-  return supabase !== null
+  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
 }
 
 // Types for our database

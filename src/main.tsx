@@ -1,35 +1,23 @@
-import { StrictMode } from 'react';
+import { StrictMode, Fragment } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './styles/global.css';
 
-// Environment variable debugging
-console.log('🔍 Environment check:');
-console.log('   - isDevelopment:', import.meta.env.DEV);
-console.log('   - VITE_SUPABASE_URL exists:', !!import.meta.env.VITE_SUPABASE_URL);
-console.log('   - VITE_SUPABASE_ANON_KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-console.log('   - URL length:', (import.meta.env.VITE_SUPABASE_URL || '').length);
-console.log('   - Key length:', (import.meta.env.VITE_SUPABASE_ANON_KEY || '').length);
+// Prevent initial flicker by hiding the app root until first paint is ready
+const rootElement = document.getElementById('root')!;
+rootElement.style.visibility = 'hidden';
 
-// Only log actual values in development for security
-if (import.meta.env.DEV) {
-  console.log('   - VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-  console.log('   - VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY);
-}
+// Decide whether to wrap in StrictMode (DEV only) to avoid double-render flicker in prod
+const Wrapper: React.ComponentType<{ children: React.ReactNode }> =
+  import.meta.env.MODE === 'development' ? StrictMode : Fragment;
 
-// Clean up any existing service workers to prevent caching issues
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(const registration of registrations) {
-      registration.unregister().then(() => {
-        console.log('🧹 Cleaned up service worker:', registration.scope);
-      });
-    }
-  });
-}
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+createRoot(rootElement).render(
+  <Wrapper>
     <App />
-  </StrictMode>
+  </Wrapper>
 );
+
+// Reveal the app once React has mounted (next frame)
+requestAnimationFrame(() => {
+  rootElement.style.visibility = 'visible';
+});
