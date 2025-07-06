@@ -26,12 +26,37 @@ export const callEdgeFunction = async (functionName: string, payload: unknown) =
     })
 
     if (!response.ok) {
-      throw new Error(`Edge function ${functionName} failed: ${response.statusText}`)
+      let errorMessage = `Edge function ${functionName} failed`
+      
+      try {
+        const errorData = await response.json()
+        if (errorData.error) {
+          errorMessage = errorData.error
+        } else {
+          errorMessage += `: ${response.statusText}`
+        }
+      } catch {
+        errorMessage += `: ${response.statusText}`
+      }
+      
+      throw new Error(errorMessage)
     }
 
     return await response.json()
   } catch (error) {
     console.error(`Error calling ${functionName}:`, error)
+    
+    // Enhance error messages for better user experience
+    if (error instanceof Error) {
+      if (error.message.includes('temporarily unavailable')) {
+        throw error // Pass through AI service errors as-is
+      } else if (error.message.includes('failed to fetch') || error.message.includes('network')) {
+        throw new Error('Network connection issue. Please check your internet connection and try again.')
+      } else if (error.message.includes('500')) {
+        throw new Error('Server error occurred. Please try again in a few moments.')
+      }
+    }
+    
     throw error
   }
 }

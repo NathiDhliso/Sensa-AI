@@ -66,17 +66,52 @@ async function callGemini(payload: Record<string, unknown>) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
     console.log(`➡️ Attempting to call Gemini with model: ${model}`);
     try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiRequestBody)
-      });
+      let attempt = 0;
+      const maxRetries = 2;
+      while (attempt <= maxRetries) {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiRequestBody)
+        });
 
-      if (response.status !== 404) {
-        console.log(`✅ Successfully connected to model: ${model}`);
-        break; // Found a working model, exit the loop
+        if (response.ok) {
+          console.log(`✅ Successfully connected to model: ${model}`);
+          break; // Success
+        }
+
+        // Handle quota exceeded with retry delay
+        if (response.status === 429) {
+          attempt++;
+          try {
+            const body = await response.json();
+            const retryInfo = body?.error?.details?.find((d: any) => d['@type']?.includes('RetryInfo'));
+            const retryDelayStr = retryInfo?.retryDelay || '30s';
+            const retryMs = parseInt(retryDelayStr) * 1000 || 30000;
+            console.warn(`🔄 429 quota exceeded for model ${model}. Waiting ${retryMs / 1000}s before retry #${attempt}`);
+            await new Promise(r => setTimeout(r, retryMs));
+            continue; // Retry same model
+          } catch {
+            console.warn('⚠️ Could not parse retry info. Waiting 30s.');
+            await new Promise(r => setTimeout(r, 30000));
+            continue;
+          }
+        }
+
+        // Handle 404 – try next model immediately
+        if (response.status === 404) {
+          console.warn(`⚠️ Model ${model} returned 404. Trying next model...`);
+          break;
+        }
+
+        // Other errors – throw
+        const errorText = await response.text();
+        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
       }
-      console.warn(`⚠️ Model ${model} returned 404. Trying next model...`);
+
+      if (response && response.ok) {
+        break; // exit outer loop since we succeeded after retries
+      }
     } catch (error) {
       console.error(`❌ Error calling model ${model}:`, error);
     }
@@ -115,6 +150,17 @@ async function callGemini(payload: Record<string, unknown>) {
   }
 
   const data = await response.json()
+  console.log('🤖 Gemini API response structure:', {
+    hasCandidates: !!data?.candidates,
+    candidatesLength: data?.candidates?.length || 0,
+    firstCandidateKeys: data?.candidates?.[0] ? Object.keys(data.candidates[0]) : [],
+    hasError: !!data?.error
+  })
+
+  if (data?.error) {
+    console.error('❌ Gemini API returned error:', data.error)
+    throw new Error(`Gemini API error: ${data.error.message || 'Unknown error'}`)
+  }
 
   // Gemini v1beta format: { candidates: [ { content: { parts: [ { text } ] } } ] }
   // PaLM chat-bison format: { candidates: [ { output } ] }
@@ -126,6 +172,13 @@ async function callGemini(payload: Record<string, unknown>) {
       text = data.candidates[0].output
     }
   }
+
+  if (!text) {
+    console.error('❌ No text content in Gemini response:', data)
+    throw new Error('No content received from AI service')
+  }
+
+  console.log('✅ Gemini response text length:', text.length)
 
   // Return ChatCompletion response shape for compatibility with downstream code
   return {
@@ -1795,6 +1848,11 @@ async function generateKnowMeAnalysis(requestData: ADKRequest) {
     length: googleApiKey?.length || 0
   })
   
+  if (!googleApiKey) {
+    console.error('❌ GOOGLE_AI_API_KEY not found in environment - cannot proceed with AI analysis')
+    throw new Error('AI analysis service is temporarily unavailable. Please try again later.')
+  }
+  
   try {
     let analysis
     
@@ -1898,70 +1956,19 @@ Focus on extracting problems, not memorizing solutions. Create questions that ex
         console.error('Failed to parse analysis response:', parseError, responseContent.substring(0, 200))
         analysis = null
       }
-    } else {
-      console.warn('⚠️ Google AI API key not available, using fallback analysis')
+          } else {
+        console.warn('⚠️ Google AI API key not available but this should not happen due to early check')
+        throw new Error('AI analysis service is temporarily unavailable. Please try again later.')
       }
     } else {
-      console.warn('⚠️ Google AI API key not available, using fallback analysis')
+      console.warn('⚠️ Google AI API key not available but this should not happen due to early check')
+      throw new Error('AI analysis service is temporarily unavailable. Please try again later.')
     }
 
-    // If AI failed, API key missing, or parsing failed, build deterministic fallback
+    // If AI failed, API key missing, or parsing failed, throw error
     if (!analysis) {
-      console.log('🔄 Using fallback analysis due to AI unavailability')
-      analysis = {
-        subject_area: "Technical Study Material",
-        document_type: "exam_paper",
-        problem_solution_analysis: [
-          {
-            solution_id: "sol_1",
-            technical_solution: "Network configuration and connectivity setup",
-            underlying_problem: "Need to establish secure communication between isolated systems",
-            problem_category: "communication",
-            abstracted_problem: "Building bridges between separate groups while maintaining security",
-            life_connection: "Times when you needed to help different teams collaborate while respecting boundaries",
-            complexity_level: "intermediate"
-          },
-          {
-            solution_id: "sol_2",
-            technical_solution: "Security policy implementation and access control",
-            underlying_problem: "Need to protect resources while enabling appropriate access",
-            problem_category: "security",
-            abstracted_problem: "Balancing openness with protection in relationships or systems",
-            life_connection: "Situations where you had to set boundaries while remaining accessible",
-            complexity_level: "intermediate"
-          }
-        ],
-        know_me_questions: [
-          {
-            question_id: "q1",
-            related_solution_id: "sol_1",
-            question_text: "Tell me about a time when you had to help two different groups (teams, departments, or communities) work together while respecting their individual boundaries and ways of doing things.",
-            question_purpose: "Understand your approach to facilitating collaboration across boundaries",
-            expected_insights: ["Collaboration skills", "Boundary management", "Communication approach"],
-            follow_up_prompts: ["What challenges did you face?", "How did you ensure both groups felt respected?"]
-          },
-          {
-            question_id: "q2",
-            related_solution_id: "sol_2",
-            question_text: "Describe a situation where you had to balance being open and accessible with protecting something important (information, resources, or relationships).",
-            question_purpose: "Explore your approach to security and access management",
-            expected_insights: ["Risk assessment", "Trust building", "Decision making"],
-            follow_up_prompts: ["How did you decide who to trust?", "What factors influenced your decisions?"]
-          }
-        ],
-        learning_objectives: [
-          {
-            objective: "Develop problem-solving skills through experience-based learning",
-            problem_focus: "Connecting personal experiences to technical challenges",
-            real_world_application: "Enhanced ability to tackle complex problems using past experiences"
-          },
-          {
-            objective: "Build bridge-thinking between technical and interpersonal skills",
-            problem_focus: "Understanding how technical solutions mirror human relationship dynamics",
-            real_world_application: "Better system design through understanding human needs"
-          }
-        ]
-      }
+      console.error('🤖 AI analysis failed - no fallback available')
+      throw new Error('AI analysis service is temporarily unavailable. Please try again later.')
     }
 
     // 🚧 DEBUG: Log summary of analysis result (avoid huge logs)
@@ -1982,6 +1989,18 @@ async function generateKnowMeScenarios(requestData: ADKRequest) {
   const payload = requestData.payload || {}
   const questionnaireResponses = (payload.questionnaire_responses as any) || {}
   const knowledgeAnalysis = (payload.knowledge_analysis as any) || {}
+  
+  // Check if Google AI API key is available
+  const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  console.log('[KnowMe Scenarios] Google AI API Key status:', {
+    exists: !!googleApiKey,
+    length: googleApiKey?.length || 0
+  })
+  
+  if (!googleApiKey) {
+    console.error('❌ GOOGLE_AI_API_KEY not found in environment - cannot proceed with scenario generation')
+    throw new Error('AI scenario generation service is temporarily unavailable. Please try again later.')
+  }
   
   try {
     const responses = questionnaireResponses.responses || []
@@ -2079,53 +2098,29 @@ Focus on testing problem understanding through scenarios that mirror their life 
 
     let scenarios
     try {
-      scenarios = JSON.parse(responseContent)
+      // Clean the response content before parsing
+      let cleanedContent = responseContent.trim()
+      
+      // Remove code block markers if present
+      if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+      }
+      
+      console.log('[KnowMe Scenarios] Attempting to parse response:', cleanedContent.substring(0, 200) + '...')
+      scenarios = JSON.parse(cleanedContent)
+      
+      // Validate that we have the expected structure
+      if (!scenarios.scenarios || !Array.isArray(scenarios.scenarios)) {
+        console.error('[KnowMe Scenarios] Invalid response structure:', scenarios)
+        throw new Error('Invalid scenario data structure received from AI')
+      }
+      
+      console.log('[KnowMe Scenarios] Successfully parsed scenarios:', scenarios.scenarios.length)
+      
     } catch (parseError) {
       console.error('Failed to parse scenarios response:', parseError)
-      // Fallback scenarios
-      scenarios = {
-        user_profile: {
-          problem_solving_style: "systematic",
-          experience_level: "intermediate",
-          preferred_contexts: ["work", "personal"],
-          communication_style: "collaborative"
-        },
-        scenarios: [
-          {
-            scenario_id: "scenario_1",
-            related_problem_id: "sol_1",
-            scenario_title: "Bridging Different Perspectives",
-            scenario_description: "You're working on a project where two teams have different approaches and need to collaborate effectively while maintaining their distinct strengths.",
-            core_problem: "Creating effective collaboration between different groups while respecting boundaries",
-            question: "How would you approach this problem? What's really going on here?",
-            context_type: "work",
-            difficulty_level: "intermediate",
-            problem_indicators: ["Communication barriers", "Different working styles", "Shared goals"],
-            expected_response_type: "problem_analysis",
-            estimated_time: "5-7 minutes",
-            rubric: {
-              total_points: 100,
-              criteria: [
-                {
-                  name: "Problem Identification",
-                  weight: 40,
-                  description: "Identifies the core problem, not just symptoms"
-                },
-                {
-                  name: "Solution Reasoning",
-                  weight: 35,
-                  description: "Explains why their approach addresses the root problem"
-                },
-                {
-                  name: "Experience Connection",
-                  weight: 25,
-                  description: "Connects to similar problems they've solved"
-                }
-              ]
-            }
-          }
-        ]
-      }
+      console.error('Raw response content:', responseContent)
+      throw new Error('AI scenario generation service is temporarily unavailable. Please try again later.')
     }
 
     console.log('✅ Know Me scenarios generated successfully')
@@ -2146,6 +2141,18 @@ async function scoreKnowMeAnswer(requestData: ADKRequest) {
   const isPartialAnswer = (payload.partial_answer as boolean) || false
   const scenariosData = (payload.scenarios_data as any) || {}
   
+  // Check if Google AI API key is available
+  const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  console.log('[KnowMe Scoring] Google AI API Key status:', {
+    exists: !!googleApiKey,
+    length: googleApiKey?.length || 0
+  })
+  
+  if (!googleApiKey) {
+    console.error('❌ GOOGLE_AI_API_KEY not found in environment - cannot proceed with answer scoring')
+    throw new Error('AI scoring service is temporarily unavailable. Please try again later.')
+  }
+  
   try {
     if (isPartialAnswer) {
       const scenarios = scenariosData.scenarios || []
@@ -2153,10 +2160,7 @@ async function scoreKnowMeAnswer(requestData: ADKRequest) {
 
       if (!currentScenario) {
         console.warn(`[KnowMe Scoring] Could not find scenario with id: ${questionId} for hint generation.`)
-        return {
-          hints: ["Keep going!", "You're on the right track.", "Try to connect your answer to the main topic."],
-          encouragement: "Good progress!"
-        }
+        throw new Error('Scenario not found for hint generation.')
       }
       
       // Generate real-time hints
@@ -2194,12 +2198,15 @@ Focus on guiding their thought process, not providing direct answers.`
       const responseContent = response.choices[0]?.message?.content
       let hints
       try {
-        hints = JSON.parse(responseContent || '{}')
-      } catch {
-        hints = {
-          hints: ["Think about the key concepts involved", "Consider the practical implications", "What would be your first step?"],
-          encouragement: "You're on the right track!"
+        let cleaned = (responseContent || '').trim()
+        if (cleaned.startsWith('```')) {
+          cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
         }
+        hints = JSON.parse(cleaned || '{}')
+      } catch (parseErr) {
+        console.error('Detailed hint parsing error:', parseErr)
+        console.error('Raw hint response content:', responseContent)
+        throw new Error(`AI hint generation service is temporarily unavailable: ${parseErr instanceof Error ? parseErr.message : 'Unknown parse error'}`)
       }
 
       return hints
@@ -2266,23 +2273,15 @@ Provide encouraging, constructive feedback.`
       const responseContent = response.choices[0]?.message?.content
       let scoring
       try {
-        scoring = JSON.parse(responseContent || '{}')
-      } catch {
-        scoring = {
-          total_score: 75,
-          total_possible: 100,
-          percentage: 75.0,
-          detailed_scores: [],
-          feedback_items: [
-            {
-              type: "positive",
-              message: "Good effort on this response",
-              points: 0
-            }
-          ],
-          overall_feedback: "Thank you for your thoughtful response!",
-          completion_status: "complete"
+        let cleaned = (responseContent || '').trim()
+        if (cleaned.startsWith('```')) {
+          cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
         }
+        scoring = JSON.parse(cleaned || '{}')
+      } catch (parseErr) {
+        console.error('Detailed scoring parsing error:', parseErr)
+        console.error('Raw scoring response content:', responseContent)
+        throw new Error(`AI scoring service is temporarily unavailable: ${parseErr instanceof Error ? parseErr.message : 'Unknown parse error'}`)
       }
 
       return scoring
@@ -2290,34 +2289,7 @@ Provide encouraging, constructive feedback.`
 
   } catch (error) {
     console.error('❌ Know Me scoring failed:', error)
-    // Graceful fallback to avoid 500 errors and provide helpful response when AI service is unavailable
-    if (isPartialAnswer) {
-      return {
-        hints: [
-          "Think about the scenario's core problem first",
-          "Connect your real-life experience to at least one problem indicator",
-          "Outline your very first step toward a solution"
-        ],
-        encouragement: "Great start – keep refining your reasoning!"
-      }
-    }
-
-    // Fallback for full scoring when AI is unavailable
-    return {
-      total_score: 0,
-      total_possible: 100,
-      percentage: 0,
-      detailed_scores: [],
-      feedback_items: [
-        {
-          type: "neutral",
-          message: "🤖 AI scoring is temporarily unavailable. Focus on clearly identifying the problem and explaining your reasoning.",
-          points: 0
-        }
-      ],
-      overall_feedback: "AI unavailable – manual review suggested.",
-      completion_status: "incomplete"
-    }
+    throw new Error(`AI scoring service is temporarily unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
@@ -2328,19 +2300,41 @@ async function generateKnowMeReport(requestData: ADKRequest) {
   const scoringResults = (payload.scoring_results as Array<any>) || []
   const knowledgeAnalysis = (payload.knowledge_analysis as any) || {}
   
+  // Check if Google AI API key is available
+  const googleApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+  console.log('[KnowMe Report] Google AI API Key status:', {
+    exists: !!googleApiKey,
+    length: googleApiKey?.length || 0
+  })
+  
+  if (!googleApiKey) {
+    console.error('❌ GOOGLE_AI_API_KEY not found in environment - cannot proceed with report generation')
+    throw new Error('AI report generation service is temporarily unavailable. Please try again later.')
+  }
+  
   try {
     const problemSolutionAnalysis = knowledgeAnalysis.problem_solution_analysis || []
     const learningObjectives = knowledgeAnalysis.learning_objectives || []
     const subjectArea = knowledgeAnalysis.subject_area || 'Academic Subject'
     
-    const reportPrompt = `You are an expert educational analyst generating a comprehensive performance report based on problem-solving assessment.
+    const reportPrompt = `You are an expert educational analyst generating a comprehensive performance report that showcases core problems being resolved through personalized learning.
 
 SCORING RESULTS: ${JSON.stringify(scoringResults)}
 PROBLEM-SOLUTION ANALYSIS: ${JSON.stringify(problemSolutionAnalysis)}
 LEARNING OBJECTIVES: ${JSON.stringify(learningObjectives)}
 SUBJECT AREA: ${subjectArea}
 
-TASK: Generate a detailed performance report focusing on problem-solving abilities and real-world application readiness.
+CRITICAL FOCUS: This report should demonstrate how the Know Me feature resolves these core educational problems:
+1. PROBLEM: Students memorize solutions without understanding underlying problems
+   SOLUTION: Problem-based learning that connects technical concepts to life experiences
+2. PROBLEM: Generic study approaches that don't match individual learning styles
+   SOLUTION: Personalized scenarios based on student's real experiences and problem-solving patterns
+3. PROBLEM: Lack of confidence in applying knowledge to new situations
+   SOLUTION: Experience-based learning that builds bridges between familiar and unfamiliar problems
+4. PROBLEM: Difficulty transferring academic knowledge to real-world contexts
+   SOLUTION: Life-experience connections that make abstract concepts concrete and memorable
+
+TASK: Generate a detailed performance report that showcases how these core problems are being resolved through personalized, experience-based learning.
 
 RETURN FORMAT (JSON):
 {
@@ -2355,37 +2349,51 @@ RETURN FORMAT (JSON):
       "average_score": 78.5,
       "scenarios_completed": 2,
       "score_range": "70% - 87%",
-      "real_world_readiness": "high"
+      "real_world_readiness": "high",
+      "core_problem_addressed": "Memorization vs. understanding",
+      "learning_transformation": "Now connects communication challenges to personal team experiences"
     }
   },
   "predictive_insights": {
     "predicted_exam_performance": "70-80%",
     "confidence_in_prediction": "high",
-    "strongest_problem_areas": ["area1", "area2"],
-    "areas_needing_focus": ["area3"],
-    "problem_solving_pattern": "Systematic approach with good experience connections",
+    "strongest_problem_areas": ["Experience-based reasoning", "Problem pattern recognition"],
+    "areas_needing_focus": ["Complex problem decomposition"],
+    "problem_solving_pattern": "Systematic approach with strong experience connections - demonstrates shift from memorization to understanding",
     "exam_readiness": "ready",
-    "key_insights": ["insight1", "insight2"]
+    "key_insights": [
+      "Successfully bridges personal experiences with technical concepts",
+      "Demonstrates understanding of underlying problems, not just solutions",
+      "Shows improved confidence in applying knowledge to new contexts"
+    ]
   },
   "improvement_areas": [
     {
       "problem_category": "Problem Category",
       "current_score": 65.0,
       "improvement_potential": "high",
-      "specific_actions": ["action1", "action2"],
+      "specific_actions": ["Connect more diverse life experiences", "Practice problem decomposition"],
       "priority_level": "high",
-      "life_experience_connections": ["connection1", "connection2"]
+      "life_experience_connections": ["Work collaboration challenges", "Personal conflict resolution"],
+      "core_problem_being_resolved": "Generic study approach → Personalized experience-based learning"
     }
   ],
   "study_recommendations": {
-    "priority_problems": ["problem1", "problem2"],
-    "recommended_approaches": ["experience-based learning", "scenario practice"],
+    "priority_problems": ["Complex problem decomposition", "Multi-step reasoning"],
+    "recommended_approaches": ["Continue experience-based learning", "Expand scenario complexity"],
     "estimated_prep_time": "2-3 weeks",
-    "focus_areas": "Problem identification and solution reasoning"
+    "focus_areas": "Deepen problem identification skills and expand experience connections",
+    "personalization_success": "High - student effectively connects personal experiences to technical concepts"
+  },
+  "core_problems_resolved": {
+    "memorization_to_understanding": "Successfully demonstrated through experience-based connections",
+    "generic_to_personalized": "Achieved through tailored scenarios matching student's background",
+    "confidence_building": "Evident in strong problem-solving pattern and experience integration",
+    "knowledge_transfer": "Proven ability to apply academic concepts to real-world contexts"
   }
 }
 
-Focus on problem-solving abilities and how well they connect academic concepts to real-world experiences.`
+Emphasize how the personalized, experience-based approach resolves core educational problems and transforms learning from memorization to deep understanding.`
 
     const response = await callGemini({
       messages: [
@@ -2406,26 +2414,10 @@ Focus on problem-solving abilities and how well they connect academic concepts t
       throw new Error('Failed to generate report')
     }
 
-    // If no scoring results, return deterministic feedback immediately
+    // If no scoring results, throw error
     if (scoringResults.length === 0) {
-      console.warn('[KnowMe] No scoring results supplied – returning generic fallback report')
-      return {
-        overall_metrics: {
-          problem_solving_score: null,
-          confidence_level: "low",
-          scenarios_completed: 0,
-          consistency_rating: 0
-        },
-        predictive_insights: {
-          exam_readiness: "insufficient data",
-          predicted_exam_performance: "N/A",
-          strongest_problem_areas: [],
-          areas_needing_focus: ["Complete at least one scenario"],
-          problem_solving_pattern: "N/A",
-          confidence_in_prediction: "low",
-          key_insights: ["No scenarios were completed; finish a scenario for a detailed report"]
-        }
-      }
+      console.warn('[KnowMe] No scoring results supplied – cannot generate report')
+      throw new Error('No scoring results available. Complete at least one scenario to generate a report.')
     }
 
     try {
@@ -2435,103 +2427,16 @@ Focus on problem-solving abilities and how well they connect academic concepts t
       }
       let report = JSON.parse(cleaned)
 
-      // If no overall_metrics, use default values
-      if (!report.overall_metrics) {
-        report.overall_metrics = {
-          problem_solving_score: null,
-          confidence_level: "low",
-          scenarios_completed: 0,
-          consistency_rating: 0
-        }
-      }
-
-      // If no predictive_insights, use default values
-      if (!report.predictive_insights) {
-        report.predictive_insights = {
-          exam_readiness: "insufficient data",
-          predicted_exam_performance: "N/A",
-          strongest_problem_areas: [],
-          areas_needing_focus: ["Complete at least one scenario"],
-          problem_solving_pattern: "N/A",
-          confidence_in_prediction: "low",
-          key_insights: ["No scenarios were completed; finish a scenario for a detailed report"]
-        }
-      }
-
-      // If no improvement_areas, use default values
-      if (!report.improvement_areas) {
-        report.improvement_areas = [
-          {
-            problem_category: "Core Problem Solving",
-            current_score: null,
-            improvement_potential: "insufficient data",
-            specific_actions: [],
-            priority_level: "low",
-            life_experience_connections: []
-          }
-        ]
-      }
-
-      // If no study_recommendations, use default values
-      if (!report.study_recommendations) {
-        report.study_recommendations = {
-          priority_problems: [],
-          recommended_approaches: [],
-          estimated_prep_time: "insufficient data",
-          focus_areas: "insufficient data"
-        }
+      // Validate that report has required fields
+      if (!report.overall_metrics || !report.predictive_insights) {
+        throw new Error('AI generated incomplete report data.')
       }
 
       console.log('✅ Know Me report generated successfully')
       return report
     } catch (parseError) {
       console.error('Failed to parse report response:', parseError)
-      // Fallback report
-      const avgScore = scoringResults.length > 0 
-        ? scoringResults.reduce((sum, r) => sum + (r.percentage || 0), 0) / scoringResults.length
-        : 75
-
-      return {
-        overall_metrics: {
-          problem_solving_score: avgScore,
-          confidence_level: avgScore >= 75 ? "high" : "medium",
-          scenarios_completed: scoringResults.length,
-          consistency_rating: 5.0
-        },
-        problem_category_breakdown: {
-          "General Problem Solving": {
-            average_score: avgScore,
-            scenarios_completed: scoringResults.length,
-            score_range: `${Math.max(avgScore - 10, 0)}% - ${Math.min(avgScore + 10, 100)}%`,
-            real_world_readiness: avgScore >= 70 ? "high" : "medium"
-          }
-        },
-        predictive_insights: {
-          predicted_exam_performance: `${Math.max(avgScore - 10, 0)}-${Math.min(avgScore + 10, 100)}%`,
-          confidence_in_prediction: "medium",
-          strongest_problem_areas: ["Experience-based reasoning"],
-          areas_needing_focus: ["Problem identification"],
-          problem_solving_pattern: "Developing systematic approach",
-          exam_readiness: avgScore >= 70 ? "ready" : "needs_work",
-          key_insights: ["Shows good effort", "Demonstrates learning potential"]
-        },
-        improvement_areas: [
-          {
-            problem_category: "Core Problem Solving",
-            current_score: avgScore,
-            improvement_potential: "high",
-            specific_actions: ["Practice problem identification", "Connect more life experiences"],
-            priority_level: "medium",
-            life_experience_connections: ["Work scenarios", "Personal challenges"]
-          }
-        ],
-        study_recommendations: {
-          priority_problems: ["Problem identification", "Solution reasoning"],
-          recommended_approaches: ["Experience-based learning", "Scenario practice"],
-          estimated_prep_time: "1-2 weeks",
-          focus_areas: "Problem identification and solution reasoning"
-        }
-      }
+      throw new Error('AI report generation service is temporarily unavailable. Please try again later.')
     }
 
   } catch (error) {

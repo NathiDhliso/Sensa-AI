@@ -21,12 +21,19 @@ import { useAuthStore } from '../stores/authStore';
 import { callEdgeFunction } from '../services/edgeFunctions';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 
-// Configure the worker — using CDN to avoid bundler issues
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+// Configure worker source immediately
+try {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  if (pdfjsLib?.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+} catch (wErr) {
+  console.warn('Failed to configure PDF.js workerSrc:', wErr);
+}
 
 // Enhanced Types for Problem-Based Learning
 interface KnowMePhase {
@@ -106,6 +113,7 @@ interface PerformanceReport {
   };
   improvement_areas: any[];
   study_recommendations: any;
+  core_problems_resolved?: Record<string, string>;
 }
 
 const KnowMePage: React.FC = () => {
@@ -146,6 +154,7 @@ const KnowMePage: React.FC = () => {
   // General state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updatePhaseStatus = (phaseIndex: number, status: 'pending' | 'active' | 'completed') => {
@@ -165,69 +174,8 @@ const KnowMePage: React.FC = () => {
   // Phase 1: PDF Upload and Problem-Solution Analysis
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || file.type !== 'application/pdf') {
-      setError('Please upload a PDF file');
-      return;
-    }
-
-    setUploadedFile(file);
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Extract text from the uploaded PDF using pdfjs-dist
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-      let extractedTextCombined = '';
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = (textContent.items as any[]).map(item => item.str).join(' ');
-        extractedTextCombined += pageText + '\n';
-        // Limit to first ~20k chars to avoid oversize payloads
-        if (extractedTextCombined.length > 20000) {
-          extractedTextCombined = extractedTextCombined.substring(0, 20000);
-          break;
-        }
-      }
-
-      setExtractedText(extractedTextCombined);
-
-      // Call Enhanced Knowledge Extraction Agent with real extracted text
-      console.log('🔍 Calling edge function with payload:', {
-        action: 'know_me_start',
-        pdf_content: extractedTextCombined.substring(0, 100) + '...',
-        user_id: user?.id || 'demo-user'
-      });
-
-      const knowledgeResult = await callEdgeFunction('adk-agents', {
-        payload: {
-          action: 'know_me_start',
-          pdf_content: extractedTextCombined,
-          user_id: user?.id || 'demo-user'
-        }
-      });
-
-      console.log('📥 Edge function response:', knowledgeResult);
-
-      if (knowledgeResult.success) {
-        console.log('✅ Analysis successful:', knowledgeResult.knowledge_analysis);
-        setKnowledgeAnalysis(knowledgeResult.knowledge_analysis);
-        setProblemSolutionAnalysis(knowledgeResult.knowledge_analysis?.problem_solution_analysis || []);
-        setKnowMeQuestions(knowledgeResult.knowledge_analysis?.know_me_questions || []);
-        setLearningObjectives(knowledgeResult.knowledge_analysis?.learning_objectives || []);
-        moveToNextPhase();
-      } else {
-        console.error('❌ Analysis failed:', knowledgeResult.error);
-        throw new Error(knowledgeResult.error || 'Failed to analyze PDF');
-      }
-
-    } catch (err) {
-      console.error('💥 Upload error:', err);
-      setError(`Failed to process PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
+    if (file) {
+      processFile(file);
     }
   };
 
@@ -267,7 +215,8 @@ const KnowMePage: React.FC = () => {
       }
 
     } catch (err) {
-      setError(`Failed to process questionnaire: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('❌ Questionnaire submission failed:', err);
+      setError('🤖 AI scenario generation is temporarily unavailable. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -305,7 +254,9 @@ const KnowMePage: React.FC = () => {
         setRealTimeHints(hintResult.scoring_result.hints);
       }
     } catch (err) {
-      console.error('Failed to get real-time hints:', err);
+      console.error('❌ Real-time hints failed:', err);
+      // Clear hints when AI is unavailable
+      setRealTimeHints([]);
     }
   };
 
@@ -343,7 +294,8 @@ const KnowMePage: React.FC = () => {
       }
 
     } catch (err) {
-      setError(`Failed to score answer: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('❌ Scenario scoring failed:', err);
+      setError('🤖 AI scoring is temporarily unavailable. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -373,7 +325,8 @@ const KnowMePage: React.FC = () => {
       }
 
     } catch (err) {
-      setError(`Failed to generate report: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('❌ Report generation failed:', err);
+      setError('🤖 AI report generation is temporarily unavailable. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -382,6 +335,133 @@ const KnowMePage: React.FC = () => {
   // Voice recording functionality (placeholder for future integration)
   const toggleRecording = () => {
     setIsRecording(!isRecording);
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type === 'application/pdf') {
+        processFile(file);
+      } else {
+        setError('Please upload a PDF file');
+      }
+    }
+  };
+
+  const processFile = async (file: File) => {
+    if (!file || file.type !== 'application/pdf') {
+      setError('Please upload a PDF file');
+      return;
+    }
+
+    setUploadedFile(file);
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Extract text from the uploaded PDF using pdfjs-dist with improved error handling
+      const arrayBuffer = await file.arrayBuffer();
+      
+      let extractedTextCombined = '';
+      let extractionSucceeded = true;
+      
+      try {
+        // Try to load the PDF with PDF.js legacy build
+        const loadingTask = pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0 // Reduce console noise
+        });
+        
+        const pdf = await loadingTask.promise;
+        console.log(`✅ PDF loaded successfully: ${pdf.numPages} pages`);
+
+        for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 10); pageNum++) { // Limit to first 10 pages
+          try {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageText = (textContent.items as any[]).map(item => item.str).join(' ');
+            extractedTextCombined += pageText + '\n';
+            
+            // Limit to first ~20k chars to avoid oversize payloads
+            if (extractedTextCombined.length > 20000) {
+              extractedTextCombined = extractedTextCombined.substring(0, 20000);
+              console.log(`📄 Text extraction stopped at ${extractedTextCombined.length} characters`);
+              break;
+            }
+          } catch (pageError) {
+            console.warn(`⚠️ Failed to extract text from page ${pageNum}:`, pageError);
+            continue; // Skip this page and continue with others
+          }
+        }
+        
+        if (extractedTextCombined.length < 200) {
+          throw new Error('Extracted text too short');
+        }
+        
+        console.log(`✅ Text extraction completed: ${extractedTextCombined.length} characters`);
+        
+      } catch (pdfError) {
+        extractionSucceeded = false;
+        console.error('PDF.js extraction failed:', pdfError);
+        setError('Failed to extract text from the PDF. Please try a different PDF or re-export the file to ensure text is selectable.');
+        setLoading(false);
+        return; // Abort further processing
+      }
+
+      if (!extractionSucceeded) return;
+
+      setExtractedText(extractedTextCombined);
+
+      // Call Enhanced Knowledge Extraction Agent with real extracted text
+      console.log('🔍 Calling edge function with payload:', {
+        action: 'know_me_start',
+        pdf_content: extractedTextCombined.substring(0, 100) + '...',
+        user_id: user?.id || 'demo-user'
+      });
+
+      const knowledgeResult = await callEdgeFunction('adk-agents', {
+        payload: {
+          action: 'know_me_start',
+          pdf_content: extractedTextCombined,
+          user_id: user?.id || 'demo-user'
+        }
+      });
+
+      console.log('📥 Edge function response:', knowledgeResult);
+
+      if (knowledgeResult.success) {
+        console.log('✅ Analysis successful:', knowledgeResult.knowledge_analysis);
+        setKnowledgeAnalysis(knowledgeResult.knowledge_analysis);
+        setProblemSolutionAnalysis(knowledgeResult.knowledge_analysis?.problem_solution_analysis || []);
+        setKnowMeQuestions(knowledgeResult.knowledge_analysis?.know_me_questions || []);
+        setLearningObjectives(knowledgeResult.knowledge_analysis?.learning_objectives || []);
+        moveToNextPhase();
+      } else {
+        console.error('❌ Analysis failed:', knowledgeResult.error);
+        throw new Error(knowledgeResult.error || 'Failed to analyze PDF');
+      }
+
+    } catch (err) {
+      console.error('💥 Upload error:', err);
+      setError(`Failed to process PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderPhaseIndicator = () => (
@@ -437,14 +517,34 @@ const KnowMePage: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Upload PDF Document
+      <div className="bg-white rounded-xl shadow-xl p-8 border border-gray-100">
+        <div 
+          className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+            uploadedFile 
+              ? 'border-green-300 bg-green-50' 
+              : isDragOver
+                ? 'border-indigo-500 bg-indigo-100 scale-105'
+                : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {uploadedFile ? (
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+          ) : (
+            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          )}
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {uploadedFile ? 'PDF Ready for Analysis' : 'Upload PDF Document'}
           </h3>
-          <p className="text-gray-600 mb-4">
-            Choose an exam paper or study material to analyze
+          <p className="text-gray-600 mb-6">
+            {uploadedFile 
+              ? `File: ${uploadedFile.name}` 
+              : isDragOver
+                ? 'Drop your PDF file here to get started!'
+                : 'Choose an exam paper or study material to analyze with AI, or drag and drop a PDF file here'
+            }
           </p>
           
         <input
@@ -458,47 +558,52 @@ const KnowMePage: React.FC = () => {
           
           <label
             htmlFor="file-upload"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+            className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white transition-all duration-200 cursor-pointer ${
+              loading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-xl'
+            }`}
           >
-            {loading ? 'Processing...' : 'Choose File'}
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing PDF...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2" size={20} />
+                Choose PDF File
+              </>
+            )}
           </label>
 
-          {/* Test Button */}
-          <div className="mt-4">
-              <button
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  const testResult = await callEdgeFunction('adk-agents', {
-                    payload: {
-                      action: 'know_me_start',
-                      pdf_content: 'Test content about network configuration and VNet peering',
-                      user_id: 'test-user'
-                    }
-                  });
-                  console.log('🧪 Test result:', testResult);
-                  alert('Test completed - check console for results');
-                } catch (error) {
-                  console.error('🧪 Test error:', error);
-                  alert('Test failed - check console for error details');
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              className="ml-4 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Test Edge Function
-              </button>
+          <div className="mt-4 text-sm text-gray-500">
+            <p>📄 Supported format: PDF files up to 20MB</p>
+            <p>🔍 AI will analyze your content to create personalized learning experiences</p>
           </div>
         </div>
 
         {uploadedFile && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-              <span className="text-green-800">
-                Uploaded: {uploadedFile.name}
-              </span>
+          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FileText className="h-6 w-6 text-green-600 mr-3" />
+                <div>
+                  <span className="text-green-800 font-medium">
+                    {uploadedFile.name}
+                  </span>
+                  <p className="text-sm text-green-600">
+                    {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB • Ready for AI analysis
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-sm text-green-700">Ready</span>
+              </div>
             </div>
           </div>
         )}
@@ -509,22 +614,41 @@ const KnowMePage: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-white rounded-lg shadow-lg p-6"
+          className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl shadow-xl p-6 border border-indigo-100"
         >
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
-            Problem-Solution Analysis Preview
-          </h3>
-          <div className="space-y-4">
+          <div className="flex items-center mb-6">
+            <Brain className="h-6 w-6 text-indigo-600 mr-3" />
+            <h3 className="text-xl font-semibold text-gray-900">
+              AI Analysis Preview
+            </h3>
+            <span className="ml-auto px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded-full">
+              {problemSolutionAnalysis.length} problems identified
+            </span>
+          </div>
+          <div className="grid gap-4">
             {problemSolutionAnalysis.slice(0, 3).map((analysis, index) => (
-              <div key={index} className="border-l-4 border-indigo-500 pl-4">
-                <h4 className="font-medium text-gray-900">{analysis.technical_solution}</h4>
-                <p className="text-sm text-gray-600 mt-1">{analysis.underlying_problem}</p>
-                <p className="text-sm text-purple-600 mt-1 italic">{analysis.life_connection}</p>
-                <span className="inline-block mt-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">
-                  {analysis.problem_category}
-                </span>
+              <div key={index} className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="font-medium text-gray-900 flex-1">{analysis.technical_solution}</h4>
+                  <span className="ml-3 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full whitespace-nowrap">
+                    {analysis.problem_category}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">
+                  <span className="font-medium">Problem:</span> {analysis.underlying_problem}
+                </p>
+                <p className="text-sm text-purple-600 italic">
+                  <span className="font-medium">Life Connection:</span> {analysis.life_connection}
+                </p>
               </div>
             ))}
+            {problemSolutionAnalysis.length > 3 && (
+              <div className="text-center">
+                <span className="text-sm text-gray-500">
+                  +{problemSolutionAnalysis.length - 3} more problems will be explored in the questionnaire
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -824,9 +948,29 @@ const KnowMePage: React.FC = () => {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Performance Report</h2>
           <p className="text-gray-600 text-lg">
-            Your personalized problem-solving assessment and recommendations
+            Discover how personalized, experience-based learning transforms your understanding
           </p>
         </div>
+
+        {/* Core Problems Resolved Section */}
+        {performanceReport.core_problems_resolved && (
+          <div className="mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <Lightbulb className="mr-2 text-indigo-600" size={20} />
+              Core Learning Problems Resolved
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(performanceReport.core_problems_resolved).map(([key, value]: [string, any]) => (
+                <div key={key} className="bg-white rounded-lg p-4 shadow-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 capitalize">
+                    {key.replace(/_/g, ' ')}
+                  </h4>
+                  <p className="text-sm text-gray-600">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Overall Metrics */}
@@ -903,6 +1047,19 @@ const KnowMePage: React.FC = () => {
                     </div>
                     </div>
 
+            {/* Key Insights - Enhanced */}
+            <div className="mt-6">
+              <h4 className="font-medium text-gray-900 mb-3">Key Learning Insights</h4>
+              <div className="space-y-2">
+                {insights.key_insights.map((insight, index) => (
+                  <div key={index} className="flex items-start space-x-2 p-2 bg-indigo-50 rounded">
+                    <CheckCircle className="text-indigo-600 mt-0.5" size={16} />
+                    <span className="text-sm text-gray-700">{insight}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Strongest Areas</h4>
@@ -959,6 +1116,18 @@ const KnowMePage: React.FC = () => {
                       {data.real_world_readiness.toUpperCase()}
                     </span>
               </div>
+                  {data.core_problem_addressed && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                      <span className="font-medium text-blue-800">Problem Addressed:</span>
+                      <div className="text-blue-700">{data.core_problem_addressed}</div>
+                    </div>
+                  )}
+                  {data.learning_transformation && (
+                    <div className="mt-2 p-2 bg-green-50 rounded text-xs">
+                      <span className="font-medium text-green-800">Learning Transformation:</span>
+                      <div className="text-green-700">{data.learning_transformation}</div>
+                    </div>
+                  )}
                 </div>
                     </div>
                   ))}
@@ -1008,8 +1177,68 @@ const KnowMePage: React.FC = () => {
             <p className="text-sm text-indigo-700 mt-2">
               Focus Areas: {performanceReport.study_recommendations.focus_areas}
             </p>
+            {performanceReport.study_recommendations.personalization_success && (
+              <div className="mt-3 p-3 bg-green-50 rounded border border-green-200">
+                <div className="flex items-center space-x-2">
+                  <Star className="text-green-600" size={16} />
+                  <span className="font-medium text-green-900">Personalization Success</span>
+                </div>
+                <p className="text-sm text-green-700 mt-1">
+                  {performanceReport.study_recommendations.personalization_success}
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Improvement Areas with Core Problem Resolution */}
+        {performanceReport.improvement_areas && performanceReport.improvement_areas.length > 0 && (
+          <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <TrendingUp className="mr-2" size={20} />
+              Learning Transformation Areas
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {performanceReport.improvement_areas.map((area: any, index: number) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">{area.problem_category}</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Current Score:</span>
+                      <span className="font-medium">{area.current_score}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Improvement Potential:</span>
+                      <span className={`font-medium ${
+                        area.improvement_potential === 'high' ? 'text-green-600' : 'text-yellow-600'
+                      }`}>
+                        {area.improvement_potential.toUpperCase()}
+                      </span>
+                    </div>
+                    {area.core_problem_being_resolved && (
+                      <div className="mt-2 p-2 bg-purple-50 rounded text-xs">
+                        <span className="font-medium text-purple-800">Transformation:</span>
+                        <div className="text-purple-700">{area.core_problem_being_resolved}</div>
+                      </div>
+                    )}
+                    {area.life_experience_connections && area.life_experience_connections.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-xs font-medium text-gray-600">Experience Connections:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {area.life_experience_connections.map((connection: string, idx: number) => (
+                            <span key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              {connection}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </motion.div>
     );
   };
@@ -1047,12 +1276,27 @@ const KnowMePage: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-            className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4"
-          >
-            <div className="flex items-center">
-              <AlertCircle className="text-red-500 mr-2" size={20} />
-              <span className="text-red-800">{error}</span>
+              className={`mb-6 rounded-lg p-4 ${
+                error.includes('🤖') 
+                  ? 'bg-blue-50 border border-blue-200' 
+                  : 'bg-red-50 border border-red-200'
+              }`}
+            >
+              <div className="flex items-center">
+                {error.includes('🤖') ? (
+                  <Brain className="text-blue-500 mr-2" size={20} />
+                ) : (
+                  <AlertCircle className="text-red-500 mr-2" size={20} />
+                )}
+                <span className={error.includes('🤖') ? 'text-blue-800' : 'text-red-800'}>
+                  {error}
+                </span>
               </div>
+              {error.includes('🤖') && (
+                <div className="mt-2 text-sm text-blue-700">
+                  Our AI is temporarily unavailable. Please try again in a few moments, or contact support if the issue persists.
+                </div>
+              )}
             </motion.div>
           )}
 
