@@ -1,26 +1,55 @@
 import { supabase, isSupabaseConnected } from '../lib/supabase';
+import type { LearningProfile } from '../types';
+
+// Additional interfaces for Supabase services
+interface SensaAnalysis {
+  insights?: string[];
+  emotional_tone?: string;
+  themes?: string[];
+  learning_style?: string;
+  confidence_score?: number;
+  [key: string]: unknown;
+}
+
+interface AnalysisData {
+  course_analysis?: Record<string, unknown>;
+  memory_connections?: Record<string, unknown>[];
+  career_pathways?: Record<string, unknown>;
+  study_map?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface StudyMapPayload {
+  title: string;
+  mermaid_text: string;
+  user_id: string;
+  updated_at: string;
+  id?: string;
+}
 
 // Enhanced error handling with detailed context
-const handleSupabaseError = (error: any, context: string) => {
+const handleSupabaseError = (error: unknown, context: string) => {
   console.error(`Supabase ${context} error:`, error);
-  
+
   if (!isSupabaseConnected()) {
     throw new Error(`Development mode: Supabase not connected. ${context} requires database connection.`);
   }
-  
-  if (error?.message?.includes('JWT')) {
+
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  if (errorMessage.includes('JWT')) {
     throw new Error('Authentication expired. Please sign in again.');
   }
-  
-  if (error?.message?.includes('not authenticated')) {
+
+  if (errorMessage.includes('not authenticated')) {
     throw new Error('Authentication required. Please sign in to continue.');
   }
-  
-  if (error?.message?.includes('Failed to fetch')) {
+
+  if (errorMessage.includes('Failed to fetch')) {
     throw new Error('Network connection failed. Please check your internet connection and try again.');
   }
-  
-  throw new Error(`${context} failed: ${error?.message || 'Unknown error'}`);
+
+  throw new Error(`${context} failed: ${errorMessage || 'Unknown error'}`);
 };
 
 // Mock data for development mode
@@ -128,7 +157,7 @@ export const supabaseServices = {
     }
   },
 
-  async saveMemory(memory: { category: string; text_content: string; sensa_analysis?: any }) {
+  async saveMemory(memory: { category: string; text_content: string; sensa_analysis?: SensaAnalysis }) {
     if (!isSupabaseConnected()) {
       console.log('🔧 Development mode: Memory save simulated');
       return {
@@ -260,7 +289,7 @@ export const supabaseServices = {
 
 // Memory Services
 export const memoryService = {
-  async saveMemory(category: string, textContent: string, sensaAnalysis?: any) {
+  async saveMemory(category: string, textContent: string, sensaAnalysis?: SensaAnalysis) {
     try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -305,7 +334,7 @@ export const memoryService = {
     }
   },
 
-  async updateMemoryAnalysis(memoryId: string, sensaAnalysis: any) {
+  async updateMemoryAnalysis(memoryId: string, sensaAnalysis: SensaAnalysis) {
     const { data, error } = await supabase!
       .from('memories')
       .update({ sensa_analysis: sensaAnalysis })
@@ -368,7 +397,7 @@ export const memoryService = {
       for (const memory of pendingMemories) {
         try {
           // Find corresponding stored data
-          const storedData = memoryAnalyses.find((a: any) => a.stepId === memory.stepId);
+          const storedData = memoryAnalyses.find((a: { stepId: string }) => a.stepId === memory.stepId);
           const category = storedData?.category || 'general';
           
           // Save memory to database first
@@ -446,10 +475,10 @@ export const courseService = {
 export const courseAnalysisService = {
   async saveCourseAnalysis(
     courseId: string,
-    analysisData: any,
-    memoryConnections?: any,
-    careerPathways?: any,
-    studyMap?: any
+    analysisData: AnalysisData,
+    memoryConnections?: Record<string, unknown>[],
+    careerPathways?: Record<string, unknown>,
+    studyMap?: Record<string, unknown>
   ) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -509,7 +538,7 @@ export const edgeFunctionService = {
     return await SensaAPI.analyzeMemory(memoryContent, category);
   },
 
-  async analyzeCourse(courseQuery: string, userMemories: any[]) {
+  async analyzeCourse(courseQuery: string) {
     console.warn('⚠️ Using legacy edgeFunctionService.analyzeCourse - consider migrating to SensaAPI.analyzeCourse');
     // For compatibility, get current user and redirect to new system
     const { data: { user } } = await supabase.auth.getUser();
@@ -520,7 +549,7 @@ export const edgeFunctionService = {
     return result.course_analysis;
   },
 
-  async generateCareerPathways(courseName: string, userMemoryProfile: any) {
+  async generateCareerPathways(courseName: string) {
     console.warn('⚠️ Using legacy edgeFunctionService.generateCareerPathways - consider migrating to SensaAPI.generateCareerPathways');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -529,7 +558,7 @@ export const edgeFunctionService = {
     return await SensaAPI.generateCareerPathways(courseName, user.id);
   },
 
-  async generateStudyMap(fieldOfStudy: string, courseSyllabus: string[], userMemoryProfile: any) {
+  async generateStudyMap(fieldOfStudy: string, courseSyllabus: string[]) {
     console.warn('⚠️ Using legacy edgeFunctionService.generateStudyMap - consider migrating to SensaAPI.generateStudyMap');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -538,7 +567,7 @@ export const edgeFunctionService = {
     return await SensaAPI.generateStudyMap(fieldOfStudy, courseSyllabus, user.id);
   },
 
-  async generateMermaidMap(fieldOfStudy: string, courseSyllabus: string[], userMemoryProfile: any) {
+  async generateMermaidMap(fieldOfStudy: string, courseSyllabus: string[]) {
     console.warn('⚠️ Using legacy edgeFunctionService.generateMermaidMap - consider migrating to SensaAPI.generateMermaidStudyMap');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -550,7 +579,7 @@ export const edgeFunctionService = {
 
 // User Profile Services
 export const userService = {
-  async updateLearningProfile(learningProfile: any) {
+  async updateLearningProfile(learningProfile: LearningProfile) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -656,7 +685,7 @@ export const studyMapService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const payload: any = { title, mermaid_text: mermaidText, user_id: user.id, updated_at: new Date().toISOString() };
+    const payload: StudyMapPayload = { title, mermaid_text: mermaidText, user_id: user.id, updated_at: new Date().toISOString() };
     if (id) payload.id = id;
 
     const { data, error } = await supabase!

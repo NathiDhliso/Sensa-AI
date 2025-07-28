@@ -65,7 +65,7 @@ export const callEdgeFunction = async (functionName: string, payload: unknown) =
 
 // 1. ADK Agents Function
 export interface ADKAgentRequest {
-  agent_type: 'memory_analysis' | 'course_intel' | 'personalization' | 'career_pathway' | 'study_map' | 'orchestrator'
+  agent_type: 'memory_analysis' | 'course_intel' | 'personalization' | 'career_pathway' | 'study_map' | 'study_guide' | 'orchestrator'
   payload: Record<string, unknown>
 }
 
@@ -160,6 +160,14 @@ export const generateStudyPlan = async (studyData: Record<string, unknown>) => {
   })
 }
 
+// Study Guide Agent
+export const generateStudyGuide = async (studyGuideData: Record<string, unknown>) => {
+  return callADKAgent({
+    agent_type: 'study_guide',
+    payload: studyGuideData
+  })
+}
+
 // Orchestrator Agent (coordinates multiple agents)
 export const orchestrateAgents = async (orchestrationRequest: Record<string, unknown>) => {
   return callADKAgent({
@@ -199,7 +207,7 @@ export const checkFunctionHealth = async () => {
   return results
 }
 
-export default {
+const edgeFunctionService = {
   callEdgeFunction,
   callADKAgent,
   generateStudyMap,
@@ -210,7 +218,10 @@ export default {
   getPersonalizedRecommendations,
   getCareerPathway,
   generateStudyPlan,
+  generateStudyGuide,
   orchestrateAgents,
   withErrorHandling,
   checkFunctionHealth
-} 
+};
+
+export default edgeFunctionService;

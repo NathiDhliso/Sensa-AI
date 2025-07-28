@@ -127,6 +127,5 @@ describe('Mind Map Editor – End-to-End', () => {
   })
 
   // Export empty object to treat file as a module and avoid global lint errors
-  // eslint-disable-next-line import/no-anonymous-default-export
   export {}
 }) 

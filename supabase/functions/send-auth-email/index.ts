@@ -37,7 +37,7 @@ serve(async (req) => {
     const redirectBaseUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
 
     switch (emailType) {
-      case 'CONFIRM_SIGNUP':
+      case 'CONFIRM_SIGNUP': {
         if (!email || !password) {
           throw new Error('Email and password are required for signup')
         }
@@ -85,8 +85,10 @@ serve(async (req) => {
             } 
           }
         )
+        break;
+      }
 
-      case 'RESET_PASSWORD':
+      case 'RESET_PASSWORD': {
         if (!email) {
           throw new Error('Email is required for password reset')
         }
@@ -103,8 +105,10 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+        break;
+      }
 
-      case 'INVITE_USER':
+      case 'INVITE_USER': {
         if (!email) {
           throw new Error('Email is required for user invitation')
         }
@@ -122,8 +126,10 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+        break;
+      }
 
-      case 'MAGIC_LINK':
+      case 'MAGIC_LINK': {
         if (!email) {
           throw new Error('Email is required for magic link')
         }
@@ -143,8 +149,10 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+        break;
+      }
 
-      case 'CHANGE_EMAIL':
+      case 'CHANGE_EMAIL': {
         if (!newEmail) {
           throw new Error('New email is required for email change')
         }
@@ -158,8 +166,10 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+        break;
+      }
 
-      case 'REAUTHENTICATION':
+      case 'REAUTHENTICATION': {
         return new Response(
           JSON.stringify({
             message: 'Reauthentication process initiated.',
@@ -167,6 +177,7 @@ serve(async (req) => {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+      }
 
       default:
         return new Response(

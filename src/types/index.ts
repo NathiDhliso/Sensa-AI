@@ -101,6 +101,65 @@ export interface StudyMap {
   map: KnowledgeNode[];
 }
 
+export interface StudyGuideSection {
+  title: string;
+  priority: 'High' | 'Medium' | 'Low';
+  estimatedTime: string;
+  topics: string[];
+}
+
+// Legacy StudyGuide interface (kept for backward compatibility)
+export interface LegacyStudyGuide {
+  title: string;
+  subject: string;
+  totalTime: string;
+  sections: StudyGuideSection[];
+}
+
+// Modern StudyGuide interface with framework and pillars
+export interface StudyGuide {
+  id: string;
+  subject: string;
+  framework: {
+    acronym: string;
+    name: string;
+    description: string;
+  };
+  pillars: Pillar[];
+  createdAt: Date;
+}
+
+export interface Pillar {
+  name: string;
+  thematicName: string;
+  studyFocus: string;
+  subAcronym?: string;
+  subTopics: SubTopic[];
+}
+
+export interface SubTopic {
+  priority: string;
+  conceptPair: string;
+  pyramid: {
+    base: string;
+    middle: string;
+    apex: string;
+    keyTakeaway: string;
+  };
+}
+
+export interface UserCommunicationStyle {
+  technicalTerms: string[];
+  communicationPatterns: {
+    usesMetaphors: boolean;
+    storytellingStyle: boolean;
+    casualTone: boolean;
+    prefersConcrete: boolean;
+  };
+  preferredExpressions: string[];
+  toneStyle: string;
+}
+
 // Enhanced Mermaid Study Map Types
 export interface NodeData {
   node_name: string;

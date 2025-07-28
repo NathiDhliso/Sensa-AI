@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Course, CourseAnalysisResult } from '../types';
+import type { Course, CourseAnalysisResult, MemoryConnection, CareerPathwayResponse, StudyMap } from '../types';
 
 interface CourseAnalysis {
   id: string;
   courseId: string;
   analysis: CourseAnalysisResult;
-  memoryConnections: any[];
-  careerPathways: any;
-  studyMap: any;
+  memoryConnections: MemoryConnection[];
+  careerPathways: CareerPathwayResponse | null;
+  studyMap: StudyMap | null;
   createdAt: Date;
 }
 

@@ -1,0 +1,130 @@
+/* Mind Map Node Component Styles */
+.mindMapNode {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  min-width: 100px;
+  position: relative;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.mindMapNode:hover {
+  border-color: #6366f1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.mindMapNode.selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.nodeContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nodeTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.nodeSubtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.nodeIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #6366f1;
+  margin-bottom: 0.25rem;
+}
+
+.nodeActions {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mindMapNode:hover .nodeActions {
+  opacity: 1;
+}
+
+.actionButton {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.editButton:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.deleteButton:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.connectButton:hover {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+/* Node Type Variations */
+.rootNode {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-color: #6366f1;
+}
+
+.rootNode .nodeTitle {
+  color: white;
+}
+
+.rootNode .nodeSubtitle {
+  color: #e0e7ff;
+}
+
+.branchNode {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.leafNode {
+  background: #fefce8;
+  border-color: #facc15;
+}
+
+.leafNode:hover {
+  border-color: #eab308;
+} 

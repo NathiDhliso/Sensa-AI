@@ -1,22 +1,26 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
-import LandingPage from './pages/LandingPage';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ProtectedRoute } from './features/Auth';
+import { LandingPage } from './features/LandingPage';
 import LoginPage from './pages/LoginPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import OnboardingFlow from './pages/OnboardingFlow';
-import Dashboard from './pages/Dashboard/Dashboard';
+import { Dashboard } from './features/Dashboard';
 import MemoryElicitation from './pages/MemoryElicitation';
 import PrivacyCenter from './pages/PrivacyCenter';
 import MemoryBank from './pages/MemoryBank';
 import SensaDialogue from './pages/SensaDialogue';
-import StudyMaterialUpload from './components/StudyMaterialUpload/StudyMaterialUpload';
-import EnhancedStudyMap from './pages/EnhancedStudyMap';
+import { StudyMaterialUpload } from './features/StudyMaterialUpload';
+import { EnhancedStudyMap } from './features/IntegratedLearning';
 import KnowMePage from './pages/KnowMePage';
-import NotificationSystem from './components/NotificationSystem/NotificationSystem';
+import { NotificationSystem } from './features/NotificationSystem';
+import PrimeMePage from './pages/PrimeMePage';
+import StudyGuideGenerator from './pages/StudyGuideGenerator';
 
 function App() {
   return (
+    <ThemeProvider>
     <Router
       future={{
         v7_startTransition: true,
@@ -74,6 +78,8 @@ function App() {
               <KnowMePage />
             </ProtectedRoute>
           } />
+                      <Route path="/prime-me" element={<PrimeMePage />} />
+            <Route path="/study-guide-generator" element={<StudyGuideGenerator />} />
           {/* Legacy routes redirecting to integrated learning hub */}
           <Route path="/course-analyzer" element={
             <ProtectedRoute>
@@ -101,6 +107,7 @@ function App() {
         <NotificationSystem />
       </div>
     </Router>
+    </ThemeProvider>
   );
 }
 

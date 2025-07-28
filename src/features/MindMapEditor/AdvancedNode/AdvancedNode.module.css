@@ -1,0 +1,77 @@
+/* Advanced Node Component Styles */
+.customNode {
+  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
+  min-width: 120px;
+  position: relative;
+}
+
+.customNode:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.nodeInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.nodeInput:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.nodeContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.nodeActions {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.customNode:hover .nodeActions {
+  opacity: 1;
+}
+
+.actionButton {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.deleteButton:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+} 

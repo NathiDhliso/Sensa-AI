@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { User, Session } from '@supabase/supabase-js'
+import { useEffect } from 'react'
+// import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { useNavigate } from 'react-router-dom'
