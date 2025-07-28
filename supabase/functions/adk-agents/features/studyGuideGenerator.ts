@@ -122,31 +122,46 @@ Generate a comprehensive study guide for the subject above, following all instru
       try {
         console.log(`🔄 Trying model: ${model}`);
 
-        geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` + Deno.env.get('GOOGLE_AI_API_KEY'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            systemInstruction: {
-                parts: [{
-                    text: STUDY_GUIDE_SYSTEM_PROMPT
-                }]
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+
+        try {
+          geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` + Deno.env.get('GOOGLE_AI_API_KEY'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            contents: [{
-              parts: [{
-                text: userPrompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.8,
-              maxOutputTokens: 8192,
-              responseMimeType: 'application/json',
-            }
-          })
-        });
+            signal: controller.signal,
+            body: JSON.stringify({
+              systemInstruction: {
+                  parts: [{
+                      text: STUDY_GUIDE_SYSTEM_PROMPT
+                  }]
+              },
+              contents: [{
+                parts: [{
+                  text: userPrompt
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.8,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
+              }
+            })
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.log(`⏰ Timeout with ${model}, trying next model...`);
+            continue;
+          }
+          throw fetchError;
+        }
 
         if (geminiResponse.ok) {
           console.log(`✅ Success with model: ${model}`);
@@ -162,11 +177,16 @@ Generate a comprehensive study guide for the subject above, following all instru
           }
 
           // For other errors, wait a bit before trying next model
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       } catch (error) {
         lastError = `${model}: ${error.message}`;
         console.log(`❌ Error with ${model}: ${lastError}`);
+
+        // If it's a timeout, try next model immediately
+        if (error.name === 'AbortError') {
+          console.log(`⏰ Timeout with ${model}, trying next model...`);
+        }
         continue;
       }
     }

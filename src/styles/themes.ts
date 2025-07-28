@@ -323,6 +323,20 @@ export const pageThemes = {
       wisdom: sensaBrandColors.gradients.wisdom.css,
       growth: sensaBrandColors.gradients.growth.css,
     }
+  },
+
+  // Epistemic Driver
+  epistemicDriver: {
+    background: 'bg-gradient-to-br from-slate-50 via-white to-amber-50',
+    card: 'bg-white/90 backdrop-blur-sm border-slate-200/50',
+    accent: 'text-amber-600',
+    button: 'bg-gradient-to-r from-amber-500 to-yellow-500',
+    gradients: {
+      memoryToLearning: sensaBrandColors.gradients.memoryToLearning.css,
+      transformation: sensaBrandColors.gradients.transformation.css,
+      wisdom: sensaBrandColors.gradients.wisdom.css,
+      growth: sensaBrandColors.gradients.growth.css,
+    }
   }
 };
 

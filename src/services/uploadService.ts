@@ -1,10 +1,10 @@
 // Use the legacy build of PDF.js to avoid module issues
-// @ts-ignore
+// @ts-expect-error - pdfjs-dist types may not be fully compatible
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 
 // Configure PDF.js worker
 try {
-  // @ts-ignore
+  // @ts-expect-error - GlobalWorkerOptions may not be typed correctly
   if (pdfjsLib?.GlobalWorkerOptions) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }

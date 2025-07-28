@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Image, File as FileIcon, X, CheckCircle, AlertCircle, Copy, Check, Clipboard } from 'lucide-react';
+import { Upload, FileText, Image, File as FileIcon, X, CheckCircle, AlertCircle, Clipboard } from 'lucide-react';
 
 interface UnifiedUploadProps {
   onFileUpload: (files: File[]) => void;

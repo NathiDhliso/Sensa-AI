@@ -20,7 +20,7 @@ import {
 import { useAuthStore } from '../../../stores/authStore';
 import { callEdgeFunction } from '../../../services/edgeFunctions';
 import { uploadService, uploadConfigs } from '../../../services/uploadService';
-import { UnifiedUpload } from '../../../components';
+import { UnifiedUpload, BackButton } from '../../../components';
 import {
   usePageTheme
 } from '../../../contexts/ThemeContext';
@@ -268,7 +268,7 @@ const KnowMePage: React.FC = () => {
           action: 'know_me_questionnaire',
           questionnaire_responses: { responses },
           knowledge_analysis: workflow.upload.knowledgeAnalysis,
-          user_id: user?.id || 'demo-user'
+          user_id: user?.id
         }
       });
 
@@ -380,7 +380,7 @@ const KnowMePage: React.FC = () => {
           action: 'know_me_report',
           scoring_results: allResults,
           knowledge_analysis: workflow.upload.knowledgeAnalysis,
-          user_id: user?.id || 'demo-user'
+          user_id: user?.id
         }
       });
 
@@ -435,14 +435,14 @@ const KnowMePage: React.FC = () => {
       console.log('🔍 Calling edge function with payload:', {
         action: 'know_me_start',
         pdf_content: uploadResult.totalExtractedText.substring(0, 100) + '...',
-        user_id: user?.id || 'demo-user'
+        user_id: user?.id
       });
 
       const knowledgeResult = await callEdgeFunction('adk-agents', {
         payload: {
           action: 'know_me_start',
           pdf_content: uploadResult.totalExtractedText,
-          user_id: user?.id || 'demo-user'
+          user_id: user?.id
         }
       });
 
@@ -1185,9 +1185,12 @@ const KnowMePage: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${pageTheme.background}`}>
-        {renderPhaseIndicator()}
+      {/* Back Button */}
+      <BackButton variant="floating" />
+
+      {renderPhaseIndicator()}
       <div className="max-w-7xl mx-auto px-4 py-8">
-          {renderCurrentPhase()}
+        {renderCurrentPhase()}
       </div>
     </div>
   );

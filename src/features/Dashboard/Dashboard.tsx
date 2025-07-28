@@ -18,7 +18,8 @@ import {
   Lightbulb,
   Target,
   BookOpen,
-  Award
+  Award,
+  Zap
 } from 'lucide-react';
 import { usePageTheme, useThemeClasses, withPageTheme } from '../../contexts/ThemeContext';
 import { useMemoryStore, useCourseStore, useUIStore } from '../../stores';
@@ -38,7 +39,8 @@ const Dashboard: React.FC = () => {
     setMemories
   } = useMemoryStore();
   
-  const { 
+  const {
+    courses,
     getAnalysisCount,
     setCourses
   } = useCourseStore();
@@ -212,189 +214,11 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Real South African university foundational modules based on comprehensive analysis
-  const sampleCourses: Course[] = [
-    {
-      id: 'CSC1015F',
-      title: 'Introduction to Computer Science I',
-      subtitle: 'Programming fundamentals with Python',
-      description: 'Introduces fundamental programming concepts, problem-solving, and algorithm development using Python programming language',
-      category: 'Computer Science',
-      difficulty: 'Beginner',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Python Programming', 'Algorithm Development', 'Problem Solving'],
-      icon: '💻',
-      color: 'from-blue-500 via-indigo-500 to-purple-600',
-      students: '450+ students',
-      dreamJob: 'Software Developer'
-    },
-    {
-      id: 'ACCN1006A',
-      title: 'Accounting I',
-      subtitle: 'Financial accounting fundamentals',
-      description: 'Introduces the fundamental principles of financial accounting, the accounting cycle, and the preparation of financial statements',
-      category: 'Accounting',
-      difficulty: 'Beginner',
-      duration: '1 semester',
-      university: 'University of the Witwatersrand',
-      skills: ['Financial Statements', 'Accounting Cycle', 'Financial Reporting'],
-      icon: '📈',
-      color: 'from-green-400 via-emerald-500 to-teal-600',
-      students: '380+ students',
-      dreamJob: 'Financial Analyst'
-    },
-    {
-      id: 'PSYC1004F',
-      title: 'Introduction to Psychology I',
-      subtitle: 'Understanding human behavior',
-      description: 'Provides a broad overview of psychology, covering its history, major perspectives, and key areas of study including cognitive, social, and developmental psychology',
-      category: 'Psychology',
-      difficulty: 'Beginner',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Research Methods', 'Human Behavior', 'Psychological Theories'],
-      icon: '🧠',
-      color: 'from-purple-400 via-pink-500 to-rose-600',
-      students: '520+ students',
-      dreamJob: 'Clinical Psychologist'
-    },
-    {
-      id: 'MAM1020F',
-      title: 'Mathematics 1A for Engineers',
-      subtitle: 'Foundation calculus for engineering',
-      description: 'A foundational calculus course for engineering students, covering limits, differentiation, and integration with engineering applications',
-      category: 'Mathematics',
-      difficulty: 'Intermediate',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Calculus', 'Differential Equations', 'Mathematical Modeling'],
-      icon: '📐',
-      color: 'from-amber-400 via-orange-500 to-red-600',
-      students: '650+ students',
-      dreamJob: 'Engineering Consultant'
-    },
-    {
-      id: 'ECO1010F',
-      title: 'Microeconomics I',
-      subtitle: 'Individual economic behavior',
-      description: 'Introduces the theory of consumer behavior, firm behavior, and market structures including competition and monopoly in South African context',
-      category: 'Economics',
-      difficulty: 'Intermediate',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Market Analysis', 'Economic Theory', 'Policy Evaluation'],
-      icon: '📊',
-      color: 'from-cyan-400 via-teal-500 to-blue-600',
-      students: '400+ students',
-      dreamJob: 'Economic Analyst'
-    },
-    {
-      id: 'CEM1000W',
-      title: 'Chemistry I',
-      subtitle: 'Fundamental chemical principles',
-      description: 'A year-long introduction to fundamental principles of chemistry, including atomic structure, bonding, stoichiometry, and chemical reactions',
-      category: 'Chemistry',
-      difficulty: 'Intermediate',
-      duration: '1 year',
-      university: 'University of Cape Town',
-      skills: ['Chemical Bonding', 'Stoichiometry', 'Laboratory Techniques'],
-      icon: '⚗️',
-      color: 'from-emerald-400 via-green-500 to-teal-600',
-      students: '320+ students',
-      dreamJob: 'Chemical Engineer'
-    },
-    {
-      id: 'SOC1001F',
-      title: 'Introduction to Sociology',
-      subtitle: 'Understanding society and social structures',
-      description: 'Introduces the sociological imagination and how social structures like family, education, and work shape individual lives in South African society',
-      category: 'Sociology',
-      difficulty: 'Beginner',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Social Analysis', 'Research Methods', 'Critical Thinking'],
-      icon: '👥',
-      color: 'from-indigo-400 via-purple-500 to-pink-600',
-      students: '290+ students',
-      dreamJob: 'Social Researcher'
-    },
-    {
-      id: 'BIO1000F',
-      title: 'Cell Biology',
-      subtitle: 'Life at the cellular level',
-      description: 'Explores the structure, function, and biochemistry of the cell as the fundamental unit of life, including molecular mechanisms',
-      category: 'Biology',
-      difficulty: 'Intermediate',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Cellular Processes', 'Molecular Biology', 'Laboratory Skills'],
-      icon: '🔬',
-      color: 'from-lime-400 via-green-500 to-emerald-600',
-      students: '380+ students',
-      dreamJob: 'Research Scientist'
-    },
-    {
-      id: 'PVL1003W',
-      title: 'Foundations of South African Law',
-      subtitle: 'Legal system fundamentals',
-      description: 'Introduces the history, sources, and structure of the South African legal system, including court hierarchy and legal reasoning',
-      category: 'Law',
-      difficulty: 'Intermediate',
-      duration: '1 year',
-      university: 'University of Cape Town',
-      skills: ['Legal Reasoning', 'Constitutional Law', 'Case Analysis'],
-      icon: '⚖️',
-      color: 'from-slate-400 via-gray-500 to-zinc-600',
-      students: '250+ students',
-      dreamJob: 'Legal Advocate'
-    },
-    {
-      id: 'MECN2024A',
-      title: 'Applied Mechanics A',
-      subtitle: 'Engineering statics and dynamics',
-      description: 'A core second-year course covering the principles of statics and the mechanics of rigid bodies for mechanical engineering applications',
-      category: 'Mechanical Engineering',
-      difficulty: 'Advanced',
-      duration: '1 semester',
-      university: 'University of the Witwatersrand',
-      skills: ['Statics', 'Dynamics', 'Force Analysis'],
-      icon: '⚙️',
-      color: 'from-gray-400 via-slate-500 to-gray-600',
-      students: '180+ students',
-      dreamJob: 'Mechanical Engineer'
-    },
-    {
-      id: 'HIS1012F',
-      title: 'The Making of the Modern World',
-      subtitle: 'Global historical developments',
-      description: 'A survey of major global historical developments that have shaped the contemporary world, with focus on South African perspectives',
-      category: 'History',
-      difficulty: 'Beginner',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Historical Analysis', 'Critical Thinking', 'Research Skills'],
-      icon: '📚',
-      color: 'from-yellow-400 via-amber-500 to-orange-600',
-      students: '200+ students',
-      dreamJob: 'Historical Researcher'
-    },
-    {
-      id: 'BUS1036F',
-      title: 'Evidence-based Management',
-      subtitle: 'Data-driven business decisions',
-      description: 'Introduces the practice of making managerial decisions based on critical evaluation of the best available evidence and data',
-      category: 'Business Management',
-      difficulty: 'Intermediate',
-      duration: '1 semester',
-      university: 'University of Cape Town',
-      skills: ['Data Analysis', 'Decision Making', 'Strategic Planning'],
-      icon: '💼',
-      color: 'from-blue-400 via-indigo-500 to-purple-600',
-      students: '300+ students',
-      dreamJob: 'Business Analyst'
-    }
-  ];
+
+
+
+
+
 
   return (
     <div className={`min-h-screen ${pageTheme.background}`}>
@@ -579,7 +403,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {sampleCourses.slice(0, 3).map((course, index) => (
+                {courses && courses.length > 0 ? courses.slice(0, 3).map((course, index) => (
                   <motion.div
                     key={course.id}
                     initial={{ opacity: 0, y: 30 }}
@@ -630,7 +454,13 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                )) : (
+                  <div className={`text-center py-8 ${themeClasses.text.tertiary}`}>
+                    <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No courses available yet</p>
+                    <p className="text-sm mt-2">Courses will appear here once loaded</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -704,7 +534,7 @@ const Dashboard: React.FC = () => {
                 <h3 className={`text-lg font-semibold ${themeClasses.text.primary}`}>Ready to Grow?</h3>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
                 {/* Share Memories Button */}
                 <motion.button
                   className="group relative bg-gradient-to-br from-rose-50 to-orange-50 hover:from-rose-100 hover:to-orange-100 border-2 border-rose-200 hover:border-rose-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
@@ -774,6 +604,24 @@ const Dashboard: React.FC = () => {
                   </h3>
                   <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
                     <ArrowRight className="text-purple-600 w-4 h-4" />
+                  </div>
+                </motion.button>
+
+                {/* Epistemic Driver Button */}
+                <motion.button
+                  className="group relative bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border-2 border-amber-200 hover:border-amber-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate('/epistemic-driver')}
+                >
+                  <div className="bg-gradient-to-r from-amber-500 to-yellow-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
+                    <Zap className="text-white w-6 h-6" />
+                  </div>
+                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
+                    Epistemic Drivers
+                  </h3>
+                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    <ArrowRight className="text-amber-600 w-4 h-4" />
                   </div>
                 </motion.button>
 

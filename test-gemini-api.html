@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .test-button {
+            background: #2196F3;
+        }
+        .test-button:hover {
+            background: #1976D2;
+        }
+        .supabase-button {
+            background: #ff6b35;
+        }
+        .supabase-button:hover {
+            background: #e55a2b;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .loading {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .success { color: #4CAF50; }
+        .error-text { color: #f44336; }
+        .warning { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Gemini API Test Page</h1>
+        
+        <div class="form-group">
+            <label for="apiKey">Google AI API Key:</label>
+            <input type="password" id="apiKey" placeholder="Enter your Google AI API key (AIza...)">
+        </div>
+
+        <div class="form-group">
+            <label for="supabaseKey">Supabase Anon Key (for Supabase function test):</label>
+            <input type="password" id="supabaseKey" placeholder="Enter your Supabase anon key (eyJ...)">
+        </div>
+        
+        <div class="form-group">
+            <label for="model">Model:</label>
+            <select id="model">
+                <option value="gemini-1.5-pro-latest">gemini-1.5-pro-latest</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                <option value="gemini-pro">gemini-pro</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="prompt">Test Prompt:</label>
+            <textarea id="prompt" placeholder="Enter your test prompt...">Hello, can you respond with just "API working"?</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="temperature">Temperature:</label>
+            <input type="number" id="temperature" value="0.1" min="0" max="1" step="0.1">
+        </div>
+        
+        <button onclick="testDirectAPI()" class="test-button">🔬 Test Direct Gemini API</button>
+        <button onclick="testSupabaseFunction()" class="supabase-button">🚀 Test Supabase Function</button>
+        <button onclick="listModels()" class="test-button">📋 List Available Models</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://okvdirskoukqnjzqsowb.supabase.co';
+        
+        function showResults(content, type = 'success') {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.className = `results ${type}`;
+            resultsDiv.innerHTML = content;
+        }
+        
+        function showLoading(message) {
+            showResults(`
+                <div class="status warning">⏳ ${message}</div>
+                <div>Please wait...</div>
+            `, 'loading');
+        }
+        
+        async function testDirectAPI() {
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('model').value;
+            const prompt = document.getElementById('prompt').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+
+            if (!apiKey) {
+                showResults(`
+                    <div class="status error-text">❌ Error</div>
+                    <div>Please enter your Google AI API key</div>
+                `, 'error');
+                return;
+            }
+
+            showLoading('Testing Gemini API via proxy...');
+
+            try {
+                // Use proxy server to avoid CORS issues
+                const url = `http://localhost:3000/api/gemini/models/${model}:generateContent?key=${apiKey}`;
+                const requestBody = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature }
+                };
+
+                console.log('🔍 Request URL:', url);
+                console.log('🔍 Request Body:', JSON.stringify(requestBody, null, 2));
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                console.log('🔍 Response Status:', response.status, response.statusText);
+                console.log('🔍 Response Headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('🔍 Error Response:', errorText);
+                    
+                    showResults(`
+                        <div class="status error-text">❌ API Error</div>
+                        <div><strong>Status:</strong> ${response.status} ${response.statusText}</div>
+                        <div><strong>Model:</strong> ${model}</div>
+                        <div><strong>Error Response:</strong></div>
+                        <pre>${errorText || 'No error details'}</pre>
+                    `, 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('🔍 Success Response:', data);
+                
+                const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response text found';
+                
+                showResults(`
+                    <div class="status success">✅ Success!</div>
+                    <div><strong>Model:</strong> ${model}</div>
+                    <div><strong>Response:</strong></div>
+                    <pre>${responseText}</pre>
+                    <div><strong>Full Response:</strong></div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `);
+                
+            } catch (error) {
+                console.error('🔍 Request Error:', error);
+                showResults(`
+                    <div class="status error-text">❌ Request Failed</div>
+                    <div><strong>Error:</strong> ${error.message}</div>
+                    <div><strong>Model:</strong> ${model}</div>
+                `, 'error');
+            }
+        }
+        
+        async function testSupabaseFunction() {
+            const prompt = document.getElementById('prompt').value;
+            const supabaseKey = document.getElementById('supabaseKey').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+
+            if (!supabaseKey) {
+                showResults(`
+                    <div class="status error-text">❌ Error</div>
+                    <div>Please enter your Supabase anon key</div>
+                `, 'error');
+                return;
+            }
+
+            showLoading('Testing Supabase ADK Agents function...');
+
+            try {
+                const payload = {
+                    agent_type: 'orchestrator',
+                    task: 'epistemic_driver_generation',
+                    payload: {
+                        subject: 'Test Subject',
+                        objectives: prompt
+                    }
+                };
+
+                console.log('🔍 Supabase Request:', JSON.stringify(payload, null, 2));
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/adk-agents`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabaseKey}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('🔍 Supabase Response Status:', response.status, response.statusText);
+                
+                const data = await response.json();
+                console.log('🔍 Supabase Response:', data);
+                
+                if (!response.ok) {
+                    showResults(`
+                        <div class="status error-text">❌ Supabase Function Error</div>
+                        <div><strong>Status:</strong> ${response.status} ${response.statusText}</div>
+                        <div><strong>Error:</strong> ${data.error || 'Unknown error'}</div>
+                        <div><strong>Full Response:</strong></div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, 'error');
+                    return;
+                }
+                
+                showResults(`
+                    <div class="status success">✅ Supabase Function Success!</div>
+                    <div><strong>Response:</strong></div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `);
+                
+            } catch (error) {
+                console.error('🔍 Supabase Error:', error);
+                showResults(`
+                    <div class="status error-text">❌ Supabase Request Failed</div>
+                    <div><strong>Error:</strong> ${error.message}</div>
+                `, 'error');
+            }
+        }
+        
+        async function listModels() {
+            const apiKey = document.getElementById('apiKey').value;
+
+            if (!apiKey) {
+                showResults(`
+                    <div class="status error-text">❌ Error</div>
+                    <div>Please enter your Google AI API key</div>
+                `, 'error');
+                return;
+            }
+
+            showLoading('Fetching available models...');
+
+            try {
+                // Use proxy server to avoid CORS issues
+                const url = `http://localhost:3000/api/models?key=${apiKey}`;
+
+                console.log('🔍 Models Request URL:', url);
+
+                const response = await fetch(url);
+                
+                console.log('🔍 Models Response Status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('🔍 Models Error Response:', errorText);
+                    
+                    showResults(`
+                        <div class="status error-text">❌ Failed to List Models</div>
+                        <div><strong>Status:</strong> ${response.status} ${response.statusText}</div>
+                        <div><strong>Error Response:</strong></div>
+                        <pre>${errorText || 'No error details'}</pre>
+                    `, 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('🔍 Models Response:', data);
+                
+                const models = data.models || [];
+                const modelNames = models.map(m => m.name || 'Unknown').join('\n');
+                
+                showResults(`
+                    <div class="status success">✅ Available Models</div>
+                    <div><strong>Total Models:</strong> ${models.length}</div>
+                    <div><strong>Model Names:</strong></div>
+                    <pre>${modelNames || 'No models found'}</pre>
+                    <div><strong>Full Response:</strong></div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `);
+                
+            } catch (error) {
+                console.error('🔍 Models Request Error:', error);
+                showResults(`
+                    <div class="status error-text">❌ Request Failed</div>
+                    <div><strong>Error:</strong> ${error.message}</div>
+                `, 'error');
+            }
+        }
+        
+        // Auto-focus on API key input
+        document.getElementById('apiKey').focus();
+    </script>
+</body>
+</html>

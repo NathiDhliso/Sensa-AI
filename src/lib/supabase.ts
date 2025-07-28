@@ -223,6 +223,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      epistemic_driver_history: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          subject: string
+          objectives: string
+          study_map_data: Record<string, unknown>
+          is_favorite: boolean
+          tags: string[]
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          subject: string
+          objectives: string
+          study_map_data: Record<string, unknown>
+          is_favorite?: boolean
+          tags?: string[]
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          subject?: string
+          objectives?: string
+          study_map_data?: Record<string, unknown>
+          is_favorite?: boolean
+          tags?: string[]
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

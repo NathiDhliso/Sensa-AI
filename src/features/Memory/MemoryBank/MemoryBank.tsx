@@ -50,24 +50,29 @@ const MemoryBank: React.FC = () => {
             id: memory.id || `memory_${Date.now()}`,
             memory: memory.text_content || '',
             category: memory.category || 'general',
-            insights: ['Analysis available'],
-            learningStyle: 'Visual-Kinesthetic Learner',
-            emotionalTone: 'Positive',
-            connections: [],
+            insights: memory.sensa_analysis?.insights || ['Analysis pending'],
+            learningStyle: memory.sensa_analysis?.learningStyle || 'Analysis pending',
+            emotionalTone: memory.sensa_analysis?.emotionalTone || 'Analysis pending',
+            connections: memory.sensa_analysis?.connections || [],
             timestamp: new Date(memory.created_at || Date.now())
           }));
 
           setMemories(insights);
 
-          // Generate basic learning profile
-          setLearningProfile({
-            dominantStyle: 'Visual-Kinesthetic Learner',
-            emotionalAnchors: ['Safety & Security', 'Wonder & Discovery', 'Creative Expression'],
-            cognitivePatterns: ['Pattern Recognition', 'Spatial Reasoning', 'Analogical Thinking'],
-            preferredEnvironments: ['Structured yet flexible spaces', 'Collaborative settings'],
-            motivationalTriggers: ['Real-world applications', 'Personal connections'],
-            courseRecommendations: ['Computer Science', 'Psychology', 'Design Thinking']
-          });
+          // Only set learning profile if we have actual analysis data
+          if (memoriesData.some(memory => memory.sensa_analysis)) {
+            const analysisData = memoriesData.find(memory => memory.sensa_analysis)?.sensa_analysis;
+            if (analysisData) {
+              setLearningProfile({
+                dominantStyle: analysisData.dominantStyle || 'Analysis pending',
+                emotionalAnchors: analysisData.emotionalAnchors || [],
+                cognitivePatterns: analysisData.cognitivePatterns || [],
+                preferredEnvironments: analysisData.preferredEnvironments || [],
+                motivationalTriggers: analysisData.motivationalTriggers || [],
+                courseRecommendations: analysisData.courseRecommendations || []
+              });
+            }
+          }
 
           addNotification({
             type: 'success',

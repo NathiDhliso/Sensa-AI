@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConnected } from '../lib/supabase';
 import type { LearningProfile } from '../types';
+import { callEdgeFunction } from './edgeFunctions';
 
 // Additional interfaces for Supabase services
 interface SensaAnalysis {
@@ -52,67 +53,13 @@ const handleSupabaseError = (error: unknown, context: string) => {
   throw new Error(`${context} failed: ${errorMessage || 'Unknown error'}`);
 };
 
-// Mock data for development mode
-const mockUser = {
-  id: 'dev-user-123',
-  email: 'dev@example.com',
-  full_name: 'Development User'
-};
 
-const mockMemories = [
-  {
-    id: 'mem-1',
-    category: 'Academic',
-    text_content: 'I remember solving my first programming problem in high school. The satisfaction of seeing the code work was incredible.',
-    sensa_analysis: {
-      themes: ['Problem-solving', 'Technology'],
-      learningStyle: 'Hands-on',
-      emotionalTone: 'Positive'
-    },
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'mem-2', 
-    category: 'Personal',
-    text_content: 'Leading a team project taught me how to coordinate different perspectives and find solutions.',
-    sensa_analysis: {
-      themes: ['Leadership', 'Collaboration'],
-      learningStyle: 'Interactive',
-      emotionalTone: 'Confident'
-    },
-    created_at: new Date().toISOString()
-  }
-];
-
-const mockCourses = [
-  {
-    id: 'CSC1015F',
-    name: 'Introduction to Computer Science I',
-    university: 'University of Cape Town',
-    field: 'Computer Science',
-    difficulty: 'Beginner',
-    duration: '1 semester',
-    description: 'Programming fundamentals with Python',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'PSYC1004F',
-    name: 'Introduction to Psychology I',
-    university: 'University of Cape Town', 
-    field: 'Psychology',
-    difficulty: 'Beginner',
-    duration: '1 semester',
-    description: 'Understanding human behavior',
-    created_at: new Date().toISOString()
-  }
-];
 
 export const supabaseServices = {
   // User Management
   async getCurrentUser() {
     if (!isSupabaseConnected()) {
-      console.log('🔧 Development mode: Using mock user data');
-      return { data: { user: mockUser }, error: null };
+      throw new Error('Supabase connection required for user authentication');
     }
 
     try {
@@ -128,8 +75,7 @@ export const supabaseServices = {
 
   async getUserMemories(userId?: string) {
     if (!isSupabaseConnected()) {
-      console.log('🔧 Development mode: Using mock memory data');
-      return mockMemories;
+      throw new Error('Supabase connection required for accessing memories');
     }
 
     if (!userId) {
@@ -159,12 +105,7 @@ export const supabaseServices = {
 
   async saveMemory(memory: { category: string; text_content: string; sensa_analysis?: SensaAnalysis }) {
     if (!isSupabaseConnected()) {
-      console.log('🔧 Development mode: Memory save simulated');
-      return {
-        id: `mock-${Date.now()}`,
-        ...memory,
-        created_at: new Date().toISOString()
-      };
+      throw new Error('Supabase connection required for saving memories');
     }
 
     try {
@@ -199,8 +140,7 @@ export const supabaseServices = {
   // Course Management
   async getCourses() {
     if (!isSupabaseConnected()) {
-      console.log('🔧 Development mode: Using mock course data');
-      return mockCourses;
+      throw new Error('Supabase connection required for course data');
     }
 
     try {
@@ -211,13 +151,13 @@ export const supabaseServices = {
 
       if (error) {
         console.error('Error getting courses:', error);
-        return mockCourses; // Fallback to mock data
+        throw error;
       }
 
-      return data || mockCourses;
+      return data || [];
     } catch (error) {
       console.error('Error getting courses:', error);
-      return mockCourses; // Fallback to mock data
+      throw error;
     }
   },
 
@@ -283,6 +223,23 @@ export const supabaseServices = {
       return { error };
     } catch (error) {
       handleSupabaseError(error, 'Sign out');
+    }
+  },
+
+  // ADK Agents Integration - Call deployed edge functions
+  async callADKAgents(request: {
+    agent_type: string;
+    task?: string;
+    payload: Record<string, unknown>;
+  }) {
+    try {
+      console.log('🤖 Calling ADK agents with request:', request);
+      const result = await callEdgeFunction('adk-agents', request);
+      console.log('✅ ADK agents response:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ ADK Agents API call failed:', error);
+      throw new Error(`Failed to call ADK agents: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 };
@@ -707,6 +664,133 @@ export const studyMapService = {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
     if (error) handleSupabaseError(error, 'list study maps');
+    return data || [];
+  },
+};
+
+// Epistemic Driver History Services
+export const epistemicDriverHistoryService = {
+  async saveEpistemicDriver(input: {
+    title: string;
+    subject: string;
+    objectives: string;
+    study_map_data: Record<string, unknown>;
+    tags?: string[];
+    notes?: string;
+    is_favorite?: boolean;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .insert({
+        user_id: user.id,
+        title: input.title,
+        subject: input.subject,
+        objectives: input.objectives,
+        study_map_data: input.study_map_data,
+        tags: input.tags || [],
+        notes: input.notes,
+        is_favorite: input.is_favorite || false,
+      })
+      .select()
+      .single();
+
+    if (error) handleSupabaseError(error, 'save epistemic driver');
+    return data;
+  },
+
+  async getUserEpistemicDriverHistory() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) handleSupabaseError(error, 'get epistemic driver history');
+    return data || [];
+  },
+
+  async getEpistemicDriverById(id: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) handleSupabaseError(error, 'get epistemic driver by id');
+    return data;
+  },
+
+  async updateEpistemicDriver(id: string, updates: {
+    title?: string;
+    tags?: string[];
+    notes?: string;
+    is_favorite?: boolean;
+  }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) handleSupabaseError(error, 'update epistemic driver');
+    return data;
+  },
+
+  async deleteEpistemicDriver(id: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase!
+      .from('epistemic_driver_history')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) handleSupabaseError(error, 'delete epistemic driver');
+  },
+
+  async getFavoriteEpistemicDrivers() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_favorite', true)
+      .order('updated_at', { ascending: false });
+
+    if (error) handleSupabaseError(error, 'get favorite epistemic drivers');
+    return data || [];
+  },
+
+  async searchEpistemicDrivers(query: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase!
+      .from('epistemic_driver_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .or(`title.ilike.%${query}%,subject.ilike.%${query}%,notes.ilike.%${query}%`)
+      .order('created_at', { ascending: false });
+
+    if (error) handleSupabaseError(error, 'search epistemic drivers');
     return data || [];
   },
 };

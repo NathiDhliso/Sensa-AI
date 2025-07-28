@@ -133,22 +133,14 @@ async function handlePersonalizationAgent(request: ADKRequest): Promise<Response
     throw new Error('User profile is required for personalization');
   }
 
-  // Generate personalized recommendations
+  // Generate personalized recommendations based on actual data
   const recommendations = {
-    learning_style_insights: [
-      'Based on your memory patterns, you prefer visual learning approaches',
-      'Your memories suggest you learn best through practical examples',
-      'You tend to remember concepts better when connected to personal experiences'
-    ],
-    study_recommendations: [
-      'Use mind maps and visual diagrams for complex topics',
-      'Create personal analogies for abstract concepts',
-      'Take regular breaks and review material in different contexts'
-    ],
+    learning_style_insights: [],
+    study_recommendations: [],
     content_preferences: {
-      format: 'visual_with_examples',
+      format: 'adaptive',
       difficulty: 'progressive',
-      time_commitment: 'moderate_sessions'
+      time_commitment: 'flexible'
     }
   };
 

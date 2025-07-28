@@ -5,18 +5,19 @@ import { ProtectedRoute } from './features/Auth';
 import { LandingPage } from './features/LandingPage';
 import LoginPage from './pages/LoginPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
-import OnboardingFlow from './pages/OnboardingFlow';
+import { OnboardingFlow } from './features/Onboarding';
 import { Dashboard } from './features/Dashboard';
-import MemoryElicitation from './pages/MemoryElicitation';
-import PrivacyCenter from './pages/PrivacyCenter';
-import MemoryBank from './pages/MemoryBank';
-import SensaDialogue from './pages/SensaDialogue';
+import { MemoryElicitation } from './features/Memory';
+import { PrivacyCenter } from './features/Privacy';
+import { MemoryBank } from './features/Memory';
+import { SensaDialogue } from './features/Dialogue';
 import { StudyMaterialUpload } from './features/StudyMaterialUpload';
 import { EnhancedStudyMap } from './features/IntegratedLearning';
-import KnowMePage from './pages/KnowMePage';
+import { KnowMePage } from './features/KnowMe';
 import { NotificationSystem } from './features/NotificationSystem';
-import PrimeMePage from './pages/PrimeMePage';
-import StudyGuideGenerator from './pages/StudyGuideGenerator';
+import { PrimeMePage } from './features/PrimeMe';
+import { StudyGuideGenerator } from './features/StudyGuide';
+import { EpistemicDriver } from './features/EpistemicDriver';
 
 function App() {
   return (
@@ -80,6 +81,11 @@ function App() {
           } />
                       <Route path="/prime-me" element={<PrimeMePage />} />
             <Route path="/study-guide-generator" element={<StudyGuideGenerator />} />
+            <Route path="/epistemic-driver" element={
+              <ProtectedRoute>
+                <EpistemicDriver />
+              </ProtectedRoute>
+            } />
           {/* Legacy routes redirecting to integrated learning hub */}
           <Route path="/course-analyzer" element={
             <ProtectedRoute>

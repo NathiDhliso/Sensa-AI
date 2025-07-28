@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, Upload, FileText, Brain, Sparkles, Download,
     Copy, CheckCircle, AlertTriangle, Target, Layers, Star, Zap, X
@@ -128,68 +129,8 @@ const generateMarkdown = (guide: StudyGuide): string => {
     return markdown;
 };
 
-/**
- * @function createMockGuide
- * @description Generates a fallback study guide for demonstration or when the API fails.
- */
-const createMockGuide = (subjectName: string): StudyGuide => ({
-    id: `guide-mock-${Date.now()}`,
-    subject: subjectName,
-    framework: {
-        acronym: 'SMART',
-        name: 'Strategic Mastery and Retention Techniques',
-        description: `This is a demo guide. It provides a structured approach to studying for the ${subjectName} exam, breaking down core domains into pillars.`
-    },
-    pillars: [
-        {
-            name: 'Strategic Foundation',
-            thematicName: 'Strategy',
-            studyFocus: 'This pillar focuses on building fundamental understanding and strategic thinking. Students will develop core analytical skills essential for advanced problem-solving.',
-            subAcronym: 'CORE',
-            subTopics: [
-                {
-                    priority: '[High Priority]',
-                    conceptPair: 'Basic Concepts vs. Advanced Applications',
-                    pyramid: {
-                        base: 'Students struggle to understand fundamental principles and their real-world applications.',
-                        middle: 'Learn core theories, definitions, and basic problem-solving frameworks.',
-                        apex: 'Complex scenarios arise where basic theories must be adapted and integrated with advanced concepts.',
-                        keyTakeaway: 'Master the fundamentals first, then build complexity through practical application.'
-                    }
-                },
-                {
-                    priority: '[Common Scenario]',
-                    conceptPair: 'Theory vs. Practice',
-                    pyramid: {
-                        base: 'There is often a gap between theoretical knowledge and practical implementation.',
-                        middle: 'Study the established theories and work through textbook examples.',
-                        apex: 'Real-world application often involves unforeseen variables and constraints not covered in theory, requiring adaptive problem-solving.',
-                        keyTakeaway: 'Continuously bridge theory with hands-on practice to develop true expertise.'
-                    }
-                }
-            ]
-        },
-        {
-            name: 'Advanced Methodologies',
-            thematicName: 'Methods',
-            studyFocus: 'This pillar covers advanced techniques and methodologies used in professional practice. Students will learn to apply sophisticated approaches to complex problems.',
-            subAcronym: 'FLEX',
-            subTopics: [
-                {
-                    priority: '[Medium Priority]',
-                    conceptPair: 'Standard Methods vs. Adaptive Approaches',
-                    pyramid: {
-                        base: 'Traditional methods may not work effectively in all contexts or situations.',
-                        middle: 'Learn established methodologies and when to apply each approach.',
-                        apex: 'Situations arise requiring creative adaptation of multiple methodologies or development of hybrid approaches.',
-                        keyTakeaway: 'Flexibility in method selection and adaptation is crucial for professional success.'
-                    }
-                }
-            ]
-        }
-    ],
-    createdAt: new Date()
-});
+
+
 
 // --- UTILITY FUNCTIONS ---
 
@@ -245,10 +186,7 @@ const generateStudyGuideAPI = async (examContent: string, subjectName: string, u
         return result;
     } catch (error) {
         console.error('AI study guide generation failed:', error);
-
-        // Fallback to mock data if AI service fails
-        console.warn('Using fallback mock guide due to AI service error');
-        return createMockGuide(subjectName);
+        throw new Error(`Failed to generate study guide: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 };
 
@@ -755,6 +693,7 @@ const StudyGuideGenerator: React.FC = () => {
 
     const { notifications, addNotification } = useNotifications();
     const { user } = useAuthStore();
+    const navigate = useNavigate();
     const theme = defaultTheme;
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -941,7 +880,7 @@ const StudyGuideGenerator: React.FC = () => {
                 <GeneratedGuideDisplay
                     guide={generatedGuide}
                     theme={theme}
-                    onBack={goToInput}
+                    onBack={() => navigate('/dashboard')}
                     onCopy={handleCopy}
                     onDownload={handleDownload}
                     copySuccess={copySuccess}

@@ -12,40 +12,59 @@ export const callEdgeFunction = async (functionName: string, payload: unknown) =
     throw new Error('Supabase client not initialized')
   }
 
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
 
+  // Create an AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout for AI operations
+
+  try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     })
 
+    clearTimeout(timeoutId);
+
+    console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+    console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      let errorMessage = `Edge function ${functionName} failed`
-      
+      let errorMessage = `Edge function ${functionName} failed with status ${response.status}`
+
       try {
         const errorData = await response.json()
+        console.log(`📡 Error response data:`, errorData);
         if (errorData.error) {
           errorMessage = errorData.error
         } else {
           errorMessage += `: ${response.statusText}`
         }
-      } catch {
+      } catch (parseError) {
+        console.log(`📡 Failed to parse error response:`, parseError);
         errorMessage += `: ${response.statusText}`
       }
-      
+
       throw new Error(errorMessage)
     }
 
     return await response.json()
   } catch (error) {
+    clearTimeout(timeoutId);
+
+    // Handle timeout specifically
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out after 2 minutes. The AI service may be experiencing high load. Please try again or use a shorter input.');
+    }
+
     console.error(`Error calling ${functionName}:`, error)
-    
+
     // Enhance error messages for better user experience
     if (error instanceof Error) {
       if (error.message.includes('temporarily unavailable')) {
@@ -56,7 +75,7 @@ export const callEdgeFunction = async (functionName: string, payload: unknown) =
         throw new Error('Server error occurred. Please try again in a few moments.')
       }
     }
-    
+
     throw error
   }
 }

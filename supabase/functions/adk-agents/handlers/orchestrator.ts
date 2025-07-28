@@ -28,6 +28,7 @@ import {
 } from '../features/knowMe.ts';
 import { generatePrimeMeNarrative } from '../features/primeMe.ts';
 import { generateStudyGuide } from '../features/studyGuideGenerator.ts';
+import { generateEpistemicDriver } from '../features/epistemicDriver.ts';
 
 /**
  * Create task handler mapping for clean routing
@@ -47,6 +48,7 @@ function createTaskHandlerMap(): TaskHandlerMap {
     [Task.KnowMeReport, generateKnowMeReport],
     [Task.PrimeMeNarrative, generatePrimeMeNarrative],
     [Task.StudyGuideGeneration, generateStudyGuide],
+    [Task.EpistemicDriverGeneration, generateEpistemicDriver],
   ]);
 }
 

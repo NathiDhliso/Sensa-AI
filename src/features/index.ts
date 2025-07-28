@@ -1,23 +1,26 @@
-// Auth features
+// Feature exports - organized by category
+
+// Authentication features
 export * from './Auth';
 
-// MindMapEditor features
-export * from './MindMapEditor';
-
-// NotificationSystem features
+// Core application features
+export * from './Dashboard';
+export * from './LandingPage';
 export * from './NotificationSystem';
 
-// StudyMaterialUpload features
+// Learning and study features
 export * from './StudyMaterialUpload';
+export * from './IntegratedLearning';
+export * from './StudyGuide';
+export * from './EpistemicDriver';
+export * from './MindMapEditor';
 
-// Page features
-export { Dashboard } from './Dashboard';
-export { LandingPage } from './LandingPage';
+// Memory and analysis features
+export * from './Memory';
+export * from './KnowMe';
+export * from './PrimeMe';
+export * from './Dialogue';
 
-// New feature pages
-export { default as KnowMePage } from './KnowMe/KnowMePage';
-export { default as PrimeMePage } from './PrimeMe/PrimeMePage';
-export { default as StudyGuideGenerator } from './StudyGuide/StudyGuideGenerator';
-export { default as SensaDialogue } from './Dialogue/SensaDialogue';
-export { default as OnboardingFlow } from './Onboarding/OnboardingFlow';
-export { default as PrivacyCenter } from './Privacy/PrivacyCenter';
+// System features
+export * from './Onboarding';
+export * from './Privacy';

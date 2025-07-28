@@ -7,10 +7,11 @@ export const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 } as const;
 
-// Gemini AI Models in order of preference
+// Gemini AI Models in order of preference (using currently available model names)
 export const GEMINI_MODELS = [
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.0-flash',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
 ] as const;
@@ -22,7 +23,9 @@ export const PALM_FALLBACK_MODEL = 'chat-bison-001' as const;
 export const AI_CONFIG = {
   DEFAULT_TEMPERATURE: 0.7,
   MAX_RETRIES: 2,
-  DEFAULT_RETRY_DELAY_MS: 30000,
+  DEFAULT_RETRY_DELAY_MS: 15000, // Reduced from 30s to 15s
+  GEMINI_REQUEST_TIMEOUT_MS: 45000, // 45 second timeout for individual Gemini requests
+  TOTAL_PROCESSING_TIMEOUT_MS: 100000, // 100 second total timeout for complex operations
 } as const;
 
 // Task enumeration for orchestrator routing
@@ -40,6 +43,7 @@ export enum Task {
   KnowMeReport = 'know_me_report',
   PrimeMeNarrative = 'prime_me_narrative',
   StudyGuideGeneration = 'study_guide_generation',
+  EpistemicDriverGeneration = 'epistemic_driver_generation',
 }
 
 // Agent types

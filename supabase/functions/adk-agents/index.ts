@@ -16,6 +16,7 @@ import {
 } from './utils.ts';
 import { handleOrchestratorRequest } from './handlers/orchestrator.ts';
 import { handleAgentRequest } from './handlers/agents.ts';
+import { testGeminiAPI } from './api/gemini.ts';
 import type { ADKRequest } from './types.ts';
 
 /**

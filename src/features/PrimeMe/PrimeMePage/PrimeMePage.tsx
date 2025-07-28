@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Upload,
   Brain,
   Sparkles,
   BookOpen,
@@ -21,7 +20,7 @@ import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/
 import { useUIStore } from '../../../stores';
 import { callEdgeFunction } from '../../../services/edgeFunctions';
 import { uploadService, uploadConfigs } from '../../../services/uploadService';
-import { UnifiedUpload } from '../../../components';
+import { UnifiedUpload, BackButton } from '../../../components';
 
 interface UploadedFile {
   id: string;
@@ -53,7 +52,7 @@ const PrimeMePage: React.FC = () => {
   const pageTheme = usePageTheme('knowMe');
   const themeClasses = useThemeClasses();
   const { addNotification } = useUIStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [primeNarrative, setPrimeNarrative] = useState<PrimeNarrative | null>(null);
@@ -110,49 +109,7 @@ const PrimeMePage: React.FC = () => {
     }
   };
 
-  const processFile = async (uploadedFile: UploadedFile) => {
-    try {
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === uploadedFile.id ? { ...f, status: 'analyzing' } : f
-      ));
 
-      // Extract content from file
-      const extractedContent = await extractContentFromFile(uploadedFile.file);
-      
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === uploadedFile.id 
-          ? { ...f, status: 'completed', extractedContent } 
-          : f
-      ));
-
-      addNotification({
-        type: 'success',
-        title: 'File Processed',
-        message: `${uploadedFile.file.name} has been analyzed and is ready for Prime Me generation.`,
-        duration: 4000
-      });
-
-    } catch (error) {
-      console.error('File processing error:', error);
-      
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === uploadedFile.id 
-          ? { 
-              ...f, 
-              status: 'error', 
-              error: error instanceof Error ? error.message : 'Processing failed' 
-            } 
-          : f
-      ));
-
-      addNotification({
-        type: 'error',
-        title: 'Processing Failed',
-        message: `Failed to process ${uploadedFile.file.name}. Please try again.`,
-        duration: 5000
-      });
-    }
-  };
 
   const extractContentFromFile = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -324,6 +281,9 @@ The final output should not be a list. It must be a coherent story that illustra
 
   return (
     <div className={`min-h-screen ${pageTheme.background}`}>
+      {/* Back Button */}
+      <BackButton variant="floating" />
+
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -333,14 +293,6 @@ The final output should not be a list. It must be a coherent story that illustra
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.1, x: -2 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => navigate('/dashboard')}
-                className={`p-2 ${themeClasses.text.secondary} hover:${themeClasses.text.primary} transition-colors rounded-lg hover:bg-gray-100`}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </motion.button>
               <div className="flex items-center space-x-3">
                 <div 
                   className="p-2 rounded-xl shadow-lg"

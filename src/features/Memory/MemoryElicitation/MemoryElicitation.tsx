@@ -160,9 +160,9 @@ const MemoryElicitation: React.FC = () => {
           id: savedMemory.id,
           memory: memory,
           category: category,
-          insights: ['AI analysis temporarily unavailable'],
-          learningStyle: 'Analysis pending',
-          emotionalTone: 'Analysis pending',
+          insights: [],
+          learningStyle: '',
+          emotionalTone: '',
           connections: [],
           timestamp: new Date(savedMemory.created_at)
         });

@@ -157,18 +157,15 @@ const StudyMaterialUpload: React.FC = () => {
   }, [addNotification, setUploadedFiles, selectedType, processFile]);
 
   const extractContentFromFile = async (file: File): Promise<string> => {
-    // Simulate content extraction - in production would use actual OCR/parsing
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (file.type === 'text/plain') {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string || '');
-          reader.readAsText(file);
-        } else {
-          // Mock extracted content for other file types
-          resolve(`Extracted content from ${file.name}:\n\n1. Introduction to ${file.name.split('.')[0]}\n2. Key Concepts\n3. Practical Applications\n4. Assessment Criteria\n5. Study Tips`);
-        }
-      }, 2000);
+    return new Promise((resolve, reject) => {
+      if (file.type === 'text/plain') {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string || '');
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsText(file);
+      } else {
+        reject(new Error(`Unsupported file type: ${file.type}. Please upload a text file or implement proper file parsing.`));
+      }
     });
   };
 

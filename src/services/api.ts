@@ -140,7 +140,8 @@ export class SensaAPI {
 
       // Call the comprehensive course analysis
       const result = await this.callADKAgents({
-        agent_type: 'comprehensive_course_analysis',
+        agent_type: 'orchestrator',
+        task: 'comprehensive_course_analysis',
         payload: {
           course: {
             title: courseQuery,
@@ -335,6 +336,7 @@ export class SensaAPI {
 
       // Call document analysis
       const result = await this.callADKAgents({
+        agent_type: 'orchestrator',
         task: 'document_content_analysis',
         payload: {
           document: {
@@ -342,9 +344,9 @@ export class SensaAPI {
             actual_subject: document.subject || 'Document',
             content_type: 'uploaded_document',
             key_topics: document.key_topics || []
-          }
-        },
-        memories: memories || []
+          },
+          memories: memories || []
+        }
       });
 
       if (result.success && result.analysis) {
@@ -521,8 +523,8 @@ export class SensaAPI {
   }): Promise<PersonalizedInsight[]> {
     try {
       const result = await this.callADKAgents({
-        task: 'personalized_insights_generation',
-        ...data
+        agent_type: 'personalization',
+        payload: data
       });
       
       return result.analysis || result;
