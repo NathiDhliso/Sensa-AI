@@ -133,24 +133,40 @@ src/
 
 ## 🚀 Deployment
 
-### Automatic Deployment (GitHub Actions)
+### Quick Deployment (Recommended)
 
-The project includes automated CI/CD pipeline that:
-1. **Tests & Lints** code on every push
-2. **Builds** the application
-3. **Deploys** to Google Cloud Run (if credentials are configured)
+**Option 1: Vercel (Easiest)**
+```bash
+npm install -g vercel
+npm run build
+vercel --prod
+```
 
-### Manual Deployment
+**Option 2: Netlify**
+```bash
+npm run build
+# Drag dist/ folder to https://app.netlify.com/drop
+```
 
-1. **Build the application**
-   ```bash
-   npm run build
-   ```
+**Option 3: GitHub Pages**
+```bash
+npm run build
+# Push dist/ contents to gh-pages branch
+```
 
-2. **Deploy to your preferred platform**
-   - **Vercel**: `vercel --prod`
-   - **Netlify**: Drag `dist/` folder to Netlify
-   - **Google Cloud Run**: Use included `cloudbuild.yaml`
+### Automatic Deployment (Advanced)
+
+The project includes two CI/CD workflows:
+
+1. **`build-only.yml`** - Builds and tests on every push (always works)
+2. **`deploy.yml`** - Builds, tests, and deploys to Google Cloud Run (requires setup)
+
+For Google Cloud deployment, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed setup instructions.
+
+### Current Status
+
+✅ **Build & Test**: Always works
+⚠️ **Google Cloud Deploy**: Requires WIF configuration (see deployment guide)
 
 ## 🔐 Environment Variables
 

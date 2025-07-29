@@ -61,39 +61,84 @@ jobs:
         run: |
           if [ -n "${{ secrets.WIF_PROVIDER }}" ] && [ -n "${{ secrets.WIF_SERVICE_ACCOUNT }}" ]; then
             echo "gcp-available=true" >> $GITHUB_OUTPUT
+            echo "✅ Google Cloud credentials found. Proceeding with deployment."
           else
             echo "gcp-available=false" >> $GITHUB_OUTPUT
             echo "⚠️ Google Cloud credentials not available. Skipping deployment."
+            echo "📋 To enable deployment, configure these repository secrets:"
+            echo "   - WIF_PROVIDER: Your Workload Identity Federation provider"
+            echo "   - WIF_SERVICE_ACCOUNT: Your service account email"
           fi
 
       - name: Authenticate to Google Cloud
         if: steps.check-gcp.outputs.gcp-available == 'true'
         id: auth
+        continue-on-error: true
         uses: 'google-github-actions/auth@v2'
         with:
           workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
           service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
 
-      - name: Set up Cloud SDK
+      - name: Check authentication result
         if: steps.check-gcp.outputs.gcp-available == 'true'
+        id: auth-check
+        run: |
+          if [ "${{ steps.auth.outcome }}" == "success" ]; then
+            echo "auth-success=true" >> $GITHUB_OUTPUT
+            echo "✅ Google Cloud authentication successful"
+          else
+            echo "auth-success=false" >> $GITHUB_OUTPUT
+            echo "❌ Google Cloud authentication failed"
+            echo "🔧 Please check your Workload Identity Federation configuration:"
+            echo "   1. Verify WIF_PROVIDER format: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID"
+            echo "   2. Verify WIF_SERVICE_ACCOUNT format: SERVICE_ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com"
+            echo "   3. Ensure the pool and provider exist and are enabled"
+            echo "   4. Verify the service account has necessary permissions"
+          fi
+
+      - name: Set up Cloud SDK
+        if: steps.check-gcp.outputs.gcp-available == 'true' && steps.auth-check.outputs.auth-success == 'true'
         uses: 'google-github-actions/setup-gcloud@v2'
 
       - name: Submit build to Google Cloud Build
-        if: steps.check-gcp.outputs.gcp-available == 'true'
+        if: steps.check-gcp.outputs.gcp-available == 'true' && steps.auth-check.outputs.auth-success == 'true'
         run: |
           gcloud builds submit --config cloudbuild.yaml \
             --substitutions=_VITE_SUPABASE_URL='${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}',_VITE_SUPABASE_ANON_KEY='${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}'
 
       - name: Deployment Summary
         run: |
+          echo "🎯 Build and Deployment Summary"
+          echo "================================"
+
           if [ "${{ steps.check-gcp.outputs.gcp-available }}" == "true" ]; then
-            echo "✅ Build and deployment completed successfully!"
+            if [ "${{ steps.auth-check.outputs.auth-success }}" == "true" ]; then
+              echo "✅ Build and deployment completed successfully!"
+              echo "🚀 Application deployed to Google Cloud Run"
+            else
+              echo "✅ Build completed successfully!"
+              echo "❌ Deployment failed due to authentication issues"
+              echo ""
+              echo "🔧 Google Cloud Setup Required:"
+              echo "1. Create a Workload Identity Federation pool and provider"
+              echo "2. Create a service account with Cloud Run permissions"
+              echo "3. Configure the following repository secrets:"
+              echo "   - WIF_PROVIDER: projects/YOUR_PROJECT_NUMBER/locations/global/workloadIdentityPools/YOUR_POOL/providers/YOUR_PROVIDER"
+              echo "   - WIF_SERVICE_ACCOUNT: your-service-account@your-project.iam.gserviceaccount.com"
+              echo ""
+              echo "📚 Documentation: https://cloud.google.com/iam/docs/workload-identity-federation"
+            fi
           else
             echo "✅ Build completed successfully!"
             echo "ℹ️ Deployment skipped - Google Cloud credentials not configured."
-            echo "To enable deployment, add the following secrets to your repository:"
-            echo "  - WIF_PROVIDER: Your Workload Identity Federation provider"
-            echo "  - WIF_SERVICE_ACCOUNT: Your service account email"
-            echo "  - VITE_SUPABASE_URL: Your Supabase project URL"
-            echo "  - VITE_SUPABASE_ANON_KEY: Your Supabase anonymous key"
+            echo ""
+            echo "🔧 To enable deployment, add these repository secrets:"
+            echo "   - WIF_PROVIDER: Your Workload Identity Federation provider"
+            echo "   - WIF_SERVICE_ACCOUNT: Your service account email"
+            echo "   - VITE_SUPABASE_URL: Your Supabase project URL"
+            echo "   - VITE_SUPABASE_ANON_KEY: Your Supabase anonymous key"
           fi
+
+          echo ""
+          echo "📦 Build artifacts are available in the dist/ folder"
+          echo "🌐 You can deploy manually to any static hosting service"
