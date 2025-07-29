@@ -1,0 +1,13 @@
+# Redirects for Sensa AI SPA routing
+# This file handles client-side routing for React Router
+
+# API routes (if any) - handle first
+/api/* /api/:splat 200
+
+# Static assets - serve directly
+/assets/* /assets/:splat 200
+/favicon.ico /favicon.ico 200
+/manifest.json /manifest.json 200
+
+# All other routes should serve index.html for SPA routing
+/* /index.html 200

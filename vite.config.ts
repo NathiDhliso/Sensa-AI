@@ -23,20 +23,24 @@ export default defineConfig({
     }
   },
   server: {
-    // Fix WebSocket connection issues
+    // Production-ready server configuration
     port: 5175,
     host: '0.0.0.0',
     strictPort: true,
     hmr: {
       port: 5175,
       host: 'localhost',
-      clientPort: 5175
+      clientPort: 5175,
+      overlay: false // Disable error overlay in production
     },
     watch: {
       usePolling: false,
-      ignored: ['**/node_modules/**', '**/.git/**']
+      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**']
     },
-    cors: true
+    cors: true,
+    headers: {
+      'Cache-Control': 'no-cache'
+    }
   },
   // Fix module resolution
   resolve: {
@@ -44,18 +48,25 @@ export default defineConfig({
       '@': '/src'
     }
   },
-  // Fix build issues
+  // Production-ready build configuration
   build: {
+    outDir: 'dist',
+    sourcemap: false, // Disable sourcemaps for production
+    minify: 'terser',
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
           supabase: ['@supabase/supabase-js'],
           icons: ['lucide-react'],
-          animation: ['framer-motion']
+          animation: ['framer-motion'],
+          router: ['react-router-dom']
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 1000,
+    assetsDir: 'assets',
+    emptyOutDir: true
   },
   // Environment variables
   define: {

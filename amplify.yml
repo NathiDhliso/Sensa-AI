@@ -1,0 +1,70 @@
+version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - '# Execute Amplify CLI with the helper script'
+        - amplifyPush --simple
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Installing dependencies..."
+        - npm ci
+        - echo "Installing terser for production builds..."
+        - npm install --save-dev terser
+    build:
+      commands:
+        - echo "Building Sensa AI for production..."
+        - npm run build
+    postBuild:
+      commands:
+        - echo "Build completed successfully!"
+        - echo "Optimizing assets..."
+        - ls -la dist/
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
+  customHeaders:
+    - pattern: '**/*'
+      headers:
+        - key: 'Strict-Transport-Security'
+          value: 'max-age=31536000; includeSubDomains'
+        - key: 'X-Content-Type-Options'
+          value: 'nosniff'
+        - key: 'X-Frame-Options'
+          value: 'DENY'
+        - key: 'X-XSS-Protection'
+          value: '1; mode=block'
+        - key: 'Referrer-Policy'
+          value: 'strict-origin-when-cross-origin'
+    - pattern: '/assets/**'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=31536000, immutable'
+    - pattern: '*.js'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=31536000, immutable'
+    - pattern: '*.css'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=31536000, immutable'
+    - pattern: '/index.html'
+      headers:
+        - key: 'Cache-Control'
+          value: 'no-cache, no-store, must-revalidate'
+  environmentVariables:
+    - name: NODE_ENV
+      value: production
+    - name: VITE_SUPABASE_URL
+      value: https://okvdirskoukqnjzqsowb.supabase.co
+    - name: VITE_SUPABASE_ANON_KEY
+      value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rdmRpcnNrb3VrcW5qenFzb3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODQxNjQsImV4cCI6MjA2NjE2MDE2NH0.k2q9Zb0mT53xrZIH5v5MN_to6knZIrjfhRWI-HDyZQo
+    - name: GOOGLE_AI_API_KEY
+      value: AIzaSyDbHwWzoMKaaN9Z6WZdv-tF3tChRb5nF1I
