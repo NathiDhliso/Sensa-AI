@@ -280,7 +280,7 @@ The final output should not be a list. It must be a coherent story that illustra
   };
 
   return (
-    <div className={`min-h-screen ${pageTheme?.background || 'bg-gradient-to-br from-purple-50 to-pink-50'}`}>
+    <div className={`min-h-screen ${pageTheme.background}`}>
       {/* Back Button */}
       <BackButton variant="floating" />
 

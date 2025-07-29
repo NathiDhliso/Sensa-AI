@@ -6,22 +6,26 @@ import {
   Map,
   Brain,
   Search,
+  FileText,
   Zap,
   Target,
+  Download,
   RefreshCw,
   Sparkles,
+  Clipboard,
+  Send,
   ArrowLeft,
   Code
 } from 'lucide-react';
 import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 import { memoryService } from '../../../services/supabaseServices';
-
+import { callEdgeFunction } from '../../../services/edgeFunctions';
 import { SensaAPI } from '../../../services/api';
-import { useUIStore } from '../../../stores';
+import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
 import { MermaidNativeEditor } from '../../MindMapEditor';
 import mermaid from 'mermaid';
-import type { StudyGuide } from '../../../types';
+import type { StudyMap, StudyGuide, StudyGuideSection, MermaidStudyMap } from '../../../types';
 import { UnifiedUpload } from '../../../components';
 
 // Import the CSS module file
@@ -57,7 +61,7 @@ interface WorkflowStep {
   title: string;
   description: string;
   status: 'pending' | 'current' | 'completed';
-  icon: React.ComponentType<{ className?: string; size?: number }>;
+  icon: React.ComponentType<any>;
 }
 
 // Consolidated workflow state interface
@@ -84,7 +88,7 @@ interface LearningWorkflow {
   
   // Visualization state
   visualization: {
-    studyMap: { mermaid_code: string; node_data: Record<string, unknown>; legend_html: string } | null;
+    studyMap: any | null;
     studyGuide: StudyGuide | null;
     showMindMapEditor: boolean | string;
   };
@@ -182,6 +186,8 @@ const IntegratedLearningHub: React.FC = () => {
   const initialTab = uploadedContent ? 'analyze' : (urlParams.get('tab') || 'discover');
   
   // Store hooks
+  const { addAnalysis } = useCourseStore();
+  const { updateMemory } = useMemoryStore();
   const { addNotification } = useUIStore();
   
   // Consolidated workflow state
@@ -428,7 +434,7 @@ const IntegratedLearningHub: React.FC = () => {
     }
   };
 
-  const generateAIMindMap = useCallback(async (subject: string, _content: string) => {
+  const generateAIMindMap = useCallback(async (subject: string, content: string) => {
     return { mermaid_code: `mindmap\n  root((${subject}))`, node_data: {}, legend_html: '' };
   }, []);
 

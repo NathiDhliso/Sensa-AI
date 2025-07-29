@@ -1,10 +1,7 @@
-name: Build and Test
+name: Deploy Frontend to Cloud Run
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
@@ -31,10 +28,14 @@ jobs:
       - name: Run tests
         run: npm run test:run
 
-  build:
-    name: Build Application
+  build-and-deploy:
+    name: Build and Deploy
     needs: test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
     steps:
       - name: Checkout repository
@@ -55,23 +56,44 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 30
-
-      - name: Build Summary
+      - name: Check for Google Cloud credentials
+        id: check-gcp
         run: |
-          echo "🎯 Build Summary"
-          echo "==============="
-          echo "✅ Linting: Passed"
-          echo "✅ Tests: Passed"
-          echo "✅ Build: Successful"
-          echo ""
-          echo "🚀 Deployment: Managed by AWS Amplify"
-          echo "📦 Build artifacts uploaded for manual deployment if needed"
-          echo ""
-          echo "ℹ️ AWS Amplify automatically deploys from this repository"
-          echo "🌐 Live at: https://sensalearn.co.za"
+          if [ -n "${{ secrets.WIF_PROVIDER }}" ] && [ -n "${{ secrets.WIF_SERVICE_ACCOUNT }}" ]; then
+            echo "gcp-available=true" >> $GITHUB_OUTPUT
+          else
+            echo "gcp-available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Google Cloud credentials not available. Skipping deployment."
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: steps.check-gcp.outputs.gcp-available == 'true'
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+
+      - name: Set up Cloud SDK
+        if: steps.check-gcp.outputs.gcp-available == 'true'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: Submit build to Google Cloud Build
+        if: steps.check-gcp.outputs.gcp-available == 'true'
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_VITE_SUPABASE_URL='${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}',_VITE_SUPABASE_ANON_KEY='${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}'
+
+      - name: Deployment Summary
+        run: |
+          if [ "${{ steps.check-gcp.outputs.gcp-available }}" == "true" ]; then
+            echo "✅ Build and deployment completed successfully!"
+          else
+            echo "✅ Build completed successfully!"
+            echo "ℹ️ Deployment skipped - Google Cloud credentials not configured."
+            echo "To enable deployment, add the following secrets to your repository:"
+            echo "  - WIF_PROVIDER: Your Workload Identity Federation provider"
+            echo "  - WIF_SERVICE_ACCOUNT: Your service account email"
+            echo "  - VITE_SUPABASE_URL: Your Supabase project URL"
+            echo "  - VITE_SUPABASE_ANON_KEY: Your Supabase anonymous key"
+          fi

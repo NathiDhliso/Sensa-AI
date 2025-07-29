@@ -1,66 +1,71 @@
-import { useEffect } from 'react';
-import { useTheme } from './ThemeContext';
-import { pageThemes } from './ThemeContextDefinition';
-import {
-  getSafeTheme,
-  getSafePageTheme,
-  safePageThemeBackground,
-  safePageThemeCard,
-  safePageThemeAccent
-} from '../utils/themeSafety';
+import { useContext, useEffect } from 'react';
+import { ThemeContext, type ThemeContextType } from './ThemeContext';
 
-// Re-export useTheme for convenience
-export { useTheme } from './ThemeContext';
+// Custom hook to use theme context
+export const useTheme = (): ThemeContextType => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
 
 // Custom hook for page-specific theming
 export const usePageTheme = (page: string) => {
-  const { setPageTheme } = useTheme();
+  const { setPageTheme, pageTheme } = useTheme();
 
   useEffect(() => {
-    // Valid page themes from pageThemes object
-    const validPages = Object.keys(pageThemes);
-    const themePage = validPages.includes(page) ? page : 'dashboard';
-    setPageTheme(themePage as keyof typeof pageThemes);
+    setPageTheme(page as any);
   }, [page, setPageTheme]);
+
+  return pageTheme;
 };
 
-// Custom hook for component colors - BULLETPROOF
+// Custom hook for component colors
 export const useComponentColors = () => {
-  const { theme, pageTheme } = useTheme();
-
-  // Apply safety wrappers after hook call
-  return {
-    theme: getSafeTheme(theme),
-    pageTheme: getSafePageTheme(pageTheme)
-  };
+  const { theme } = useTheme();
+  return theme;
 };
 
-// Utility hook for creating dynamic class names based on theme - BULLETPROOF
+// Utility hook for creating dynamic class names based on theme
 export const useThemeClasses = () => {
   const { isDark, theme, pageTheme } = useTheme();
 
-  // Apply safety wrappers after hook call
-  const safeTheme = getSafeTheme(theme);
-  const safePageTheme = getSafePageTheme(pageTheme);
-
   return {
-    isDark: isDark || false,
-    theme: safeTheme,
-    pageTheme: safePageTheme,
+    isDark,
+    theme,
+    pageTheme,
+    text: {
+      primary: `text-slate-900 ${isDark ? 'dark:text-white' : ''}`,
+      secondary: `text-slate-600 ${isDark ? 'dark:text-slate-300' : ''}`,
+      tertiary: `text-slate-500 ${isDark ? 'dark:text-slate-400' : ''}`,
+      accent: `text-blue-600 ${isDark ? 'dark:text-blue-400' : ''}`,
+      muted: `text-slate-500 ${isDark ? 'dark:text-slate-400' : ''}`
+    },
+    bg: {
+      primary: `bg-white ${isDark ? 'dark:bg-slate-900' : ''}`,
+      secondary: `bg-slate-50 ${isDark ? 'dark:bg-slate-800' : ''}`,
+      card: `bg-white/90 ${isDark ? 'dark:bg-slate-800/90' : ''}`,
+      surface: `bg-slate-100 ${isDark ? 'dark:bg-slate-700' : ''}`
+    },
+    border: {
+      primary: `border-slate-200 ${isDark ? 'dark:border-slate-700' : ''}`,
+      secondary: `border-slate-300 ${isDark ? 'dark:border-slate-600' : ''}`,
+      light: `border-slate-100 ${isDark ? 'dark:border-slate-800' : ''}`
+    },
+    interactive: {
+      hover: `hover:bg-slate-50 ${isDark ? 'dark:hover:bg-slate-800' : ''}`
+    },
     getThemeClass: (lightClass: string, darkClass: string) =>
       isDark ? darkClass : lightClass,
     conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
       condition ? trueClass : falseClass,
-    // Helper methods for common theme access - GUARANTEED safe
-    getPageBackground: () => safePageThemeBackground(pageTheme),
-    getPageCard: () => safePageThemeCard(pageTheme),
-    getPageAccent: () => safePageThemeAccent(pageTheme),
   };
 };
 
 // Utility for getting responsive theme values
 export const useResponsiveTheme = () => {
-  const { theme, pageTheme } = useTheme();
+  const { theme } = useTheme();
 
   return {
     getResponsiveValue: (values: {
@@ -73,7 +78,6 @@ export const useResponsiveTheme = () => {
       return values.desktop || values.tablet || values.mobile || '';
     },
     theme,
-    pageTheme,
   };
 };
 
@@ -105,7 +109,7 @@ export const useThemeAnimations = () => {
 
 // Utility for theme-aware spacing
 export const useThemeSpacing = () => {
-  const { theme, pageTheme } = useTheme();
+  const { theme } = useTheme();
 
   return {
     getSpacing: (size: 'xs' | 'sm' | 'md' | 'lg' | 'xl') => {
@@ -119,6 +123,5 @@ export const useThemeSpacing = () => {
       return spacingMap[size];
     },
     theme,
-    pageTheme,
   };
 };

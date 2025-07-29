@@ -9,16 +9,34 @@ export default defineConfig({
     exclude: /node_modules/,
   })],
   optimizeDeps: {
-    include: ['lucide-react', 'framer-motion', '@supabase/supabase-js'],
-    force: true
+    include: [
+      'lucide-react',
+      'framer-motion',
+      '@supabase/supabase-js',
+      'react',
+      'react-dom',
+      'react-router-dom'
+    ],
+    force: true,
+    esbuildOptions: {
+      target: 'es2020'
+    }
   },
   server: {
     // Fix WebSocket connection issues
     port: 5175,
-    host: true,
+    host: '0.0.0.0',
+    strictPort: true,
     hmr: {
       port: 5175,
-    }
+      host: 'localhost',
+      clientPort: 5175
+    },
+    watch: {
+      usePolling: false,
+      ignored: ['**/node_modules/**', '**/.git/**']
+    },
+    cors: true
   },
   // Fix module resolution
   resolve: {

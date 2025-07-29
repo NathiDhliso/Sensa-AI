@@ -133,33 +133,24 @@ src/
 
 ## 🚀 Deployment
 
-### Automatic Deployment (Current)
+### Automatic Deployment (GitHub Actions)
 
-The application is deployed using **AWS Amplify** with automatic deployment from GitHub:
+The project includes automated CI/CD pipeline that:
+1. **Tests & Lints** code on every push
+2. **Builds** the application
+3. **Deploys** to Google Cloud Run (if credentials are configured)
 
-- **Live URL**: https://sensalearn.co.za
-- **Auto-deploy**: Every push to `main` branch triggers deployment
-- **Build & Test**: GitHub Actions runs tests and builds on every push
-- **Hosting**: AWS Amplify handles hosting and CDN distribution
+### Manual Deployment
 
-### Manual Deployment (Alternative)
+1. **Build the application**
+   ```bash
+   npm run build
+   ```
 
-If you need to deploy elsewhere:
-
-```bash
-# Build the application
-npm run build
-
-# The dist/ folder contains the production build
-# Deploy to any static hosting service
-```
-
-### Current Status
-
-✅ **Build & Test**: GitHub Actions workflow
-✅ **Auto Deploy**: AWS Amplify from GitHub
-✅ **Live Site**: https://sensalearn.co.za
-✅ **Custom Domain**: Configured with nameservers
+2. **Deploy to your preferred platform**
+   - **Vercel**: `vercel --prod`
+   - **Netlify**: Drag `dist/` folder to Netlify
+   - **Google Cloud Run**: Use included `cloudbuild.yaml`
 
 ## 🔐 Environment Variables
 
