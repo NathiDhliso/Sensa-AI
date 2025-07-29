@@ -2,7 +2,7 @@
 import { createContext } from 'react';
 
 // Define theme types
-interface ThemeColors {
+export interface ThemeColors {
   background: {
     primary: string;
     secondary: string;
@@ -22,7 +22,7 @@ interface ThemeColors {
   };
 }
 
-interface PageTheme {
+export interface PageTheme {
   background: string;
   card: string;
   accent: string;
