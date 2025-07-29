@@ -6,9 +6,7 @@ import {
   getSafePageTheme,
   safePageThemeBackground,
   safePageThemeCard,
-  safePageThemeAccent,
-  getEmergencyTheme,
-  getEmergencyPageTheme
+  safePageThemeAccent
 } from '../utils/themeSafety';
 
 // Re-export useTheme for convenience
@@ -28,59 +26,36 @@ export const usePageTheme = (page: string) => {
 
 // Custom hook for component colors - BULLETPROOF
 export const useComponentColors = () => {
-  try {
-    const { theme, pageTheme } = useTheme();
+  const { theme, pageTheme } = useTheme();
 
-    return {
-      theme: getSafeTheme(theme),
-      pageTheme: getSafePageTheme(pageTheme)
-    };
-  } catch (error) {
-    console.error('useComponentColors failed, using emergency themes:', error);
-    return {
-      theme: getEmergencyTheme(),
-      pageTheme: getEmergencyPageTheme()
-    };
-  }
+  // Apply safety wrappers after hook call
+  return {
+    theme: getSafeTheme(theme),
+    pageTheme: getSafePageTheme(pageTheme)
+  };
 };
 
 // Utility hook for creating dynamic class names based on theme - BULLETPROOF
 export const useThemeClasses = () => {
-  try {
-    const { isDark, theme, pageTheme } = useTheme();
-    const safeTheme = getSafeTheme(theme);
-    const safePageTheme = getSafePageTheme(pageTheme);
+  const { isDark, theme, pageTheme } = useTheme();
 
-    return {
-      isDark: isDark || false,
-      theme: safeTheme,
-      pageTheme: safePageTheme,
-      getThemeClass: (lightClass: string, darkClass: string) =>
-        isDark ? darkClass : lightClass,
-      conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
-        condition ? trueClass : falseClass,
-      // Helper methods for common theme access - GUARANTEED safe
-      getPageBackground: () => safePageThemeBackground(pageTheme),
-      getPageCard: () => safePageThemeCard(pageTheme),
-      getPageAccent: () => safePageThemeAccent(pageTheme),
-    };
-  } catch (error) {
-    console.error('useThemeClasses failed completely, using emergency fallback:', error);
-    const emergencyTheme = getEmergencyTheme();
-    const emergencyPageTheme = getEmergencyPageTheme();
+  // Apply safety wrappers after hook call
+  const safeTheme = getSafeTheme(theme);
+  const safePageTheme = getSafePageTheme(pageTheme);
 
-    return {
-      isDark: false,
-      theme: emergencyTheme,
-      pageTheme: emergencyPageTheme,
-      getThemeClass: (lightClass: string) => lightClass,
-      conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
-        condition ? trueClass : falseClass,
-      getPageBackground: () => emergencyPageTheme.background,
-      getPageCard: () => emergencyPageTheme.card,
-      getPageAccent: () => emergencyPageTheme.accent,
-    };
-  }
+  return {
+    isDark: isDark || false,
+    theme: safeTheme,
+    pageTheme: safePageTheme,
+    getThemeClass: (lightClass: string, darkClass: string) =>
+      isDark ? darkClass : lightClass,
+    conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
+      condition ? trueClass : falseClass,
+    // Helper methods for common theme access - GUARANTEED safe
+    getPageBackground: () => safePageThemeBackground(pageTheme),
+    getPageCard: () => safePageThemeCard(pageTheme),
+    getPageAccent: () => safePageThemeAccent(pageTheme),
+  };
 };
 
 // Utility for getting responsive theme values

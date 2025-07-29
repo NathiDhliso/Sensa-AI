@@ -18,7 +18,7 @@ import { supabase } from '../../../lib/supabase';
 import { memoryService } from '../../../services/supabaseServices';
 
 import { SensaAPI } from '../../../services/api';
-import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
+import { useUIStore } from '../../../stores';
 import { MermaidNativeEditor } from '../../MindMapEditor';
 import mermaid from 'mermaid';
 import type { StudyGuide } from '../../../types';
@@ -57,7 +57,7 @@ interface WorkflowStep {
   title: string;
   description: string;
   status: 'pending' | 'current' | 'completed';
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
 }
 
 // Consolidated workflow state interface
@@ -84,7 +84,7 @@ interface LearningWorkflow {
   
   // Visualization state
   visualization: {
-    studyMap: any | null;
+    studyMap: { mermaid_code: string; node_data: Record<string, unknown>; legend_html: string } | null;
     studyGuide: StudyGuide | null;
     showMindMapEditor: boolean | string;
   };
@@ -182,8 +182,6 @@ const IntegratedLearningHub: React.FC = () => {
   const initialTab = uploadedContent ? 'analyze' : (urlParams.get('tab') || 'discover');
   
   // Store hooks
-  const { addAnalysis } = useCourseStore();
-  const { updateMemory } = useMemoryStore();
   const { addNotification } = useUIStore();
   
   // Consolidated workflow state
@@ -430,7 +428,7 @@ const IntegratedLearningHub: React.FC = () => {
     }
   };
 
-  const generateAIMindMap = useCallback(async (subject: string, content: string) => {
+  const generateAIMindMap = useCallback(async (subject: string, _content: string) => {
     return { mermaid_code: `mindmap\n  root((${subject}))`, node_data: {}, legend_html: '' };
   }, []);
 
