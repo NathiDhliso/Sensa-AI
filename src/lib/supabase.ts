@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
+import { supabaseConfig } from '../config/env'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
-
-// Create Supabase client with error handling
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create Supabase client with validated environment configuration
+export const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -14,7 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Development mode helper
 export const isSupabaseConnected = () => {
-  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
+  return Boolean(supabaseConfig.url && supabaseConfig.anonKey)
 }
 
 // Specific type interfaces to replace 'any'
