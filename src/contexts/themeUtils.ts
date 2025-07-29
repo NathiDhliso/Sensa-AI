@@ -1,28 +1,26 @@
-import { useContext, useEffect } from 'react';
-import { ThemeContext, type ThemeContextType } from './ThemeContext';
+import { useEffect } from 'react';
+import { useTheme } from './ThemeContext';
+import { pageThemes } from './ThemeContextDefinition';
 
-// Custom hook to use theme context
-export const useTheme = (): ThemeContextType => {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
+// Re-export useTheme for convenience
+export { useTheme } from './ThemeContext';
 
 // Custom hook for page-specific theming
 export const usePageTheme = (page: string) => {
   const { setPageTheme } = useTheme();
 
   useEffect(() => {
-    setPageTheme(page as any);
+    // Valid page themes from pageThemes object
+    const validPages = Object.keys(pageThemes);
+    const themePage = validPages.includes(page) ? page : 'dashboard';
+    setPageTheme(themePage as keyof typeof pageThemes);
   }, [page, setPageTheme]);
 };
 
 // Custom hook for component colors
 export const useComponentColors = () => {
-  const { theme } = useTheme();
-  return theme;
+  const { theme, pageTheme } = useTheme();
+  return { theme, pageTheme };
 };
 
 // Utility hook for creating dynamic class names based on theme
@@ -37,12 +35,16 @@ export const useThemeClasses = () => {
       isDark ? darkClass : lightClass,
     conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
       condition ? trueClass : falseClass,
+    // Helper methods for common theme access
+    getPageBackground: () => pageTheme?.background || theme.background.primary,
+    getPageCard: () => pageTheme?.card || theme.background.surface,
+    getPageAccent: () => pageTheme?.accent || theme.text.accent,
   };
 };
 
 // Utility for getting responsive theme values
 export const useResponsiveTheme = () => {
-  const { theme } = useTheme();
+  const { theme, pageTheme } = useTheme();
 
   return {
     getResponsiveValue: (values: {
@@ -55,6 +57,7 @@ export const useResponsiveTheme = () => {
       return values.desktop || values.tablet || values.mobile || '';
     },
     theme,
+    pageTheme,
   };
 };
 
@@ -86,7 +89,7 @@ export const useThemeAnimations = () => {
 
 // Utility for theme-aware spacing
 export const useThemeSpacing = () => {
-  const { theme } = useTheme();
+  const { theme, pageTheme } = useTheme();
 
   return {
     getSpacing: (size: 'xs' | 'sm' | 'md' | 'lg' | 'xl') => {
@@ -100,5 +103,6 @@ export const useThemeSpacing = () => {
       return spacingMap[size];
     },
     theme,
+    pageTheme,
   };
 };

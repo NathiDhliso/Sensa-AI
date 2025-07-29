@@ -6,26 +6,22 @@ import {
   Map,
   Brain,
   Search,
-  FileText,
   Zap,
   Target,
-  Download,
   RefreshCw,
   Sparkles,
-  Clipboard,
-  Send,
   ArrowLeft,
   Code
 } from 'lucide-react';
 import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 import { memoryService } from '../../../services/supabaseServices';
-import { callEdgeFunction } from '../../../services/edgeFunctions';
+
 import { SensaAPI } from '../../../services/api';
 import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
 import { MermaidNativeEditor } from '../../MindMapEditor';
 import mermaid from 'mermaid';
-import type { StudyMap, StudyGuide, StudyGuideSection, MermaidStudyMap } from '../../../types';
+import type { StudyGuide } from '../../../types';
 import { UnifiedUpload } from '../../../components';
 
 // Import the CSS module file
