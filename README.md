@@ -133,12 +133,17 @@ src/
 
 ## 🚀 Deployment
 
-### Automatic Deployment (GitHub Actions)
+### AWS Amplify (Recommended)
 
-The project includes automated CI/CD pipeline that:
-1. **Tests & Lints** code on every push
-2. **Builds** the application
-3. **Deploys** to Google Cloud Run (if credentials are configured)
+This project is configured for AWS Amplify with automatic CI/CD:
+
+1. **Connect to GitHub** - Link your repository to AWS Amplify
+2. **Automatic Builds** - Every push to main branch triggers deployment
+3. **Environment Variables** - Configure in Amplify console:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `GOOGLE_AI_API_KEY`
+   - `NODE_ENV=production`
 
 ### Manual Deployment
 
@@ -148,9 +153,9 @@ The project includes automated CI/CD pipeline that:
    ```
 
 2. **Deploy to your preferred platform**
+   - **AWS Amplify**: Automatic via GitHub integration
    - **Vercel**: `vercel --prod`
    - **Netlify**: Drag `dist/` folder to Netlify
-   - **Google Cloud Run**: Use included `cloudbuild.yaml`
 
 ## 🔐 Environment Variables
 

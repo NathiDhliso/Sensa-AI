@@ -1,0 +1,21 @@
+# This file disables GitHub Actions for this repository
+# AWS Amplify handles CI/CD automatically via GitHub integration
+
+name: Disabled - Using AWS Amplify
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment Info
+        run: |
+          echo "🚀 This repository uses AWS Amplify for automatic deployment"
+          echo "📝 GitHub Actions are disabled to prevent conflicts"
+          echo "✅ Every push to main branch automatically deploys via AWS Amplify"
+          echo "🔗 Check your AWS Amplify console for deployment status"
