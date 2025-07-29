@@ -18,10 +18,12 @@ import { NotificationSystem } from './features/NotificationSystem';
 import { PrimeMePage } from './features/PrimeMe';
 import { StudyGuideGenerator } from './features/StudyGuide';
 import { EpistemicDriver } from './features/EpistemicDriver';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
-    <ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
     <Router
       future={{
         v7_startTransition: true,
@@ -113,7 +115,8 @@ function App() {
         <NotificationSystem />
       </div>
     </Router>
-    </ThemeProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

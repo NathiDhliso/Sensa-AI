@@ -133,9 +133,9 @@ const MemoryBank: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen" style={{ 
-      background: pageTheme.background,
-      color: '#1a1a1a' 
+    <div className="min-h-screen" style={{
+      background: pageTheme?.background || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: '#1a1a1a'
     }}>
       {/* Header */}
       <motion.header

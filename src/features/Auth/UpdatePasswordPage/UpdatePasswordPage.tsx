@@ -114,7 +114,7 @@ const UpdatePasswordPage: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen ${pageTheme.background} flex items-center justify-center px-4`}>
+    <div className={`min-h-screen ${pageTheme?.background || 'bg-gradient-to-br from-purple-50 to-pink-50'} flex items-center justify-center px-4`}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -127,8 +127,8 @@ const UpdatePasswordPage: React.FC = () => {
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 3, repeat: Infinity }}
           >
-            <div 
-              className={`p-4 rounded-2xl shadow-xl ${pageTheme.button} text-white`}
+            <div
+              className={`p-4 rounded-2xl shadow-xl ${pageTheme?.button || 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white`}
             >
               <Brain className="w-8 h-8" />
             </div>

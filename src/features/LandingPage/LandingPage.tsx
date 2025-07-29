@@ -10,7 +10,7 @@ const LandingPage: React.FC = () => {
   const themeClasses = useThemeClasses();
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden ${pageTheme.background}`}>
+    <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden ${pageTheme?.background || 'bg-gradient-to-br from-purple-50 to-pink-50'}`}>
       {/* Header with Sensa Branding */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -22,7 +22,7 @@ const LandingPage: React.FC = () => {
             className="flex items-center gap-3"
             whileHover={{ scale: 1.05 }}
           >
-            <div className={`${pageTheme.button} p-2 rounded-xl`}>
+            <div className={`${pageTheme?.button || 'bg-gradient-to-r from-purple-600 to-pink-600'} p-2 rounded-xl`}>
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div className="flex flex-col">

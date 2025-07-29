@@ -13,30 +13,59 @@ import {
 
 
 
+// Default fallback theme
+const defaultTheme: ThemeColors = {
+  background: { primary: '#ffffff', secondary: '#f8fafc', accent: '#e2e8f0', surface: '#f1f5f9' },
+  text: { primary: '#1e293b', secondary: '#475569', accent: '#3b82f6', muted: '#64748b' },
+  border: { primary: '#e2e8f0', secondary: '#cbd5e1', accent: '#94a3b8' }
+};
+
+const defaultPageTheme: PageTheme = {
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  card: 'rgba(255, 255, 255, 0.1)',
+  accent: '#3b82f6',
+  button: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+  gradients: {
+    memoryToLearning: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    transformation: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    wisdom: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    growth: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+  }
+};
+
 // Theme Provider Component
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [theme] = useState<ThemeColors>(sensaTheme || {
-    background: { primary: '#ffffff', secondary: '#f8fafc', accent: '#e2e8f0', surface: '#f1f5f9' },
-    text: { primary: '#1e293b', secondary: '#475569', accent: '#3b82f6', muted: '#64748b' },
-    border: { primary: '#e2e8f0', secondary: '#cbd5e1', accent: '#94a3b8' }
-  });
-  const [pageTheme, setCurrentPageTheme] = useState<PageTheme>(pageThemes?.dashboard || {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    card: 'rgba(255, 255, 255, 0.1)',
-    accent: '#3b82f6',
-    button: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-    gradients: {
-      memoryToLearning: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      transformation: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      wisdom: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      growth: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+  const [theme] = useState<ThemeColors>(() => {
+    try {
+      return sensaTheme || defaultTheme;
+    } catch (error) {
+      console.warn('Failed to load sensaTheme, using default:', error);
+      return defaultTheme;
     }
   });
+
+  const [pageTheme, setCurrentPageTheme] = useState<PageTheme>(() => {
+    try {
+      return pageThemes?.dashboard || defaultPageTheme;
+    } catch (error) {
+      console.warn('Failed to load pageThemes, using default:', error);
+      return defaultPageTheme;
+    }
+  });
+
   const [isDark, setIsDark] = useState<boolean>(false);
 
   const setPageTheme = (page: keyof typeof pageThemes) => {
-    if (pageThemes && pageThemes[page]) {
-      setCurrentPageTheme(pageThemes[page]);
+    try {
+      if (pageThemes && pageThemes[page]) {
+        setCurrentPageTheme(pageThemes[page]);
+      } else {
+        console.warn(`Page theme '${page}' not found, using default`);
+        setCurrentPageTheme(defaultPageTheme);
+      }
+    } catch (error) {
+      console.error('Error setting page theme:', error);
+      setCurrentPageTheme(defaultPageTheme);
     }
   };
 
@@ -96,7 +125,30 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    console.error('useTheme must be used within a ThemeProvider');
+    // Return a safe fallback instead of throwing
+    return {
+      theme: {
+        background: { primary: '#ffffff', secondary: '#f8fafc', accent: '#e2e8f0', surface: '#f1f5f9' },
+        text: { primary: '#1e293b', secondary: '#475569', accent: '#3b82f6', muted: '#64748b' },
+        border: { primary: '#e2e8f0', secondary: '#cbd5e1', accent: '#94a3b8' }
+      },
+      pageTheme: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        card: 'rgba(255, 255, 255, 0.1)',
+        accent: '#3b82f6',
+        button: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+        gradients: {
+          memoryToLearning: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          transformation: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          wisdom: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+          growth: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+        }
+      },
+      setPageTheme: () => {},
+      isDark: false,
+      toggleDark: () => {}
+    };
   }
   return context;
 };

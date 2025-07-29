@@ -20,12 +20,40 @@ export const usePageTheme = (page: string) => {
 // Custom hook for component colors
 export const useComponentColors = () => {
   const { theme, pageTheme } = useTheme();
+
+  // Add safety checks
+  if (!theme || !theme.background) {
+    console.warn('Theme or theme.background is undefined in useComponentColors');
+  }
+  if (!pageTheme) {
+    console.warn('PageTheme is undefined in useComponentColors');
+  }
+
   return { theme, pageTheme };
 };
 
 // Utility hook for creating dynamic class names based on theme
 export const useThemeClasses = () => {
   const { isDark, theme, pageTheme } = useTheme();
+
+  // Add safety checks with detailed logging
+  if (!theme) {
+    console.error('Theme is undefined in useThemeClasses');
+    return {
+      isDark: false,
+      theme: null,
+      pageTheme: null,
+      getThemeClass: () => '',
+      conditionalClass: () => '',
+      getPageBackground: () => '#ffffff',
+      getPageCard: () => '#f1f5f9',
+      getPageAccent: () => '#3b82f6',
+    };
+  }
+
+  if (!theme.background) {
+    console.error('Theme.background is undefined in useThemeClasses', { theme });
+  }
 
   return {
     isDark,
@@ -35,10 +63,10 @@ export const useThemeClasses = () => {
       isDark ? darkClass : lightClass,
     conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
       condition ? trueClass : falseClass,
-    // Helper methods for common theme access
-    getPageBackground: () => pageTheme?.background || theme.background.primary,
-    getPageCard: () => pageTheme?.card || theme.background.surface,
-    getPageAccent: () => pageTheme?.accent || theme.text.accent,
+    // Helper methods for common theme access with fallbacks
+    getPageBackground: () => pageTheme?.background || theme?.background?.primary || '#ffffff',
+    getPageCard: () => pageTheme?.card || theme?.background?.surface || '#f1f5f9',
+    getPageAccent: () => pageTheme?.accent || theme?.text?.accent || '#3b82f6',
   };
 };
 
