@@ -133,40 +133,33 @@ src/
 
 ## 🚀 Deployment
 
-### Quick Deployment (Recommended)
+### Automatic Deployment (Current)
 
-**Option 1: Vercel (Easiest)**
+The application is deployed using **AWS Amplify** with automatic deployment from GitHub:
+
+- **Live URL**: https://sensalearn.co.za
+- **Auto-deploy**: Every push to `main` branch triggers deployment
+- **Build & Test**: GitHub Actions runs tests and builds on every push
+- **Hosting**: AWS Amplify handles hosting and CDN distribution
+
+### Manual Deployment (Alternative)
+
+If you need to deploy elsewhere:
+
 ```bash
-npm install -g vercel
+# Build the application
 npm run build
-vercel --prod
+
+# The dist/ folder contains the production build
+# Deploy to any static hosting service
 ```
-
-**Option 2: Netlify**
-```bash
-npm run build
-# Drag dist/ folder to https://app.netlify.com/drop
-```
-
-**Option 3: GitHub Pages**
-```bash
-npm run build
-# Push dist/ contents to gh-pages branch
-```
-
-### Automatic Deployment (Advanced)
-
-The project includes two CI/CD workflows:
-
-1. **`build-only.yml`** - Builds and tests on every push (always works)
-2. **`deploy.yml`** - Builds, tests, and deploys to Google Cloud Run (requires setup)
-
-For Google Cloud deployment, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed setup instructions.
 
 ### Current Status
 
-✅ **Build & Test**: Always works
-⚠️ **Google Cloud Deploy**: Requires WIF configuration (see deployment guide)
+✅ **Build & Test**: GitHub Actions workflow
+✅ **Auto Deploy**: AWS Amplify from GitHub
+✅ **Live Site**: https://sensalearn.co.za
+✅ **Custom Domain**: Configured with nameservers
 
 ## 🔐 Environment Variables
 

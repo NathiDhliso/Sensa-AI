@@ -6,17 +6,17 @@ interface EnvironmentConfig {
     url: string;
     anonKey: string;
   };
-  googleAI: {
-    apiKey: string;
+  ai: {
+    geminiApiKey: string;
   };
   app: {
     nodeEnv: string;
     isDevelopment: boolean;
     isProduction: boolean;
   };
-  deployment?: {
-    wifProvider?: string;
-    wifServiceAccount?: string;
+  deployment: {
+    platform: string;
+    url: string;
   };
 }
 
@@ -50,32 +50,28 @@ const createEnvironmentConfig = (): EnvironmentConfig => {
       import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Google AI API key is required for edge functions but may not be available in client
-    const googleAIApiKey = getOptionalEnvVar('GOOGLE_AI_API_KEY') || 'not-available-in-client';
+    // Gemini AI API key is required for edge functions but may not be available in client
+    const geminiApiKey = getOptionalEnvVar('GEMINI_API_KEY') || getOptionalEnvVar('GOOGLE_AI_API_KEY') || 'not-available-in-client';
 
     const nodeEnv = import.meta.env.MODE || process.env.NODE_ENV || 'development';
-
-    // Optional deployment variables
-    const wifProvider = getOptionalEnvVar('WIF_PROVIDER');
-    const wifServiceAccount = getOptionalEnvVar('WIF_SERVICE_ACCOUNT');
 
     return {
       supabase: {
         url: supabaseUrl,
         anonKey: supabaseAnonKey,
       },
-      googleAI: {
-        apiKey: googleAIApiKey,
+      ai: {
+        geminiApiKey,
       },
       app: {
         nodeEnv,
         isDevelopment: nodeEnv === 'development',
         isProduction: nodeEnv === 'production',
       },
-      deployment: wifProvider && wifServiceAccount ? {
-        wifProvider,
-        wifServiceAccount,
-      } : undefined,
+      deployment: {
+        platform: 'AWS Amplify',
+        url: 'https://sensalearn.co.za',
+      },
     };
   } catch (error) {
     console.error('❌ Environment Configuration Error:', error);
@@ -98,14 +94,9 @@ export const env = createEnvironmentConfig();
 
 // Export individual configs for convenience
 export const supabaseConfig = env.supabase;
-export const googleAIConfig = env.googleAI;
+export const aiConfig = env.ai;
 export const appConfig = env.app;
 export const deploymentConfig = env.deployment;
-
-// Helper function to check if all deployment variables are available
-export const isDeploymentConfigured = (): boolean => {
-  return Boolean(env.deployment?.wifProvider && env.deployment?.wifServiceAccount);
-};
 
 // Helper function to get environment info for debugging
 export const getEnvironmentInfo = () => {
@@ -114,8 +105,9 @@ export const getEnvironmentInfo = () => {
     isDevelopment: env.app.isDevelopment,
     isProduction: env.app.isProduction,
     hasSupabaseConfig: Boolean(env.supabase.url && env.supabase.anonKey),
-    hasGoogleAIConfig: Boolean(env.googleAI.apiKey && env.googleAI.apiKey !== 'not-available-in-client'),
-    hasDeploymentConfig: isDeploymentConfigured(),
+    hasAIConfig: Boolean(env.ai.geminiApiKey && env.ai.geminiApiKey !== 'not-available-in-client'),
+    deploymentPlatform: env.deployment.platform,
+    deploymentUrl: env.deployment.url,
     supabaseUrl: env.supabase.url ? `${env.supabase.url.substring(0, 20)}...` : 'Not set',
   };
 };
