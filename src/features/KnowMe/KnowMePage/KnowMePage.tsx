@@ -1184,7 +1184,7 @@ const KnowMePage: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen ${pageTheme.background}`}>
+    <div className={`min-h-screen ${pageTheme?.background || 'bg-gradient-to-br from-purple-50 to-pink-50'}`}>
       {/* Back Button */}
       <BackButton variant="floating" />
 

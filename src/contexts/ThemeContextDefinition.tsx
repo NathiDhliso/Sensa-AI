@@ -43,7 +43,7 @@ export interface ThemeContextType {
   toggleDark: () => void;
 }
 
-// Define base themes
+// Define base themes with guaranteed non-null values
 export const sensaTheme: ThemeColors = {
   background: {
     primary: '#ffffff',
@@ -64,7 +64,13 @@ export const sensaTheme: ThemeColors = {
   }
 };
 
-// Define page-specific themes
+// Ensure sensaTheme is never null or undefined
+Object.freeze(sensaTheme);
+Object.freeze(sensaTheme.background);
+Object.freeze(sensaTheme.text);
+Object.freeze(sensaTheme.border);
+
+// Define page-specific themes with guaranteed non-null values
 export const pageThemes = {
   dashboard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -103,6 +109,13 @@ export const pageThemes = {
     }
   }
 };
+
+// Ensure pageThemes is never null or undefined
+Object.freeze(pageThemes);
+Object.keys(pageThemes).forEach(key => {
+  Object.freeze(pageThemes[key as keyof typeof pageThemes]);
+  Object.freeze(pageThemes[key as keyof typeof pageThemes].gradients);
+});
 
 // Create context
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
