@@ -121,12 +121,14 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   );
 };
 
-// Custom hook to use theme context
+// Custom hook to use theme context - GUARANTEED to never return undefined
 export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
-  if (context === undefined) {
-    console.error('useTheme must be used within a ThemeProvider');
-    // Return a safe fallback instead of throwing
+
+  // Since ThemeContext now has a default value, this should never be undefined
+  // But add extra safety just in case
+  if (!context || !context.theme || !context.theme.background) {
+    console.error('Theme context is corrupted, using emergency fallback');
     return {
       theme: {
         background: { primary: '#ffffff', secondary: '#f8fafc', accent: '#e2e8f0', surface: '#f1f5f9' },
@@ -150,6 +152,7 @@ export const useTheme = (): ThemeContextType => {
       toggleDark: () => {}
     };
   }
+
   return context;
 };
 

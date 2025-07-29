@@ -1,6 +1,15 @@
 import { useEffect } from 'react';
 import { useTheme } from './ThemeContext';
 import { pageThemes } from './ThemeContextDefinition';
+import {
+  getSafeTheme,
+  getSafePageTheme,
+  safePageThemeBackground,
+  safePageThemeCard,
+  safePageThemeAccent,
+  getEmergencyTheme,
+  getEmergencyPageTheme
+} from '../utils/themeSafety';
 
 // Re-export useTheme for convenience
 export { useTheme } from './ThemeContext';
@@ -17,57 +26,61 @@ export const usePageTheme = (page: string) => {
   }, [page, setPageTheme]);
 };
 
-// Custom hook for component colors
+// Custom hook for component colors - BULLETPROOF
 export const useComponentColors = () => {
-  const { theme, pageTheme } = useTheme();
+  try {
+    const { theme, pageTheme } = useTheme();
 
-  // Add safety checks
-  if (!theme || !theme.background) {
-    console.warn('Theme or theme.background is undefined in useComponentColors');
-  }
-  if (!pageTheme) {
-    console.warn('PageTheme is undefined in useComponentColors');
-  }
-
-  return { theme, pageTheme };
-};
-
-// Utility hook for creating dynamic class names based on theme
-export const useThemeClasses = () => {
-  const { isDark, theme, pageTheme } = useTheme();
-
-  // Add safety checks with detailed logging
-  if (!theme) {
-    console.error('Theme is undefined in useThemeClasses');
     return {
-      isDark: false,
-      theme: null,
-      pageTheme: null,
-      getThemeClass: () => '',
-      conditionalClass: () => '',
-      getPageBackground: () => '#ffffff',
-      getPageCard: () => '#f1f5f9',
-      getPageAccent: () => '#3b82f6',
+      theme: getSafeTheme(theme),
+      pageTheme: getSafePageTheme(pageTheme)
+    };
+  } catch (error) {
+    console.error('useComponentColors failed, using emergency themes:', error);
+    return {
+      theme: getEmergencyTheme(),
+      pageTheme: getEmergencyPageTheme()
     };
   }
+};
 
-  if (!theme.background) {
-    console.error('Theme.background is undefined in useThemeClasses', { theme });
+// Utility hook for creating dynamic class names based on theme - BULLETPROOF
+export const useThemeClasses = () => {
+  try {
+    const { isDark, theme, pageTheme } = useTheme();
+    const safeTheme = getSafeTheme(theme);
+    const safePageTheme = getSafePageTheme(pageTheme);
+
+    return {
+      isDark: isDark || false,
+      theme: safeTheme,
+      pageTheme: safePageTheme,
+      getThemeClass: (lightClass: string, darkClass: string) =>
+        isDark ? darkClass : lightClass,
+      conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
+        condition ? trueClass : falseClass,
+      // Helper methods for common theme access - GUARANTEED safe
+      getPageBackground: () => safePageThemeBackground(pageTheme),
+      getPageCard: () => safePageThemeCard(pageTheme),
+      getPageAccent: () => safePageThemeAccent(pageTheme),
+    };
+  } catch (error) {
+    console.error('useThemeClasses failed completely, using emergency fallback:', error);
+    const emergencyTheme = getEmergencyTheme();
+    const emergencyPageTheme = getEmergencyPageTheme();
+
+    return {
+      isDark: false,
+      theme: emergencyTheme,
+      pageTheme: emergencyPageTheme,
+      getThemeClass: (lightClass: string) => lightClass,
+      conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
+        condition ? trueClass : falseClass,
+      getPageBackground: () => emergencyPageTheme.background,
+      getPageCard: () => emergencyPageTheme.card,
+      getPageAccent: () => emergencyPageTheme.accent,
+    };
   }
-
-  return {
-    isDark,
-    theme,
-    pageTheme,
-    getThemeClass: (lightClass: string, darkClass: string) =>
-      isDark ? darkClass : lightClass,
-    conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
-      condition ? trueClass : falseClass,
-    // Helper methods for common theme access with fallbacks
-    getPageBackground: () => pageTheme?.background || theme?.background?.primary || '#ffffff',
-    getPageCard: () => pageTheme?.card || theme?.background?.surface || '#f1f5f9',
-    getPageAccent: () => pageTheme?.accent || theme?.text?.accent || '#3b82f6',
-  };
 };
 
 // Utility for getting responsive theme values

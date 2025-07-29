@@ -117,7 +117,31 @@ Object.keys(pageThemes).forEach(key => {
   Object.freeze(pageThemes[key as keyof typeof pageThemes].gradients);
 });
 
-// Create context
-export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+// Create context with a default value to prevent undefined
+const defaultContextValue: ThemeContextType = {
+  theme: {
+    background: { primary: '#ffffff', secondary: '#f8fafc', accent: '#e2e8f0', surface: '#f1f5f9' },
+    text: { primary: '#1e293b', secondary: '#475569', accent: '#3b82f6', muted: '#64748b' },
+    border: { primary: '#e2e8f0', secondary: '#cbd5e1', accent: '#94a3b8' }
+  },
+  pageTheme: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    card: 'rgba(255, 255, 255, 0.1)',
+    accent: '#3b82f6',
+    button: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      transformation: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      wisdom: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      growth: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+    }
+  },
+  setPageTheme: () => {},
+  isDark: false,
+  toggleDark: () => {}
+};
+
+// Create context with default value - NEVER undefined
+export const ThemeContext = createContext<ThemeContextType>(defaultContextValue);
 
 export default ThemeContext;
