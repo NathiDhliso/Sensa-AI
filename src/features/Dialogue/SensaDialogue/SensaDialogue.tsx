@@ -14,7 +14,7 @@ import {
   ArrowRight,
   Sparkles
 } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../../contexts/themeUtils';
 
 interface MemoryLink {
   id: string;
@@ -441,6 +441,4 @@ Does one of these strategic approaches feel like the right path forward for you?
   );
 };
 
-const SensaDialogueWithTheme = withPageTheme(SensaDialogue, 'memory');
-SensaDialogueWithTheme.displayName = 'SensaDialogue';
-export default SensaDialogueWithTheme;
+export default SensaDialogue;

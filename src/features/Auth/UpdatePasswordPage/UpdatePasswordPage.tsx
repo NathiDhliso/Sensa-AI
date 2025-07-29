@@ -11,7 +11,7 @@ import {
   Loader,
   ArrowRight
 } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 
 const UpdatePasswordPage: React.FC = () => {
@@ -246,6 +246,4 @@ const UpdatePasswordPage: React.FC = () => {
   );
 };
 
-const UpdatePasswordPageWithTheme = withPageTheme(UpdatePasswordPage, 'auth');
-UpdatePasswordPageWithTheme.displayName = 'UpdatePasswordPage';
-export default UpdatePasswordPageWithTheme;
+export default UpdatePasswordPage;

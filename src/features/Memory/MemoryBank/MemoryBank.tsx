@@ -10,7 +10,7 @@ import {
   Target,
   BookOpen
 } from 'lucide-react';
-import { usePageTheme, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme } from '../../../contexts/themeUtils';
 import { useMemoryStore, useUIStore } from '../../../stores';
 import { memoryService } from '../../../services/supabaseServices';
 
@@ -320,6 +320,4 @@ const MemoryBank: React.FC = () => {
   );
 };
 
-const MemoryBankWithTheme = withPageTheme(MemoryBank, 'memory');
-MemoryBankWithTheme.displayName = 'MemoryBank';
-export default MemoryBankWithTheme;
+export default MemoryBank;

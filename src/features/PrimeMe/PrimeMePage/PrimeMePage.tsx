@@ -16,7 +16,7 @@ import {
   RefreshCw,
   X
 } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../../contexts/themeUtils';
 import { useUIStore } from '../../../stores';
 import { callEdgeFunction } from '../../../services/edgeFunctions';
 import { uploadService, uploadConfigs } from '../../../services/uploadService';
@@ -571,6 +571,4 @@ The final output should not be a list. It must be a coherent story that illustra
   );
 };
 
-const PrimeMePageWithTheme = withPageTheme(PrimeMePage, 'knowMe');
-PrimeMePageWithTheme.displayName = 'PrimeMePage';
-export default PrimeMePageWithTheme;
+export default PrimeMePage;

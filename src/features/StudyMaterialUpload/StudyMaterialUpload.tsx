@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSmartNavigation } from '../../hooks/useAuth';
 import { ArrowLeft, Upload, FileText, Image, File as FileIcon, X, CheckCircle, AlertCircle, Brain, Sparkles, BookOpen, Target, Zap, Eye, Copy, Check, Cast as Paste } from 'lucide-react';
-import { usePageTheme } from '../../contexts/ThemeContext';
+import { usePageTheme } from '../../contexts/themeUtils';
 import { useUIStore } from '../../stores';
 import styles from './StudyMaterialUpload.module.css';
 import { orchestrateAgents } from '../../services/edgeFunctions';

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { usePageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme } from '../../../contexts/themeUtils';
 // Using hardcoded theme-consistent gradient classes
 import styles from './AuthForm.module.css';
 

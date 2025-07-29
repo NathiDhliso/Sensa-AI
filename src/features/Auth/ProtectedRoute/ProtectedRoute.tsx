@@ -3,7 +3,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import AuthForm from '../AuthForm/AuthForm';
 import { motion } from 'framer-motion';
 import { Brain } from 'lucide-react';
-import { usePageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme } from '../../../contexts/themeUtils';
 // Using hardcoded theme-consistent gradient classes
 
 interface ProtectedRouteProps {

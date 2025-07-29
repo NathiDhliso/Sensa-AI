@@ -21,7 +21,7 @@ import {
   Award,
   Zap
 } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../contexts/themeUtils';
 import { useMemoryStore, useCourseStore, useUIStore } from '../../stores';
 import { courseService, memoryService } from '../../services/supabaseServices';
 import type { Course, DashboardStats, MemoryConnection } from '../../types';
@@ -699,6 +699,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const DashboardWithTheme = withPageTheme(Dashboard, 'home');
-DashboardWithTheme.displayName = 'Dashboard';
-export default DashboardWithTheme;
+export default Dashboard;

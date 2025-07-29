@@ -17,7 +17,7 @@ import {
   ArrowLeft,
   Code
 } from 'lucide-react';
-import { usePageTheme, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 import { memoryService } from '../../../services/supabaseServices';
 import { callEdgeFunction } from '../../../services/edgeFunctions';
@@ -960,6 +960,4 @@ const IntegratedLearningHub: React.FC = () => {
   );
 };
 
-const IntegratedLearningHubWithTheme = withPageTheme(IntegratedLearningHub, 'course');
-IntegratedLearningHubWithTheme.displayName = 'IntegratedLearningHub';
-export default IntegratedLearningHubWithTheme;
+export default IntegratedLearningHub;

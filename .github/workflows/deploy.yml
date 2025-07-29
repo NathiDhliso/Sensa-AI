@@ -32,6 +32,7 @@ jobs:
     name: Build and Deploy
     needs: test
     runs-on: ubuntu-latest
+    if: ${{ secrets.WIF_PROVIDER != '' && secrets.WIF_SERVICE_ACCOUNT != '' }}
 
     permissions:
       contents: 'read'
@@ -40,6 +41,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Authenticate to Google Cloud
         id: auth

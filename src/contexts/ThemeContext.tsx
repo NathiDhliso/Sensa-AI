@@ -1,7 +1,7 @@
-// Theme Context for Sensa AI
+// Theme Context for Sensa AI - Components Only
 // Provides centralized theme management throughout the React app
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
 
 // Define theme types
 interface ThemeColors {
@@ -49,236 +49,114 @@ export interface ThemeContextType {
 const sensaTheme: ThemeColors = {
   background: {
     primary: '#ffffff',
-    secondary: '#f8f9fa',
-    accent: '#e3f2fd',
-    surface: '#ffffff'
+    secondary: '#f8fafc',
+    accent: '#e2e8f0',
+    surface: '#f1f5f9'
   },
   text: {
-    primary: '#1a1a1a',
-    secondary: '#6b7280',
-    accent: '#2563eb',
-    muted: '#9ca3af'
+    primary: '#1e293b',
+    secondary: '#475569',
+    accent: '#3b82f6',
+    muted: '#64748b'
   },
   border: {
-    primary: '#e5e7eb',
-    secondary: '#d1d5db',
-    accent: '#3b82f6'
-  }
-};
-
-const darkTheme: Partial<ThemeColors> = {
-  background: {
-    primary: '#0f172a',
-    secondary: '#1e293b',
-    accent: '#1e40af',
-    surface: '#334155'
-  },
-  text: {
-    primary: '#f1f5f9',
+    primary: '#e2e8f0',
     secondary: '#cbd5e1',
-    accent: '#60a5fa',
-    muted: '#94a3b8'
-  },
-  border: {
-    primary: '#475569',
-    secondary: '#64748b',
-    accent: '#3b82f6'
+    accent: '#94a3b8'
   }
 };
 
-// Import comprehensive page themes from styles
-import { pageThemes, getPageTheme } from '../styles/themes';
+// Define page-specific themes
+const pageThemes = {
+  dashboard: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    card: 'rgba(255, 255, 255, 0.1)',
+    accent: '#3b82f6',
+    button: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      transformation: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      wisdom: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      growth: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
+    }
+  },
+  epistemicDriver: {
+    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    card: 'rgba(255, 255, 255, 0.95)',
+    accent: '#ec4899',
+    button: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+      transformation: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+      wisdom: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+      growth: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+    }
+  },
+  memory: {
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    card: 'rgba(255, 255, 255, 0.95)',
+    accent: '#34d399',
+    button: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      transformation: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+      wisdom: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+      growth: 'linear-gradient(135deg, #6ee7b7 0%, #34d399 100%)'
+    }
+  }
+};
 
-// Create the theme context
+// Create context
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Theme provider component
-interface ThemeProviderProps {
-  children: ReactNode;
-  defaultPage?: keyof typeof pageThemes;
-}
-
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({
-                                                              children,
-                                                              defaultPage = 'home'
-                                                            }) => {
-  const [isDark, setIsDark] = useState(false);
-  const [currentPage, setCurrentPage] = useState<keyof typeof pageThemes>(defaultPage);
-
-  // Get the current theme (light or dark)
-  const currentTheme: ThemeColors = useMemo(() => {
-    if (isDark) {
-      return {
-        background: { ...sensaTheme.background, ...darkTheme.background },
-        text: { ...sensaTheme.text, ...darkTheme.text },
-        border: { ...sensaTheme.border, ...darkTheme.border }
-      };
-    }
-    return sensaTheme;
-  }, [isDark]);
-
-  // Get the current page theme
-  const pageTheme = getPageTheme(currentPage);
-
-  // Apply theme to document root
-  useEffect(() => {
-    const root = document.documentElement;
-
-    // Set CSS custom properties for dynamic theming
-    Object.entries(currentTheme.background).forEach(([key, value]) => {
-      root.style.setProperty(`--bg-${key}`, value);
-    });
-
-    Object.entries(currentTheme.text).forEach(([key, value]) => {
-      root.style.setProperty(`--text-${key}`, value);
-    });
-
-    Object.entries(currentTheme.border).forEach(([key, value]) => {
-      root.style.setProperty(`--border-${key}`, value);
-    });
-
-    // Add/remove dark class
-    if (isDark) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [isDark, currentTheme]);
+// Theme Provider Component
+export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [theme] = useState<ThemeColors>(sensaTheme);
+  const [pageTheme, setCurrentPageTheme] = useState<PageTheme>(pageThemes.dashboard);
+  const [isDark, setIsDark] = useState<boolean>(false);
 
   const setPageTheme = (page: keyof typeof pageThemes) => {
-    setCurrentPage(page);
+    setCurrentPageTheme(pageThemes[page]);
   };
 
   const toggleDark = () => {
     setIsDark(!isDark);
   };
 
+  // Apply theme to document
+  useEffect(() => {
+    const root = document.documentElement;
+    
+    // Apply CSS custom properties
+    root.style.setProperty('--color-primary', theme.text.primary);
+    root.style.setProperty('--color-secondary', theme.text.secondary);
+    root.style.setProperty('--color-accent', theme.text.accent);
+    root.style.setProperty('--color-muted', theme.text.muted);
+    root.style.setProperty('--bg-primary', theme.background.primary);
+    root.style.setProperty('--bg-secondary', theme.background.secondary);
+    root.style.setProperty('--bg-surface', theme.background.surface);
+    root.style.setProperty('--border-primary', theme.border.primary);
+    
+    // Apply page theme
+    root.style.setProperty('--page-background', pageTheme.background);
+    root.style.setProperty('--page-card', pageTheme.card);
+    root.style.setProperty('--page-accent', pageTheme.accent);
+    root.style.setProperty('--page-button', pageTheme.button);
+  }, [theme, pageTheme]);
+
   const value: ThemeContextType = {
-    theme: currentTheme,
-    pageTheme: pageTheme,
+    theme,
+    pageTheme,
     setPageTheme,
     isDark,
-    toggleDark,
+    toggleDark
   };
 
   return (
-      <ThemeContext.Provider value={value}>
-        {children}
-      </ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
   );
-};
-
-// Custom hook to use theme context
-export const useTheme = (): ThemeContextType => {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
-
-// Custom hook for page-specific theming
-export const usePageTheme = (page: keyof typeof pageThemes) => {
-  const { setPageTheme } = useTheme();
-
-  useEffect(() => {
-    setPageTheme(page);
-  }, [page, setPageTheme]);
-
-  return getPageTheme(page);
-};
-
-// Custom hook for component colors
-export const useComponentColors = () => {
-  const { theme, pageTheme } = useTheme();
-
-  return {
-    ...theme,
-    pageAccent: pageTheme.accent,
-    pageBackground: pageTheme.background,
-    pageCard: pageTheme.card,
-    pageButton: pageTheme.button,
-    pageGradients: pageTheme.gradients
-  };
-};
-
-// Create theme classes hook factory
-export const createThemeClassesHook = (useThemeHook: () => ThemeContextType) => {
-  return () => {
-    const { theme, pageTheme } = useThemeHook();
-
-    return {
-      // Background classes
-      bg: {
-        primary: 'bg-white',
-        secondary: 'bg-gray-50',
-        card: 'bg-white/60'
-      },
-      // Text classes
-      text: {
-        primary: 'text-gray-900',
-        secondary: 'text-gray-600',
-        tertiary: 'text-gray-500'
-      },
-      // Border classes
-      border: {
-        light: 'border-gray-200/60'
-      },
-      // Interactive classes
-      interactive: {
-        hover: 'hover:bg-white/80'
-      },
-      // Page-specific classes
-      pageAccent: pageTheme.accent,
-      pageBackground: pageTheme.background,
-      pageCard: pageTheme.card,
-      pageButton: pageTheme.button,
-      pageGradients: pageTheme.gradients,
-      // Utility functions
-      getButtonClass: (variant: 'primary' | 'secondary' | 'accent' = 'primary') => {
-        const baseClass = 'px-4 py-2 rounded-lg font-medium transition-colors';
-        switch (variant) {
-          case 'primary':
-            return `${baseClass} bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:opacity-90`;
-          case 'secondary':
-            return `${baseClass} bg-gray-50 text-gray-900 hover:opacity-90`;
-          case 'accent':
-            return `${baseClass} bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:opacity-90`;
-          default:
-            return baseClass;
-        }
-      },
-      getCardClass: () => {
-        return `bg-white rounded-lg shadow-sm border border-gray-200`;
-      }
-    };
-  };
-};
-
-// Utility hook for creating dynamic class names based on theme
-export const useThemeClasses = createThemeClassesHook(useTheme);
-
-// HOC for automatic page theme setting
-export const withPageTheme = <P extends object>(
-    Component: React.ComponentType<P>,
-    page: keyof typeof pageThemes
-) => {
-  const WrappedComponent: React.FC<P> = (props) => {
-    usePageTheme(page);
-    return <Component {...props} />;
-  };
-
-  WrappedComponent.displayName = `withPageTheme(${Component.displayName || Component.name})`;
-  return WrappedComponent;
-};
-
-// Theme-aware className builder
-export const buildThemeClass = (
-    baseClass: string,
-    isDark: boolean,
-    darkClass?: string
-): string => {
-  return isDark && darkClass ? `${baseClass} ${darkClass}` : baseClass;
 };
 
 export default ThemeContext;

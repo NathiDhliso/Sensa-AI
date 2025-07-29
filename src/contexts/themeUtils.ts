@@ -1,6 +1,5 @@
 import { useContext, useEffect } from 'react';
 import { ThemeContext, type ThemeContextType } from './ThemeContext';
-import { pageThemes, componentColors, getPageTheme, getComponentColor } from '../styles/themes';
 
 // Custom hook to use theme context
 export const useTheme = (): ThemeContextType => {
@@ -12,31 +11,29 @@ export const useTheme = (): ThemeContextType => {
 };
 
 // Custom hook for page-specific theming
-export const usePageTheme = (page: keyof typeof pageThemes) => {
+export const usePageTheme = (page: string) => {
   const { setPageTheme } = useTheme();
-  
+
   useEffect(() => {
-    setPageTheme(page);
+    setPageTheme(page as any);
   }, [page, setPageTheme]);
-  
-  return getPageTheme(page);
 };
 
 // Custom hook for component colors
-export const useComponentColors = (component: keyof typeof componentColors) => {
-  return {
-    getColor: (variant?: string) => getComponentColor(component, variant),
-    colors: componentColors[component],
-  };
+export const useComponentColors = () => {
+  const { theme } = useTheme();
+  return theme;
 };
 
 // Utility hook for creating dynamic class names based on theme
 export const useThemeClasses = () => {
-  const { isDark } = useTheme();
-  
+  const { isDark, theme, pageTheme } = useTheme();
+
   return {
     isDark,
-    getThemeClass: (lightClass: string, darkClass: string) => 
+    theme,
+    pageTheme,
+    getThemeClass: (lightClass: string, darkClass: string) =>
       isDark ? darkClass : lightClass,
     conditionalClass: (condition: boolean, trueClass: string, falseClass: string = '') =>
       condition ? trueClass : falseClass,
@@ -45,8 +42,8 @@ export const useThemeClasses = () => {
 
 // Utility for getting responsive theme values
 export const useResponsiveTheme = () => {
-  const { currentTheme } = useTheme();
-  
+  const { theme } = useTheme();
+
   return {
     getResponsiveValue: (values: {
       mobile?: string;
@@ -57,7 +54,7 @@ export const useResponsiveTheme = () => {
       // For now, return desktop value as default
       return values.desktop || values.tablet || values.mobile || '';
     },
-    theme: currentTheme,
+    theme,
   };
 };
 
@@ -89,8 +86,8 @@ export const useThemeAnimations = () => {
 
 // Utility for theme-aware spacing
 export const useThemeSpacing = () => {
-  const { currentTheme } = useTheme();
-  
+  const { theme } = useTheme();
+
   return {
     getSpacing: (size: 'xs' | 'sm' | 'md' | 'lg' | 'xl') => {
       const spacingMap = {
@@ -102,6 +99,6 @@ export const useThemeSpacing = () => {
       };
       return spacingMap[size];
     },
-    theme: currentTheme,
+    theme,
   };
 };

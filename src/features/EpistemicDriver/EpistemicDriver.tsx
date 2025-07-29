@@ -5,7 +5,7 @@ import {
   ArrowDown,
   Brain
 } from 'lucide-react';
-import { usePageTheme } from '../../contexts/ThemeContext';
+import { usePageTheme } from '../../contexts/themeUtils';
 import { supabaseServices } from '../../services/supabaseServices';
 import { BackButton } from '../../components';
 import { HistoryManager } from './components/HistoryManager';

@@ -14,7 +14,7 @@ import {
   Loader
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 
 const LoginPage: React.FC = () => {
@@ -309,6 +309,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-const LoginPageWithTheme = withPageTheme(LoginPage, 'auth');
-LoginPageWithTheme.displayName = 'LoginPage';
-export default LoginPageWithTheme;
+export default LoginPage;

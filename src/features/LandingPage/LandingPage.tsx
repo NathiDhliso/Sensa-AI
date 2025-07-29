@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Brain, BookOpen, Shield, Zap, Target, Sparkles } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../contexts/themeUtils';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -270,4 +270,4 @@ const FeatureCard: React.FC<{
   </motion.div>
 );
 
-export default withPageTheme(LandingPage, 'home');
+export default LandingPage;

@@ -23,7 +23,7 @@ import { uploadService, uploadConfigs } from '../../../services/uploadService';
 import { UnifiedUpload, BackButton } from '../../../components';
 import {
   usePageTheme
-} from '../../../contexts/ThemeContext';
+} from '../../../contexts/themeUtils';
 
 // Upload service is configured in the service file
 

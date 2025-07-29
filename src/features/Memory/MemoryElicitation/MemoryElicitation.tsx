@@ -19,7 +19,7 @@ import {
   Edit3,
   Eye
 } from 'lucide-react';
-import { usePageTheme, useThemeClasses, withPageTheme } from '../../../contexts/ThemeContext';
+import { usePageTheme, useThemeClasses } from '../../../contexts/themeUtils';
 import { memoryService } from '../../../services/supabaseServices';
 import { useMemoryStore, useUIStore } from '../../../stores';
 
@@ -519,6 +519,4 @@ const MemoryElicitation: React.FC = () => {
   );
 };
 
-const MemoryElicitationWithTheme = withPageTheme(MemoryElicitation, 'memory');
-MemoryElicitationWithTheme.displayName = 'MemoryElicitation';
-export default MemoryElicitationWithTheme;
+export default MemoryElicitation;
