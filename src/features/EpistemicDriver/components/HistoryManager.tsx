@@ -111,6 +111,11 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
       setShowHistory(true);
     } catch (error) {
       console.error('Failed to load history:', error);
+      // If table doesn't exist, show empty state but still open modal
+      if (error instanceof Error && error.message.includes('does not exist')) {
+        setHistoryEntries([]);
+        setShowHistory(true);
+      }
     } finally {
       setHistoryLoading(false);
     }
@@ -320,6 +325,9 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600 text-center">
                       No saved study maps yet. Generate and save your first epistemic driver to see it here!
+                    </p>
+                    <p className="text-gray-500 text-center text-sm mt-2">
+                      💡 Tip: Make sure the database table is created in your Supabase dashboard
                     </p>
                   </div>
                 ) : (
