@@ -1,26 +1,20 @@
 version: 1
-backend:
-  phases:
-    build:
-      commands:
-        - '# Execute Amplify CLI with the helper script'
-        - amplifyPush --simple
 frontend:
   phases:
     preBuild:
       commands:
-        - echo "Installing dependencies..."
+        - echo "🚀 Installing dependencies for Sensa AI..."
         - npm ci
-        - echo "Installing terser for production builds..."
+        - echo "📦 Installing terser for production builds..."
         - npm install --save-dev terser
     build:
       commands:
-        - echo "Building Sensa AI for production..."
+        - echo "🔨 Building Sensa AI for production..."
         - npm run build
     postBuild:
       commands:
-        - echo "Build completed successfully!"
-        - echo "Optimizing assets..."
+        - echo "✅ Build completed successfully!"
+        - echo "📊 Build artifacts:"
         - ls -la dist/
   artifacts:
     baseDirectory: dist
@@ -29,7 +23,6 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-      - .next/cache/**/*
   customHeaders:
     - pattern: '**/*'
       headers:
@@ -59,12 +52,11 @@ frontend:
       headers:
         - key: 'Cache-Control'
           value: 'no-cache, no-store, must-revalidate'
-  environmentVariables:
-    - name: NODE_ENV
-      value: production
-    - name: VITE_SUPABASE_URL
-      value: https://okvdirskoukqnjzqsowb.supabase.co
-    - name: VITE_SUPABASE_ANON_KEY
-      value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rdmRpcnNrb3VrcW5qenFzb3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODQxNjQsImV4cCI6MjA2NjE2MDE2NH0.k2q9Zb0mT53xrZIH5v5MN_to6knZIrjfhRWI-HDyZQo
-    - name: GOOGLE_AI_API_KEY
-      value: AIzaSyDbHwWzoMKaaN9Z6WZdv-tF3tChRb5nF1I
+
+# 🔧 IMPORTANT: Configure Environment Variables in AWS Amplify Console
+# Go to: Your App > App Settings > Environment variables
+# Add these variables:
+#   - NODE_ENV = production
+#   - VITE_SUPABASE_URL = https://okvdirskoukqnjzqsowb.supabase.co
+#   - VITE_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rdmRpcnNrb3VrcW5qenFzb3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODQxNjQsImV4cCI6MjA2NjE2MDE2NH0.k2q9Zb0mT53xrZIH5v5MN_to6knZIrjfhRWI-HDyZQo
+#   - GOOGLE_AI_API_KEY = AIzaSyDbHwWzoMKaaN9Z6WZdv-tF3tChRb5nF1I
