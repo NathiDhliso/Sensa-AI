@@ -123,9 +123,10 @@ const MemoryElicitation: React.FC = () => {
         const analysis = await callEdgeFunction('adk-agents', {
           agent_type: 'memory_analysis',
           payload: {
-            task: 'analyze_memory',
-            memory_content: memory,
-            category: category
+            memories: [{
+              category: category,
+              text: memory
+            }]
           }
         });
         

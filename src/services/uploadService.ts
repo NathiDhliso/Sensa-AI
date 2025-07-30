@@ -2,15 +2,26 @@
 // @ts-expect-error - pdfjs-dist types may not be fully compatible
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 
-// Configure PDF.js worker
-try {
-  // @ts-expect-error - GlobalWorkerOptions may not be typed correctly
-  if (pdfjsLib?.GlobalWorkerOptions) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Configure PDF.js worker with fallback options
+const configurePDFWorker = () => {
+  try {
+    // @ts-expect-error - GlobalWorkerOptions may not be typed correctly
+    if (pdfjsLib?.GlobalWorkerOptions) {
+      // Try multiple CDN sources in order of preference
+      const workerSources = [
+        'https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.3.93/pdf.worker.min.js'
+      ];
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSources[0];
+    }
+  } catch (err) {
+    console.warn('Failed to configure PDF.js worker:', err);
   }
-} catch (err) {
-  console.warn('Failed to configure PDF.js worker:', err);
-}
+};
+
+configurePDFWorker();
 
 export interface UploadConfig {
   acceptedTypes?: string[];
@@ -93,21 +104,44 @@ export class UploadService {
     try {
       const arrayBuffer = await file.arrayBuffer();
       
-      // Try to configure worker if not already done
-      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      // Try multiple worker configurations for better compatibility
+      const workerSources = [
+        '', // First try without worker (most compatible)
+        'https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.js'
+      ];
+
+      let pdf;
+      let lastError;
+
+      // Try different worker configurations
+      for (let i = 0; i < workerSources.length; i++) {
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSources[i];
+
+          const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            verbosity: 0,
+            useWorkerFetch: i > 0, // Only use worker fetch if worker is enabled
+            isEvalSupported: false,
+            disableAutoFetch: true
+          });
+
+          pdf = await loadingTask.promise;
+          console.log(`✅ PDF loaded successfully with worker config ${i}: ${pdf.numPages} pages`);
+          break;
+        } catch (error) {
+          lastError = error;
+          console.warn(`Worker config ${i} failed:`, error);
+          if (i === workerSources.length - 1) {
+            throw lastError;
+          }
+        }
       }
-      
-      const loadingTask = pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        disableAutoFetch: true
-      });
-      
-      const pdf = await loadingTask.promise;
-      console.log(`✅ PDF loaded successfully: ${pdf.numPages} pages`);
+
+      if (!pdf) {
+        throw new Error('Failed to load PDF with any worker configuration');
+      }
 
       let extractedText = '';
       const pagesToProcess = Math.min(pdf.numPages, maxPages);

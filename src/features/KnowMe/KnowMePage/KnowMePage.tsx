@@ -264,8 +264,9 @@ const KnowMePage: React.FC = () => {
       }));
 
       const scenarioResult = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'know_me_scenarios',
         payload: {
-          action: 'know_me_questionnaire',
           questionnaire_responses: { responses },
           knowledge_analysis: workflow.upload.knowledgeAnalysis,
           user_id: user?.id
@@ -307,8 +308,9 @@ const KnowMePage: React.FC = () => {
       if (!scenario) return;
 
       const hintResult = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'know_me_score',
         payload: {
-          action: 'know_me_score',
           question_id: scenarioId,
           user_answer: partialAnswer,
           scenarios_data: { scenarios: workflow.scenarios.data, rubrics: workflow.scenarios.data.map(s => s.rubric) },
@@ -334,8 +336,9 @@ const KnowMePage: React.FC = () => {
 
     try {
       const scoringResult = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'know_me_score',
         payload: {
-          action: 'know_me_score',
           question_id: scenarioId,
           user_answer: answer,
           scenarios_data: { scenarios: workflow.scenarios.data, rubrics: workflow.scenarios.data.map(s => s.rubric) },
@@ -376,8 +379,9 @@ const KnowMePage: React.FC = () => {
       const allResults = Object.values(workflow.scenarios.scoringResults);
       
       const reportResult = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'know_me_report',
         payload: {
-          action: 'know_me_report',
           scoring_results: allResults,
           knowledge_analysis: workflow.upload.knowledgeAnalysis,
           user_id: user?.id
@@ -439,8 +443,9 @@ const KnowMePage: React.FC = () => {
       });
 
       const knowledgeResult = await callEdgeFunction('adk-agents', {
+        agent_type: 'orchestrator',
+        task: 'know_me_start',
         payload: {
-          action: 'know_me_start',
           pdf_content: uploadResult.totalExtractedText,
           user_id: user?.id
         }
@@ -449,11 +454,13 @@ const KnowMePage: React.FC = () => {
       console.log('📥 Edge function response:', knowledgeResult);
 
       if (knowledgeResult.success) {
-        console.log('✅ Analysis successful:', knowledgeResult.knowledge_analysis);
-        updateUpload({ 
-          knowledgeAnalysis: knowledgeResult.knowledge_analysis,
-          problemSolutionAnalysis: knowledgeResult.knowledge_analysis?.problem_solution_analysis || [],
-          questions: knowledgeResult.knowledge_analysis?.know_me_questions || []
+        // The actual data is nested under knowledgeResult.data
+        const analysisData = knowledgeResult.data || knowledgeResult.knowledge_analysis;
+        console.log('✅ Analysis successful:', analysisData);
+        updateUpload({
+          knowledgeAnalysis: analysisData,
+          problemSolutionAnalysis: analysisData?.problem_solution_analysis || [],
+          questions: analysisData?.know_me_questions || []
         });
         moveToNextPhase();
       } else {

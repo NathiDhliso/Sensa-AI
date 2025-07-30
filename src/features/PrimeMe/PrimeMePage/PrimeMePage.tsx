@@ -296,7 +296,7 @@ The final output should not be a list. It must be a coherent story that illustra
               <div className="flex items-center space-x-3">
                 <div 
                   className="p-2 rounded-xl shadow-lg"
-                  style={{ background: pageTheme.gradients.transformation }}
+                  style={{ background: pageTheme?.gradients?.transformation || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)' }}
                 >
                   <Compass className="w-5 h-5 text-white" />
                 </div>
@@ -325,7 +325,7 @@ The final output should not be a list. It must be a coherent story that illustra
           <div className="text-center">
             <motion.div
               className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"
-              style={{ background: pageTheme.gradients.transformation }}
+              style={{ background: pageTheme?.gradients?.transformation || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)' }}
               animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 3, repeat: Infinity }}
             >
@@ -405,7 +405,7 @@ The final output should not be a list. It must be a coherent story that illustra
                 onClick={generatePrimeNarrative}
                 disabled={isGenerating}
                 className="w-full mt-6 px-6 py-3 text-white rounded-xl font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
-                style={{ background: pageTheme.gradients.memoryToLearning }}
+                style={{ background: pageTheme?.gradients?.memoryToLearning || 'linear-gradient(135deg, #6B46C1 0%, #F97316 100%)' }}
                 whileHover={{ scale: isGenerating ? 1 : 1.02 }}
                 whileTap={{ scale: isGenerating ? 1 : 0.98 }}
               >
@@ -481,7 +481,7 @@ The final output should not be a list. It must be a coherent story that illustra
                           <div className="flex items-center space-x-3">
                             <div 
                               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                              style={{ background: pageTheme.gradients.wisdom }}
+                              style={{ background: pageTheme?.gradients?.wisdom || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 50%, #EC4899 100%)' }}
                             >
                               {index + 1}
                             </div>

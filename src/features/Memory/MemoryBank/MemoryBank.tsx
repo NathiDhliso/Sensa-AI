@@ -46,16 +46,31 @@ const MemoryBank: React.FC = () => {
         
         if (memoriesData && memoriesData.length > 0) {
           // Transform database memories to insights format
-          const insights = memoriesData.map(memory => ({
-            id: memory.id || `memory_${Date.now()}`,
-            memory: memory.text_content || '',
-            category: memory.category || 'general',
-            insights: memory.sensa_analysis?.insights || ['Analysis pending'],
-            learningStyle: memory.sensa_analysis?.learningStyle || 'Analysis pending',
-            emotionalTone: memory.sensa_analysis?.emotionalTone || 'Analysis pending',
-            connections: memory.sensa_analysis?.connections || [],
-            timestamp: new Date(memory.created_at || Date.now())
-          }));
+          const insights = memoriesData.map(memory => {
+            // Ensure timestamp is always a valid Date object
+            let timestamp: Date;
+            try {
+              timestamp = memory.created_at ? new Date(memory.created_at) : new Date();
+              // Check if the date is valid
+              if (isNaN(timestamp.getTime())) {
+                timestamp = new Date();
+              }
+            } catch (error) {
+              console.warn('Invalid timestamp for memory:', memory.id, error);
+              timestamp = new Date();
+            }
+
+            return {
+              id: memory.id || `memory_${Date.now()}`,
+              memory: memory.text_content || '',
+              category: memory.category || 'general',
+              insights: memory.sensa_analysis?.insights || ['Analysis pending'],
+              learningStyle: memory.sensa_analysis?.learningStyle || 'Analysis pending',
+              emotionalTone: memory.sensa_analysis?.emotionalTone || 'Analysis pending',
+              connections: memory.sensa_analysis?.connections || [],
+              timestamp
+            };
+          });
 
           setMemories(insights);
 
@@ -248,7 +263,10 @@ const MemoryBank: React.FC = () => {
                                 {memory.category}
                               </span>
                               <span className="text-xs text-gray-500">
-                                {memory.timestamp.toLocaleDateString()}
+                                {memory.timestamp instanceof Date
+                                  ? memory.timestamp.toLocaleDateString()
+                                  : new Date(memory.timestamp).toLocaleDateString()
+                                }
                               </span>
                             </div>
                             <p className="text-gray-900 mb-2">{memory.memory}</p>

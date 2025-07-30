@@ -579,7 +579,7 @@ const IntegratedLearningHub: React.FC = () => {
           >
             <div className={styles.dialogInner}>
               <div className={styles.dialogHeader}>
-                <div className={styles.iconContainer} style={{ background: pageTheme.gradients.transformation }}>
+                <div className={styles.iconContainer} style={{ background: pageTheme?.gradients?.transformation || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)' }}>
                   <span className={styles.iconEmoji}>🎯</span>
                 </div>
                 <div>
@@ -663,7 +663,7 @@ const IntegratedLearningHub: React.FC = () => {
                 </motion.button>
                 <div
                   className={styles.iconContainer}
-                  style={{ background: pageTheme.gradients.transformation }}
+                  style={{ background: pageTheme?.gradients?.transformation || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)' }}
                 >
                   <Sparkles className={styles.headerIcon} />
                 </div>

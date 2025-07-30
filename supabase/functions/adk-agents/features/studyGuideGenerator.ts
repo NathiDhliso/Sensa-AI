@@ -109,11 +109,9 @@ Generate a comprehensive study guide for the subject above, following all instru
     // Call Gemini API with retry logic and multiple models
     console.log('📞 Calling Gemini API with JSON mode enabled...');
 
-    const models = [
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-pro'
-    ];
+    // Import the updated model list from constants
+    const { GEMINI_MODELS } = await import('../constants.ts');
+    const models = [...GEMINI_MODELS];
 
     let geminiResponse;
     let lastError;

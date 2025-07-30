@@ -116,6 +116,18 @@ const pageThemes = {
       growth: 'linear-gradient(135deg, #F59E0B 0%, #10B981 100%)'
     }
   },
+  course: {
+    background: 'bg-gradient-to-br from-amber-50 via-white to-emerald-50',
+    card: 'bg-white/85 backdrop-blur-sm border-amber-200/50',
+    accent: 'text-amber-600',
+    button: 'bg-gradient-to-r from-amber-500 to-emerald-500',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #6B46C1 0%, #F97316 100%)',
+      transformation: 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)',
+      wisdom: 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 50%, #EC4899 100%)',
+      growth: 'linear-gradient(135deg, #F59E0B 0%, #10B981 100%)'
+    }
+  },
   knowMe: {
     background: 'bg-gradient-to-br from-purple-50 via-orange-50 to-amber-50',
     card: 'bg-white/80 backdrop-blur-sm border-purple-200/50',
