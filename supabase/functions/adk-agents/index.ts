@@ -85,8 +85,19 @@ async function parseRequest(req: Request): Promise<ADKRequest | null> {
   try {
     const body = await req.json();
     
-    if (!validateRequest(body)) {
+    const validation = validateRequest(body);
+    if (!validation.isValid) {
+      logWithContext('error', 'Request validation failed', {
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
       return null;
+    }
+    
+    if (validation.warnings.length > 0) {
+      logWithContext('warn', 'Request validation warnings', {
+        warnings: validation.warnings
+      });
     }
     
     return body as ADKRequest;
@@ -169,4 +180,4 @@ function setupErrorMonitoring(): void {
 setupErrorMonitoring();
 
 // Log startup
-logWithContext('info', '🎉 ADK Edge Function initialized with modular architecture'); 
+logWithContext('info', '🎉 ADK Edge Function initialized with modular architecture');

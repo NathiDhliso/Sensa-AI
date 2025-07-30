@@ -6,26 +6,20 @@ import {
   Map,
   Brain,
   Search,
-  FileText,
   Zap,
   Target,
-  Download,
   RefreshCw,
   Sparkles,
-  Clipboard,
-  Send,
   ArrowLeft,
   Code
 } from 'lucide-react';
 import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
-import { memoryService } from '../../../services/supabaseServices';
-import { callEdgeFunction } from '../../../services/edgeFunctions';
-import { SensaAPI } from '../../../services/api';
+import { memoryService, SensaAPI, SensaMindmapIntegration } from '../../../services';
 import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
-import { MermaidNativeEditor } from '../../MindMapEditor';
+import { MermaidNativeEditor, ComprehensiveMindMapEditor } from '../../MindMapEditor';
 import mermaid from 'mermaid';
-import type { StudyMap, StudyGuide, StudyGuideSection, MermaidStudyMap } from '../../../types';
+import type { StudyGuide } from '../../../types';
 import { UnifiedUpload } from '../../../components';
 
 // Import the CSS module file
@@ -435,7 +429,33 @@ const IntegratedLearningHub: React.FC = () => {
   };
 
   const generateAIMindMap = useCallback(async (subject: string, content: string) => {
-    return { mermaid_code: `mindmap\n  root((${subject}))`, node_data: {}, legend_html: '' };
+    try {
+      const userId = supabase.auth.getUser().then(({ data }) => data.user?.id);
+      const resolvedUserId = await userId;
+      
+      if (!resolvedUserId) {
+        throw new Error('User not authenticated');
+      }
+
+      return await SensaMindmapIntegration.generateMindmap({
+        subject,
+        content,
+        userId: resolvedUserId,
+        options: {
+          format: 'mermaid',
+          style: 'educational',
+          includeMemories: true
+        }
+      });
+    } catch (error) {
+      console.error('Mindmap generation failed:', error);
+      // Fallback to basic structure
+      return { 
+        mermaid_code: `mindmap\n  root((${subject}))\n    Error\n      Please try again`, 
+        node_data: { error: true }, 
+        legend_html: '<p style="color: #dc2626;">⚠️ Failed to generate AI mindmap. Please try again.</p>' 
+      };
+    }
   }, []);
 
   const generateMindMap = useCallback(async () => {
@@ -449,28 +469,57 @@ const IntegratedLearningHub: React.FC = () => {
     }
     try {
       updateAnalysis({ isLoading: true });
-      let mindMapData;
-      if (workflow.analyzedDocument) {
-        mindMapData = await generateAIMindMap(
-          workflow.analyzedDocument.subject,
-          workflow.analyzedDocument.content
-        );
-      } else if (workflow.selectedCourse && workflow.analysis.result) {
-        mindMapData = await generateAIMindMap(
-          workflow.selectedCourse.title,
-          JSON.stringify(workflow.analysis.result)
-        );
+      
+      const userId = await supabase.auth.getUser().then(({ data }) => data.user?.id);
+      if (!userId) {
+        throw new Error('User not authenticated');
       }
-      if (mindMapData) {
+
+      let mindMapData;
+      
+      if (workflow.analyzedDocument) {
+        // Use specialized document analysis method
+        mindMapData = await SensaMindmapIntegration.generateFromDocument({
+          document: {
+            fileName: workflow.analyzedDocument.fileName,
+            subject: workflow.analyzedDocument.subject,
+            content: workflow.analyzedDocument.content,
+            topics: workflow.analyzedDocument.topics
+          },
+          userId
+        });
+      } else if (workflow.selectedCourse && workflow.analysis.result) {
+        // Use specialized course analysis method
+        mindMapData = await SensaMindmapIntegration.generateFromCourseAnalysis({
+          courseTitle: workflow.selectedCourse.title,
+          analysisResult: workflow.analysis.result,
+          userId
+        });
+      }
+      
+      if (mindMapData && SensaMindmapIntegration.validateMindmapData(mindMapData)) {
         updateVisualization({ studyMap: mindMapData });
         updateWorkflow({ currentTab: 'visualize' });
+        
+        addNotification({
+          type: 'success',
+          title: 'Mindmap Generated',
+          message: 'Your personalized mindmap has been created successfully!'
+        });
+      } else {
+        throw new Error('Invalid mindmap data received');
       }
     } catch (error) {
-      handleError(error as Error, 'Mind Map Generation');
+      console.error('Mind Map Generation Error:', error);
+      addNotification({
+        type: 'error',
+        title: 'Mindmap Generation Failed',
+        message: error instanceof Error ? error.message : 'Please try again later.'
+      });
     } finally {
       updateAnalysis({ isLoading: false });
     }
-  }, [workflow.analysis.result, workflow.analyzedDocument, workflow.selectedCourse, addNotification, generateAIMindMap]);
+  }, [workflow.analysis.result, workflow.analyzedDocument, workflow.selectedCourse, addNotification, updateAnalysis, updateVisualization, updateWorkflow]);
 
   const performAnalysis = async (course?: Course, files?: File[], skipFocusQuestion = false) => {
     // Focus question logic
@@ -879,7 +928,7 @@ const IntegratedLearningHub: React.FC = () => {
                             Mermaid Code
                           </button>
                           <button
-                            onClick={() => addNotification({ type: 'info', title: 'Coming Soon!', message: 'Our new Sensa Editor is in development.' })}
+                            onClick={() => updateVisualization({ showMindMapEditor: 'comprehensive' })}
                             className={styles.secondaryButton}
                           >
                             <Sparkles className={styles.buttonIcon} />
@@ -949,6 +998,17 @@ const IntegratedLearningHub: React.FC = () => {
               initialData={workflow.visualization.studyMap}
               onSave={(editedData) => {
                 console.log('Mermaid mind map saved:', editedData);
+                updateVisualization({ showMindMapEditor: false });
+              }}
+              onClose={() => updateVisualization({ showMindMapEditor: false })}
+            />
+          )}
+
+          {workflow.visualization.showMindMapEditor === 'comprehensive' && workflow.visualization.studyMap && (
+            <ComprehensiveMindMapEditor
+              initialData={workflow.visualization.studyMap}
+              onSave={(editedData) => {
+                console.log('Comprehensive mind map saved:', editedData);
                 updateVisualization({ showMindMapEditor: false });
               }}
               onClose={() => updateVisualization({ showMindMapEditor: false })}

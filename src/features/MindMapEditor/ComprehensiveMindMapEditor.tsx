@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
+  ReactFlowProvider,
   MiniMap,
   Controls,
   Background,
@@ -55,7 +56,8 @@ interface MindMapEditorProps {
   onClose?: () => void;
 }
 
-export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ onSave, onClose }) => {
+// Internal component that uses React Flow hooks
+const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ onSave, onClose }) => {
   
   // Core States
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -937,4 +939,13 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
   );
 };
 
-export default ComprehensiveMindMapEditor; 
+// Main component with ReactFlowProvider wrapper
+export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <ComprehensiveMindMapEditorInternal {...props} />
+    </ReactFlowProvider>
+  );
+};
+
+export default ComprehensiveMindMapEditor;

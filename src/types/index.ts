@@ -17,6 +17,20 @@ export interface UserMemoryProfile {
     category: string;
     text: string;
   }>;
+  dominant_learning_style?: string;
+  learning_profile?: {
+    course_analysis: CourseAnalysisResult;
+    memory_connections: MemoryConnection[];
+  };
+  revolutionary_insights?: string[];
+  career_path?: string;
+  memory_connections?: MemoryConnection[];
+  topic_memory_connections?: string[];
+  content_specific_insights?: string[];
+  agents_available?: boolean;
+  code?: string;
+  node_insights?: Record<string, unknown>;
+  legend_html?: string;
 }
 
 export interface MemoryInsight {
@@ -43,6 +57,16 @@ export interface CourseAnalysisResult {
   difficultyLevel: 'Beginner' | 'Intermediate' | 'Advanced';
   keyTopics: string[];
   careerOutcomes: string[];
+  revolutionary_insights?: string[];
+  career_path?: string;
+  memory_connections?: MemoryConnection[];
+  topic_memory_connections?: string[];
+  content_specific_insights?: string[];
+  agents_available?: boolean;
+  code?: string;
+  node_insights?: Record<string, unknown>;
+  legend_html?: string;
+  [key: string]: unknown;
 }
 
 export interface CourseWorkflow {
@@ -255,4 +279,13 @@ export interface VisualElement {
 export interface StudyMapLegend {
   elements: VisualElement[];
   html: string;
+}
+
+// User Memory Interface for mindmap integration
+export interface UserMemory {
+  id: string;
+  category: string;
+  text_content: string;
+  sensa_analysis?: Record<string, unknown>;
+  [key: string]: unknown;
 }

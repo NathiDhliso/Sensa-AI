@@ -1,24 +1,123 @@
 import { supabase } from '../lib/supabase';
 import { callEdgeFunction } from './edgeFunctions';
 import type {
-  CourseAnalysisResult,
-  CareerPathwayResponse,
-  StudyMap,
-  MermaidStudyMap,
-  UserMemoryProfile,
-  OnboardingMemoryAnalysis
+  // Assuming these types are defined elsewhere, we'll create local versions
+  // for the properties we see being used.
+  // CourseAnalysisResult, 
+  // CareerPathwayResponse,
+  // StudyMap,
+  // MermaidStudyMap,
+  // UserMemoryProfile,
+  // OnboardingMemoryAnalysis
 } from '../types';
 
-// API-specific interfaces
+// --- Locally Defined/Inferred Types for Clarity ---
+// Based on usage in the functions below.
+
+interface CourseAnalysisResult {
+  courseId: string;
+  courseName: string;
+  university: string;
+  coreGoal: string;
+  practicalOutcome: string;
+  learningObjectives: string[];
+  prerequisites: string[];
+  estimatedDuration: string;
+  difficultyLevel: 'Beginner' | 'Intermediate' | 'Advanced' | 'Variable';
+  keyTopics: string[];
+  careerOutcomes: string[];
+}
+
+interface CareerPathway {
+  title: string;
+  description: string;
+  skills: string[];
+  roles: string[];
+}
+
+interface CareerPathwayResponse {
+  pathways: CareerPathway[];
+}
+
+interface MermaidStudyMap {
+  mermaid_code: string;
+  node_data: Record<string, any>;
+  legend_html: string;
+}
+
+interface StudyMap {
+  field: string;
+  map: Array<{
+    node_name: string;
+    in_course: boolean;
+    sensa_insight: {
+      analogy: string;
+      study_tip: string;
+    };
+  }>;
+}
+
+interface UserMemoryProfile {
+  dominant_learning_style?: string;
+  study_recommendations?: string[];
+  memories?: UserMemory[];
+}
+
+interface OnboardingMemoryAnalysis {
+  themes: string[];
+  emotionalTone: string;
+  learningIndicators: string[];
+  followUpSuggestions: string[];
+  confidence: number;
+}
+
+
+// --- API-specific interfaces from original code ---
+
 interface ADKAgentRequest {
   agent_type: string;
   payload: Record<string, unknown>;
+  task?: string;
+  dominant_learning_style?: string;
+  course_id?: string;
+  agents_available?: boolean;
+  [key: string]: unknown;
 }
 
+// Adjusted ADKAgentResponse to better reflect actual usage and potential shapes
 interface ADKAgentResponse {
   success: boolean;
-  data?: Record<string, unknown>;
+  data?: any; // Kept as 'any' due to highly variable structure (e.g., fallback_guide)
   error?: string;
+  memories?: UserMemory[];
+  analysis?: {
+    course_analysis?: CourseAnalysisResult;
+    learning_profile?: UserMemoryProfile;
+    memory_connections?: MemoryConnection[];
+    personalized_insights?: PersonalizedInsight[];
+    content_analysis?: ContentAnalysis;
+    revolutionary_insights?: string[];
+    career_path?: CareerPathway; // Corrected to be a single object based on usage
+    topic_memory_connections?: string[] | MemoryConnection[]; // Allow both for flexibility
+    content_specific_insights?: string[] | PersonalizedInsight[]; // Allow both
+    agents_available?: boolean;
+    code?: string;
+    node_insights?: Record<string, unknown>;
+    legend_html?: string;
+    fallback_guide?: any;
+    framework?: {
+      acronym?: string;
+      name?: string;
+      description?: string;
+    };
+    pillars?: any[];
+    [key: string]: unknown;
+  };
+  study_guide?: any; // Kept as 'any' to handle fallback and direct data
+  mindmap?: any;
+  mermaid_code?: string;
+  node_data?: Record<string, any>;
+  legend_html?: string;
   [key: string]: unknown;
 }
 
@@ -31,9 +130,11 @@ interface MemoryConnection {
 
 interface ContentAnalysis {
   subject: string;
-  complexity_level: string;
+  complexity_level: string; // Corrected from 'complexity'
   key_concepts: string[];
   learning_objectives: string[];
+  topic_memory_connections?: string[];
+  content_specific_insights?: string[];
   [key: string]: unknown;
 }
 
@@ -42,7 +143,6 @@ interface PersonalizedInsight {
   content: string;
   relevance_score: number;
   memory_connection?: string;
-  [key: string]: unknown;
 }
 
 interface UserMemory {
@@ -65,17 +165,17 @@ const ADK_AGENTS_CONFIG = {
 
 // API service for calling the ADK multi-agent system via Supabase Edge Functions
 export class SensaAPI {
-  
+
   private static getEndpoint(): string {
-    return ADK_AGENTS_CONFIG.USE_LOCAL 
-      ? ADK_AGENTS_CONFIG.LOCAL_ENDPOINT 
+    return ADK_AGENTS_CONFIG.USE_LOCAL
+      ? ADK_AGENTS_CONFIG.LOCAL_ENDPOINT
       : ADK_AGENTS_CONFIG.MAIN_ENDPOINT;
   }
 
-  private static async callADKAgents(data: ADKAgentRequest): Promise<ADKAgentResponse> {
+  static async callADKAgents(data: ADKAgentRequest): Promise<ADKAgentResponse> {
     try {
       console.log('🤖 Calling ADK agents with data:', data);
-      const result = await callEdgeFunction('adk-agents', data);
+      const result: ADKAgentResponse = await callEdgeFunction('adk-agents', data);
       console.log('✅ ADK agents response:', result);
       return result;
     } catch (error) {
@@ -144,9 +244,11 @@ export class SensaAPI {
         task: 'comprehensive_course_analysis',
         payload: {
           course: {
-            title: courseQuery,
-            category: 'General',
-            difficulty: 'intermediate'
+            name: courseQuery,
+            actual_subject: courseQuery,
+            key_topics: [],
+            description: `Course analysis for ${courseQuery}`,
+            difficulty_level: 'intermediate'
           },
           memories: memories || []
         }
@@ -157,67 +259,69 @@ export class SensaAPI {
         // Check if we have a fallback response from failed AI generation
         if (result.data && !result.data.success && result.data.fallback_guide) {
           const fallbackGuide = result.data.fallback_guide;
-                     return {
-             course_analysis: {
-               courseId: `generated_${Date.now()}`,
-               courseName: courseQuery,
-               university: 'AI Generated',
-               coreGoal: (result.data as any)?.fallback_guide?.framework?.description || `Master the fundamentals of ${courseQuery}`,
-               practicalOutcome: `Apply ${courseQuery} knowledge in real-world scenarios`,
-               learningObjectives: (result.data as any)?.fallback_guide?.pillars?.map((p: any) => p.studyFocus) || [`Master the fundamentals of ${courseQuery}`],
-               prerequisites: ['Basic academic preparation'],
-               estimatedDuration: 'Variable',
-               difficultyLevel: 'Intermediate' as const,
-               keyTopics: (result.data as any)?.fallback_guide?.pillars?.flatMap((p: any) => p.subTopics?.map((st: any) => st.conceptPair) || []) || [],
-               careerOutcomes: ['Professional development', 'Enhanced skills']
-             },
+          return {
+            course_analysis: {
+              courseId: `generated_${Date.now()}`,
+              courseName: courseQuery,
+              university: 'AI Generated',
+              coreGoal: fallbackGuide?.framework?.description || `Master the fundamentals of ${courseQuery}`,
+              practicalOutcome: `Apply ${courseQuery} knowledge in real-world scenarios`,
+              learningObjectives: fallbackGuide?.pillars?.map((p: any) => p.studyFocus) || [`Master the fundamentals of ${courseQuery}`],
+              prerequisites: ['Basic academic preparation'],
+              estimatedDuration: 'Variable',
+              difficultyLevel: 'Intermediate',
+              keyTopics: fallbackGuide?.pillars?.flatMap((p: any) => p.subTopics?.map((st: any) => st.conceptPair) || []) || [],
+              careerOutcomes: ['Professional development', 'Enhanced skills']
+            },
             memory_connections: [],
             career_pathways: {
               pathways: []
             },
             study_map: {
-              mermaid_code: 'graph TD\n    A[Start] --> B[' + courseQuery + '] --> C[Mastery]',
+              mermaid_code: 'graph TD\n  A[Start] --> B[' + courseQuery + '] --> C[Mastery]',
               node_data: {},
               legend_html: '<div>AI-Generated Study Map</div>'
             },
             learning_profile: {
               dominant_learning_style: 'AI-Enhanced',
-              study_recommendations: ['Personalized learning pathway', 'Memory-based connections']
+              study_recommendations: ['Personalized learning pathway', 'Memory-based connections'],
+              memories: [],
             }
           };
         }
-        
+
         // Handle normal successful response with analysis
         if (result.analysis) {
           const analysis = result.analysis;
-          
-                     return {
-             course_analysis: {
-               courseId: `generated_${Date.now()}`,
-               courseName: courseQuery,
-               university: 'AI Generated',
-               coreGoal: `Master the fundamentals of ${courseQuery}`,
-               practicalOutcome: `Apply ${courseQuery} knowledge in real-world scenarios`,
-               learningObjectives: (analysis as any)?.revolutionary_insights || [`Master the fundamentals of ${courseQuery}`],
-               prerequisites: ['Basic academic preparation'],
-               estimatedDuration: 'Variable',
-               difficultyLevel: 'Intermediate' as const,
-               keyTopics: (analysis as any)?.memory_connections?.map((c: any) => c.description || 'Topic') || [],
-               careerOutcomes: (analysis as any)?.career_path?.skills || []
-             },
-             memory_connections: (analysis as any)?.memory_connections || [],
-             career_pathways: {
-               pathways: (analysis as any)?.career_path ? [(analysis as any).career_path] : []
-             },
-             study_map: {
-               mermaid_code: 'graph TD\n    A[Start] --> B[' + courseQuery + '] --> C[Mastery]',
-               node_data: {},
-               legend_html: '<div>AI-Generated Study Map</div>'
-             },
-             learning_profile: {
-               memories: []
-             }
-           };
+          return {
+            course_analysis: {
+              courseId: `generated_${Date.now()}`,
+              courseName: courseQuery,
+              university: 'AI Generated',
+              coreGoal: `Master the fundamentals of ${courseQuery}`,
+              practicalOutcome: `Apply ${courseQuery} knowledge in real-world scenarios`,
+              learningObjectives: analysis.revolutionary_insights || [`Master the fundamentals of ${courseQuery}`],
+              prerequisites: ['Basic academic preparation'],
+              estimatedDuration: 'Variable',
+              difficultyLevel: 'Intermediate',
+              keyTopics: analysis.memory_connections?.map((c: any) => c.description || 'Topic') || [],
+              careerOutcomes: analysis.career_path?.skills || []
+            },
+            memory_connections: analysis.memory_connections || [],
+            career_pathways: {
+              pathways: analysis.career_path ? [analysis.career_path] : []
+            },
+            study_map: {
+              mermaid_code: analysis.code || 'graph TD\n  A[Start] --> B[' + courseQuery + '] --> C[Mastery]',
+              node_data: analysis.node_insights || {},
+              legend_html: analysis.legend_html || '<div>AI-Generated Study Map</div>'
+            },
+            learning_profile: analysis.learning_profile || {
+                dominant_learning_style: 'AI-Enhanced',
+                study_recommendations: ['Personalized learning pathway', 'Memory-based connections'],
+                memories: [],
+            }
+          };
         }
       }
 
@@ -236,7 +340,7 @@ export class SensaAPI {
           learningObjectives: [`Understand core concepts of ${courseQuery}`, `Apply practical skills`],
           prerequisites: ['Basic academic preparation'],
           estimatedDuration: 'Variable',
-          difficultyLevel: 'Intermediate' as const,
+          difficultyLevel: 'Intermediate',
           keyTopics: ['Fundamentals', 'Applications', 'Best Practices'],
           careerOutcomes: ['Enhanced professional skills', 'Career advancement opportunities']
         },
@@ -245,13 +349,14 @@ export class SensaAPI {
           pathways: []
         },
         study_map: {
-          mermaid_code: `graph TD\n    A[Start Learning] --> B[${courseQuery} Fundamentals]\n    B --> C[Practical Applications]\n    C --> D[Mastery]`,
+          mermaid_code: `graph TD\n  A[Start Learning] --> B[${courseQuery} Fundamentals]\n  B --> C[Practical Applications]\n  C --> D[Mastery]`,
           node_data: {},
           legend_html: '<div>AI-Generated Study Map</div>'
         },
         learning_profile: {
           dominant_learning_style: 'AI-Enhanced',
-          study_recommendations: ['Personalized learning pathway', 'Memory-based connections']
+          study_recommendations: ['Personalized learning pathway', 'Memory-based connections'],
+          memories: [],
         }
       };
     } catch (error) {
@@ -291,43 +396,47 @@ export class SensaAPI {
 
       // Call comprehensive analysis
       const result = await this.callADKAgents({
+        agent_type: 'orchestrator',
         task: 'comprehensive_course_analysis',
-        course: {
-          title: course.title,
-          category: course.category,
-          university: course.university,
-          difficulty: course.difficulty || 'intermediate'
-        },
-        memories: memories || []
+        payload: {
+          course: {
+            name: course.title,
+            actual_subject: course.title,
+            key_topics: [],
+            description: course.description || `Course analysis for ${course.title}`,
+            difficulty_level: course.difficulty || 'intermediate'
+          },
+          memories: memories || []
+        }
       });
 
       if (result.success && result.analysis) {
         const analysis = result.analysis;
-        
+
         return {
           course_analysis: {
-            course_id: courseId,
-            course_name: course.title,
+            courseId: courseId,
+            courseName: course.title,
             university: course.university,
-            core_goal: course.description || `Master ${course.title}`,
-            practical_outcome: `Apply ${course.title} knowledge professionally`,
-            learning_objectives: analysis.revolutionary_insights || [],
+            coreGoal: course.description || `Master ${course.title}`,
+            practicalOutcome: `Apply ${course.title} knowledge professionally`,
+            learningObjectives: analysis.revolutionary_insights || [],
             prerequisites: course.prerequisites || ['Basic preparation'],
-            estimated_duration: course.duration || 'Variable',
-            difficulty_level: course.difficulty || 'Intermediate',
-            key_topics: course.key_topics || [],
-            career_outcomes: analysis.career_path?.skills || []
+            estimatedDuration: course.duration || 'Variable',
+            difficultyLevel: course.difficulty || 'Intermediate',
+            keyTopics: course.key_topics || [],
+            careerOutcomes: analysis.career_path?.skills || []
           },
           memory_connections: analysis.memory_connections || [],
           career_pathways: {
             pathways: analysis.career_path ? [analysis.career_path] : []
           },
           study_map: {
-            mermaid_code: 'graph TD\n    A[Start] --> B[' + course.title + '] --> C[Career Success]',
-            node_data: {},
-            legend_html: '<div>Personalized Study Map</div>'
+            mermaid_code: analysis.code || 'graph TD\n  A[Start] --> B[' + course.title + '] --> C[Career Success]',
+            node_data: analysis.node_insights || {},
+            legend_html: analysis.legend_html || '<div>Personalized Study Map</div>'
           },
-          learning_profile: {
+          learning_profile: analysis.learning_profile || {
             dominant_learning_style: 'AI-Enhanced',
             study_recommendations: ['Personalized learning pathway', 'Memory-based connections']
           }
@@ -374,8 +483,8 @@ export class SensaAPI {
           document: {
             name: document.name,
             actual_subject: document.subject || 'Document',
-            content_type: 'uploaded_document',
-            key_topics: document.key_topics || []
+            key_topics: document.key_topics || [],
+            content_preview: document.content.substring(0, 1000) // First 1000 chars as preview
           },
           memories: memories || []
         }
@@ -384,14 +493,26 @@ export class SensaAPI {
       if (result.success && result.analysis) {
         const analysis = result.analysis;
         
+        // FIX: Map string[] to object[] if the API returns simple strings
+        const memoryConnections: MemoryConnection[] = (Array.isArray(analysis.topic_memory_connections) && typeof analysis.topic_memory_connections[0] === 'string')
+          ? (analysis.topic_memory_connections as string[]).map(desc => ({ memory_id: 'unknown', relevance_score: 0.5, connection_type: 'topic', description: desc }))
+          : (analysis.topic_memory_connections as MemoryConnection[] || []);
+
+        const personalizedInsights: PersonalizedInsight[] = (Array.isArray(analysis.content_specific_insights) && typeof analysis.content_specific_insights[0] === 'string')
+          ? (analysis.content_specific_insights as string[]).map(insight => ({ insight_type: 'content', content: insight, relevance_score: 0.5 }))
+          : (analysis.content_specific_insights as PersonalizedInsight[] || []);
+
+
         return {
           content_analysis: {
             subject: document.subject || 'Document',
-            complexity: 'AI-Analyzed',
-            key_concepts: document.key_topics || []
+            // FIX: Use 'complexity_level' as defined in the interface
+            complexity_level: analysis.content_analysis?.complexity_level || 'AI-Analyzed',
+            key_concepts: analysis.content_analysis?.key_concepts || document.key_topics || [],
+            learning_objectives: analysis.content_analysis?.learning_objectives || [],
           },
-          memory_connections: analysis.topic_memory_connections || [],
-          personalized_insights: analysis.content_specific_insights || [],
+          memory_connections: memoryConnections,
+          personalized_insights: personalizedInsights,
           study_recommendations: [
             'Focus on key topics identified in your document',
             'Connect content to your personal experiences',
@@ -411,7 +532,7 @@ export class SensaAPI {
    * Generate career pathways (legacy compatibility)
    */
   static async generateCareerPathways(
-    courseName: string, 
+    courseName: string,
     userId: string
   ): Promise<CareerPathwayResponse> {
     try {
@@ -442,6 +563,7 @@ export class SensaAPI {
         }
       });
 
+      // Return a mock/fallback as the result isn't used
       return {
         field: fieldOfStudy,
         map: [{
@@ -464,13 +586,13 @@ export class SensaAPI {
    */
   static async generateMermaidStudyMap(
     fieldOfStudy: string,
-    courseSyllabus: string[],
+    courseSyllabus: string[], // This parameter is unused but kept for compatibility
     userId: string
   ): Promise<MermaidStudyMap> {
     try {
       const result = await this.analyzeCourse(fieldOfStudy, userId);
       return result.study_map || {
-        mermaid_code: 'graph TD\n    A[Start] --> B[' + fieldOfStudy + '] --> C[Success]',
+        mermaid_code: 'graph TD\n  A[Start] --> B[' + fieldOfStudy + '] --> C[Success]',
         node_data: {},
         legend_html: '<div>Study Map</div>'
       };
@@ -482,18 +604,27 @@ export class SensaAPI {
 
   /**
    * Health check for the ADK system
+   * FIX: Updated return type to match implementation
    */
-  static async healthCheck(): Promise<{ status: string; timestamp: string; success: boolean }> {
+  static async healthCheck(): Promise<{
+    status: string;
+    timestamp: string;
+    success: boolean;
+    agents_available?: boolean;
+    response?: ADKAgentResponse;
+    error?: string;
+  }> {
     try {
       const result = await this.callADKAgents({
         agent_type: 'orchestrator',
-        payload: { action: 'health_check' }
+        payload: { health_check: true }
       });
-      
+
       return {
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        agents_available: true,
+        success: true,
+        agents_available: result.analysis?.agents_available ?? true,
         response: result
       };
     } catch (error) {
@@ -501,6 +632,7 @@ export class SensaAPI {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
+        success: false,
         agents_available: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
@@ -524,14 +656,24 @@ export class SensaAPI {
   }> {
     try {
       const result = await this.analyzeCourse(courseQuery, userId);
-      
+
+      // FIX: Map MemoryConnection[] to PersonalizedInsight[]
+      const insights: PersonalizedInsight[] = (result.memory_connections || []).map(conn => ({
+          insight_type: conn.connection_type,
+          content: conn.description || 'Connected to your memories.',
+          relevance_score: conn.relevance_score,
+          memory_connection: conn.memory_id
+      }));
+
       return {
         course_analysis: result.course_analysis,
-        learning_profile: result.learning_profile || {},
-        personalized_insights: result.memory_connections || [],
+        // FIX: Provide a default object for learning_profile if it's undefined
+        learning_profile: result.learning_profile || { memories: [] },
+        // FIX: Assign the correctly mapped insights
+        personalized_insights: insights,
         career_pathways: result.career_pathways || { pathways: [] },
         study_map: result.study_map || {
-          mermaid_code: 'graph TD\n    A[Start] --> B[Learning] --> C[Success]',
+          mermaid_code: 'graph TD\n  A[Start] --> B[Learning] --> C[Success]',
           node_data: {},
           legend_html: ''
         },
@@ -558,8 +700,15 @@ export class SensaAPI {
         agent_type: 'personalization',
         payload: data
       });
-      
-      return result.analysis || result;
+      // FIX: Ensure the returned data is actually PersonalizedInsight[]
+      if (result.success && result.analysis?.personalized_insights) {
+          return result.analysis.personalized_insights;
+      }
+      // Handle cases where data might be in another key or is the root
+      if (Array.isArray(result)) {
+          return result as PersonalizedInsight[];
+      }
+      return [];
     } catch (error) {
       console.error('Personalized insights error:', error);
       throw error;
@@ -578,11 +727,24 @@ export class SensaAPI {
   }): Promise<ContentAnalysis> {
     try {
       const result = await this.callADKAgents({
-        task: 'document_memory_analysis',
-        ...data
+        agent_type: 'orchestrator',
+        task: 'document_content_analysis',
+        payload: {
+          document: {
+            name: `${data.subject} Analysis`,
+            actual_subject: data.subject,
+            key_topics: data.topics
+          },
+          memories: data.user_memories,
+          analysis_type: data.analysis_type
+        }
       });
       
-      return result.analysis || result;
+      // FIX: Ensure the returned data is actually ContentAnalysis
+      if (result.success && result.analysis?.content_analysis) {
+        return result.analysis.content_analysis;
+      }
+      throw new Error("Could not extract content analysis from response.");
     } catch (error) {
       console.error('Document memory analysis error:', error);
       throw error;
@@ -601,8 +763,15 @@ export class SensaAPI {
   }): Promise<MermaidStudyMap> {
     try {
       const result = await this.callADKAgents({
-        task: 'personalized_mindmap_generation',
-        ...data
+        agent_type: 'orchestrator',
+        task: 'generate_ai_mind_map',
+        payload: {
+          subject: data.subject,
+          content: data.content,
+          memories: data.user_memories,
+          format: data.format,
+          style: data.style
+        }
       });
 
       return {
@@ -631,6 +800,7 @@ export class SensaAPI {
       name: string;
       description: string;
     };
+    // This type is very specific. The AI response must match it.
     pillars: Array<{
       name: string;
       thematicName: string;
@@ -663,9 +833,9 @@ export class SensaAPI {
 
       // Call ADK agents for study guide generation
       const result = await this.callADKAgents({
-        agent_type: 'study_guide',
+        agent_type: 'orchestrator',
+        task: 'study_guide_generation',
         payload: {
-          task: 'study_guide_generation',
           exam_content: data.examContent,
           subject_name: data.subjectName,
           user_memories: memories,
@@ -690,6 +860,8 @@ export class SensaAPI {
         }
 
         // Transform AI response to expected format
+        // NOTE: This assumes the 'pillars' from the AI match the required structure.
+        // A validation library like Zod would be better for production code.
         return {
           id: `guide-${Date.now()}`,
           subject: data.subjectName,
@@ -698,7 +870,7 @@ export class SensaAPI {
             name: analysis.framework?.name || 'Strategic Study Framework',
             description: analysis.framework?.description || `A comprehensive framework for mastering ${data.subjectName}.`
           },
-          pillars: analysis.pillars || [],
+          pillars: analysis.pillars || [], // This is the fragile part
           createdAt: new Date()
         };
       }
@@ -762,5 +934,6 @@ export const updateADKEndpoints = (config: {
   healthEndpoint?: string;
   useLocal?: boolean;
 }) => {
+  // This function is now effectively a no-op since the endpoint is managed internally
   console.log('ADK endpoints now use Supabase Edge Functions. Config update ignored:', config);
 };

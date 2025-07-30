@@ -4,10 +4,13 @@ const testMindMapGeneration = async () => {
   const payload = {
     task: 'generate_ai_mind_map',
     agent_type: 'orchestrator',
-    subject: 'Machine Learning',
-    content: 'Machine Learning fundamentals and applications',
+    subject: 'Artificial Intelligence and Machine Learning',
+    content: 'Comprehensive overview of AI/ML concepts, algorithms, and applications',
     memories: [],
-    payload: {}
+    payload: {
+      schema_enforcement: true,
+      advanced_prompting: true
+    }
   };
 
   try {
@@ -41,4 +44,4 @@ const testMindMapGeneration = async () => {
   }
 };
 
-testMindMapGeneration(); 
+testMindMapGeneration();
