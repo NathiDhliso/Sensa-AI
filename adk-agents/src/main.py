@@ -16,9 +16,68 @@ def get_orchestrator():
         orchestrator = OrchestratorAgent()
     return orchestrator
 
+def lambda_handler(event, context):
+    """AWS Lambda handler for Sensa ADK Agents"""
+    
+    try:
+        # Extract body from Lambda event
+        if 'body' in event:
+            if isinstance(event['body'], str):
+                body = json.loads(event['body'])
+            else:
+                body = event['body']
+        else:
+            body = event
+        
+        # Validate configuration
+        if not config.validate():
+            return {
+                'statusCode': 500,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json'
+                },
+                'body': json.dumps({
+                    'error': 'Configuration validation failed. Please check environment variables.'
+                })
+            }
+        
+        # Get orchestrator and process request
+        agent = get_orchestrator()
+        
+        # Run async function in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(agent.process(body))
+        finally:
+            loop.close()
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps(result)
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({
+                'error': str(e),
+                'type': type(e).__name__
+            })
+        }
+
 @http
 def sensa_agents_handler(request: flask.Request) -> flask.Response:
-    """Main HTTP handler for Sensa ADK Agents"""
+    """Main HTTP handler for Sensa ADK Agents (Google Cloud Functions)"""
     
     # Handle CORS preflight requests
     if request.method == 'OPTIONS':
@@ -132,4 +191,4 @@ if __name__ == '__main__':
         
     except Exception as e:
         print(f"Test failed: {str(e)}")
-        sys.exit(1) 
+        sys.exit(1)

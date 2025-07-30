@@ -9,17 +9,16 @@ This agent handles:
 """
 
 from typing import Dict, List, Any, Optional
-from ..base_agent import BaseAgent
-from ..config import get_gemini_client
+from ..base_agent import SensaBaseAgent
+from ..config import config
 import json
 import random
 
-class ScenarioGenerationAgent(BaseAgent):
+class ScenarioGenerationAgent(SensaBaseAgent):
     """Agent responsible for generating personalized scenarios based on user responses."""
     
     def __init__(self):
         super().__init__("ScenarioGenerationAgent")
-        self.gemini_client = get_gemini_client()
     
     def process_user_responses(self, questionnaire_responses: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -504,4 +503,4 @@ class ScenarioGenerationAgent(BaseAgent):
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
         from datetime import datetime
-        return datetime.now().isoformat() 
+        return datetime.now().isoformat()

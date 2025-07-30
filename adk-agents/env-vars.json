@@ -1,0 +1,9 @@
+{
+  "Variables": {
+    "GOOGLE_AI_API_KEY": "AIzaSyDqJpGqxxd-n1s1MgXFG36fbBvWf8our6Y",
+    "IDEMPOTENCY_TABLE_NAME": "mindmap-idempotency",
+    "SUPABASE_SECRET_NAME": "sensa-ai/supabase",
+    "SUPABASE_URL": "https://okvdirskoukqnjzqsowb.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rdmRpcnNrb3VrcW5qenFzb3diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1ODQxNjQsImV4cCI6MjA2NjE2MDE2NH0.k2q9Zb0mT53xrZIH5v5MN_to6knZIrjfhRWI-HDyZQo"
+  }
+}

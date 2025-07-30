@@ -7,19 +7,23 @@ This agent handles:
 3. "Know Me" questionnaire generation bridging academic content with personal experiences
 """
 
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+    
 import re
 from typing import Dict, List, Any, Optional
-from ..base_agent import BaseAgent
-from ..config import get_gemini_client
+from ..base_agent import SensaBaseAgent
+from ..config import config
 import json
 
-class KnowledgeExtractionAgent(BaseAgent):
+class KnowledgeExtractionAgent(SensaBaseAgent):
     """Agent responsible for extracting knowledge from PDFs and generating personalized questionnaires."""
     
     def __init__(self):
         super().__init__("KnowledgeExtractionAgent")
-        self.gemini_client = get_gemini_client()
     
     def extract_text_from_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -31,6 +35,9 @@ class KnowledgeExtractionAgent(BaseAgent):
         Returns:
             Dictionary containing extracted text, metadata, and structure info
         """
+        if not PYMUPDF_AVAILABLE:
+            raise ImportError("PyMuPDF is not installed. Please install it with: pip install PyMuPDF")
+            
         try:
             doc = fitz.open(pdf_path)
             
@@ -410,4 +417,4 @@ class KnowledgeExtractionAgent(BaseAgent):
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
         from datetime import datetime
-        return datetime.now().isoformat() 
+        return datetime.now().isoformat()
