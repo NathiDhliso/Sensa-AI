@@ -1,0 +1,81 @@
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "sensa-mindmap-backend"
+
+[default.build.parameters]
+use_container = true
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=dev",
+    "SupabaseUrl=https://okvdirskoukqnjzqsowb.supabase.co"
+]
+
+[default.package.parameters]
+resolve_s3 = true
+
+[default.sync.parameters]
+watch = true
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"
+
+# Development environment
+[dev]
+[dev.global.parameters]
+stack_name = "sensa-mindmap-backend-dev"
+
+[dev.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+resolve_s3 = true
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=dev",
+    "SupabaseUrl=https://okvdirskoukqnjzqsowb.supabase.co"
+]
+
+# Staging environment
+[staging]
+[staging.global.parameters]
+stack_name = "sensa-mindmap-backend-staging"
+
+[staging.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=staging",
+    "SupabaseUrl=https://okvdirskoukqnjzqsowb.supabase.co"
+]
+
+# Production environment
+[prod]
+[prod.global.parameters]
+stack_name = "sensa-mindmap-backend-prod"
+
+[prod.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=prod",
+    "SupabaseUrl=https://okvdirskoukqnjzqsowb.supabase.co"
+]
+fail_on_empty_changeset = false

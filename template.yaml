@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Sensa AI Mindmap Backend - SAM Template'
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 1024
+    Runtime: python3.9
+    Environment:
+      Variables:
+        POWERTOOLS_SERVICE_NAME: sensa-mindmap
+        POWERTOOLS_METRICS_NAMESPACE: SensaAI
+        LOG_LEVEL: INFO
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+  
+  SupabaseUrl:
+    Type: String
+    Description: Supabase project URL
+    Default: https://okvdirskoukqnjzqsowb.supabase.co
+  
+  SupabaseServiceRoleKey:
+    Type: String
+    Description: Supabase service role key
+    NoEcho: true
+  
+  GoogleAIApiKey:
+    Type: String
+    Description: Google AI API key for Gemini
+    NoEcho: true
+
+Resources:
+  # Secrets Manager for secure credential storage
+  SupabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${Environment}-sensa-supabase-credentials'
+      Description: 'Supabase credentials for Sensa AI'
+      SecretString: !Sub |
+        {
+          "url": "${SupabaseUrl}",
+          "service_role_key": "${SupabaseServiceRoleKey}"
+        }
+
+  GoogleAISecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${Environment}-sensa-google-ai-credentials'
+      Description: 'Google AI credentials for Sensa AI'
+      SecretString: !Sub |
+        {
+          "api_key": "${GoogleAIApiKey}"
+        }
+
+  # DynamoDB table for idempotency
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-sensa-mindmap-idempotency'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: sensa-mindmap
+
+  # Dead Letter Queue
+  SensaMindmapJobDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-sensa-mindmap-job-dlq'
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: sensa-mindmap
+
+  # Main SQS Queue
+  SensaMindmapJobQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-sensa-mindmap-job-queue'
+      VisibilityTimeout: 360  # 6 minutes (2x Lambda timeout)
+      MessageRetentionPeriod: 1209600  # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt SensaMindmapJobDLQ.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: sensa-mindmap
+
+  # Lambda function
+  SensaMindmapFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-sensa-mindmap-function'
+      CodeUri: adk-agents/
+      Handler: sensa_mindmap_generator.handler
+      Description: 'Sensa AI Mindmap Generation Function'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          SUPABASE_SECRET_NAME: !Ref SupabaseSecret
+          GOOGLE_AI_SECRET_NAME: !Ref GoogleAISecret
+          IDEMPOTENCY_TABLE_NAME: !Ref IdempotencyTable
+          SQS_QUEUE_URL: !Ref SensaMindmapJobQueue
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref SupabaseSecret
+                - !Ref GoogleAISecret
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt IdempotencyTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource:
+                - !GetAtt SensaMindmapJobQueue.Arn
+                - !GetAtt SensaMindmapJobDLQ.Arn
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SensaMindmapJobQueue.Arn
+            BatchSize: 1
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /sensa-mindmap-job
+            Method: post
+            RestApiId: !Ref SensaMindmapApi
+      Tags:
+        Environment: !Ref Environment
+        Service: sensa-mindmap
+
+  # API Gateway
+  SensaMindmapApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${Environment}-sensa-mindmap-api'
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST, GET, OPTIONS'"
+        AllowHeaders: "'Content-Type, X-Amz-Date, Authorization, X-Api-Key, X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'Content-Type, X-Amz-Date, Authorization, X-Api-Key, X-Amz-Security-Token'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'Content-Type, X-Amz-Date, Authorization, X-Api-Key, X-Amz-Security-Token'"
+      Tags:
+        Environment: !Ref Environment
+        Service: sensa-mindmap
+
+  # CloudWatch Log Group
+  SensaMindmapLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${Environment}-sensa-mindmap-function'
+      RetentionInDays: 14
+
+Outputs:
+  ApiGatewayEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${SensaMindmapApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${Environment}-sensa-mindmap-api-endpoint'
+  
+  SQSQueueUrl:
+    Description: 'SQS Queue URL'
+    Value: !Ref SensaMindmapJobQueue
+    Export:
+      Name: !Sub '${Environment}-sensa-mindmap-queue-url'
+  
+  LambdaFunctionArn:
+    Description: 'Lambda Function ARN'
+    Value: !GetAtt SensaMindmapFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-sensa-mindmap-function-arn'
+  
+  IdempotencyTableName:
+    Description: 'DynamoDB Idempotency Table Name'
+    Value: !Ref IdempotencyTable
+    Export:
+      Name: !Sub '${Environment}-sensa-mindmap-idempotency-table'

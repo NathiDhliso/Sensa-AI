@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Production-grade serverless infrastructure for Sensa Mindmap feature with DLQ, idempotency, and security best practices'
+
+Parameters:
+  SupabaseApiKey:
+    Type: String
+    Description: 'API Key for Supabase project'
+    NoEcho: true
+  
+  ECRImageURI:
+    Type: String
+    Description: 'ECR image URI for the Lambda function'
+    Default: '123456789012.dkr.ecr.us-east-1.amazonaws.com/sensa-mindmap:latest'
+
+  Environment:
+    Type: String
+    Description: 'Environment name (dev, staging, prod)'
+    Default: 'dev'
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+  # Dead-Letter Queue for failed message handling
+  SensaMindmapJobDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-sensa-mindmap-dlq'
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # Main SQS Queue with DLQ configuration
+  SensaMindmapJobQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Environment}-sensa-mindmap-queue'
+      VisibilityTimeout: 300  # 5 minutes (should be 6x Lambda timeout)
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt SensaMindmapJobDLQ.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # DynamoDB Table for Lambda Powertools Idempotency
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Environment}-sensa-mindmap-idempotency'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # Secrets Manager Secret for Supabase API Key
+  SupabaseApiSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${Environment}/sensa-mindmap/supabase-api-key'
+      Description: 'Stores the API Key for the Supabase project'
+      SecretString: !Ref SupabaseApiKey
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # IAM Role for Lambda Function (Least Privilege)
+  SensaMindmapGeneratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-SensaMindmapGeneratorRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SensaMindmapGeneratorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs permissions
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${Environment}-sensa-mindmap-generator*'
+              
+              # SQS permissions for main queue and DLQ
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt SensaMindmapJobQueue.Arn
+                  - !GetAtt SensaMindmapJobDLQ.Arn
+              
+              # Secrets Manager permissions
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref SupabaseApiSecret
+              
+              # DynamoDB permissions for idempotency table
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt IdempotencyTable.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # Lambda Function
+  SensaMindmapGeneratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-sensa-mindmap-generator'
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ECRImageURI
+      Role: !GetAtt SensaMindmapGeneratorRole.Arn
+      Timeout: 240  # 4 minutes
+      MemorySize: 512
+      Environment:
+        Variables:
+          IDEMPOTENCY_TABLE_NAME: !Ref IdempotencyTable
+          SECRET_ID: !Ref SupabaseApiSecret
+          ENVIRONMENT: !Ref Environment
+      Layers:
+        # AWS Parameters and Secrets Lambda Extension (us-east-1, x86_64)
+        - 'arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # Event Source Mapping for SQS to Lambda
+  SensaMindmapEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt SensaMindmapJobQueue.Arn
+      FunctionName: !Ref SensaMindmapGeneratorFunction
+      BatchSize: 5
+      MaximumBatchingWindowInSeconds: 5
+
+  # IAM Role for API Gateway to send messages to SQS
+  ApiGatewaySQSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-ApiGatewaySQSRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SQSSendMessagePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt SensaMindmapJobQueue.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: SensaMindmap
+
+  # HTTP API Gateway
+  SensaMindmapApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${Environment}-sensa-mindmap-api'
+      Description: 'HTTP API for Sensa Mindmap job submission'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+      Tags:
+        Environment: !Ref Environment
+        Service: SensaMindmap
+
+  # API Gateway Integration with SQS
+  SensaMindmapIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref SensaMindmapApi
+      IntegrationType: AWS_PROXY
+      IntegrationSubtype: SQS-SendMessage
+      CredentialsArn: !GetAtt ApiGatewaySQSRole.Arn
+      RequestParameters:
+        QueueUrl: !Ref SensaMindmapJobQueue
+        MessageBody: $request.body
+      ResponseParameters:
+        '202':
+          'application/json':
+            jobId: $integration.response.body.SendMessageResponse.SendMessageResult.MessageId
+      PayloadFormatVersion: '1.0'
+
+  # API Gateway Route
+  SensaMindmapRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SensaMindmapApi
+      RouteKey: 'POST /sensa-mindmap-job'
+      Target: !Sub 'integrations/${SensaMindmapIntegration}'
+
+  # API Gateway Stage
+  SensaMindmapStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref SensaMindmapApi
+      StageName: !Ref Environment
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      Tags:
+        Environment: !Ref Environment
+        Service: SensaMindmap
+
+Outputs:
+  ApiEndpoint:
+    Description: 'HTTP API Gateway endpoint URL'
+    Value: !Sub 'https://${SensaMindmapApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapApiEndpoint'
+
+  QueueUrl:
+    Description: 'SQS Queue URL'
+    Value: !Ref SensaMindmapJobQueue
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapQueueUrl'
+
+  DLQUrl:
+    Description: 'Dead Letter Queue URL'
+    Value: !Ref SensaMindmapJobDLQ
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapDLQUrl'
+
+  LambdaFunctionArn:
+    Description: 'Lambda Function ARN'
+    Value: !GetAtt SensaMindmapGeneratorFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapLambdaArn'
+
+  IdempotencyTableName:
+    Description: 'DynamoDB Idempotency Table Name'
+    Value: !Ref IdempotencyTable
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapIdempotencyTable'
+
+  SecretArn:
+    Description: 'Secrets Manager Secret ARN'
+    Value: !Ref SupabaseApiSecret
+    Export:
+      Name: !Sub '${Environment}-SensaMindmapSecretArn'
