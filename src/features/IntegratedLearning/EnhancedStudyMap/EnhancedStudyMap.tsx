@@ -10,14 +10,13 @@ import {
   Target,
   RefreshCw,
   Sparkles,
-  ArrowLeft,
-  Code
+  ArrowLeft
 } from 'lucide-react';
 import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 import { memoryService, SensaAPI, SensaMindmapIntegration } from '../../../services';
 import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
-import { MermaidNativeEditor, ComprehensiveMindMapEditor } from '../../MindMapEditor';
+import { ComprehensiveMindMapEditor } from '../../MindMapEditor';
 import mermaid from 'mermaid';
 import type { StudyGuide } from '../../../types';
 import { UnifiedUpload } from '../../../components';
@@ -923,10 +922,7 @@ const IntegratedLearningHub: React.FC = () => {
                       </button>
                       {workflow.visualization.studyMap && (
                         <>
-                          <button onClick={() => updateVisualization({ showMindMapEditor: true })} className={styles.secondaryButton}>
-                            <Code className={styles.buttonIcon} />
-                            Mermaid Code
-                          </button>
+
                           <button
                             onClick={() => updateVisualization({ showMindMapEditor: 'comprehensive' })}
                             className={styles.secondaryButton}
@@ -993,16 +989,7 @@ const IntegratedLearningHub: React.FC = () => {
             </motion.div>
           </AnimatePresence>
 
-          {workflow.visualization.showMindMapEditor === true && workflow.visualization.studyMap && (
-            <MermaidNativeEditor
-              initialData={workflow.visualization.studyMap}
-              onSave={(editedData) => {
-                console.log('Mermaid mind map saved:', editedData);
-                updateVisualization({ showMindMapEditor: false });
-              }}
-              onClose={() => updateVisualization({ showMindMapEditor: false })}
-            />
-          )}
+
 
           {workflow.visualization.showMindMapEditor === 'comprehensive' && workflow.visualization.studyMap && (
             <ComprehensiveMindMapEditor

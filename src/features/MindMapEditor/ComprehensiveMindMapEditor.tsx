@@ -57,11 +57,47 @@ interface MindMapEditorProps {
 }
 
 // Internal component that uses React Flow hooks
-const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ onSave, onClose }) => {
+const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ initialData, onSave, onClose }) => {
+  
+  // Process initial data
+  const processInitialData = useCallback(() => {
+    if (initialData && typeof initialData === 'object') {
+      const data = initialData as any;
+      
+      // Handle different data formats
+      if (data.nodes && Array.isArray(data.nodes)) {
+        // Direct nodes/edges format
+        return {
+          nodes: data.nodes.map((node: any) => ({
+            ...node,
+            type: 'advanced',
+            data: {
+              ...node.data,
+              shape: node.data?.shape || 'rectangle',
+              color: node.data?.color || '#6B46C1',
+              textColor: node.data?.textColor || '#FFFFFF',
+              borderColor: node.data?.borderColor || '#4C1D95',
+              fontSize: node.data?.fontSize || 14,
+              fontWeight: node.data?.fontWeight || 'normal',
+              borderWidth: node.data?.borderWidth || 2,
+              borderRadius: node.data?.borderRadius || 8
+            }
+          })),
+          edges: data.edges || []
+        };
+      } else if (data.mermaid_code) {
+        // Legacy mermaid format - return empty for now, could be enhanced later
+        return { nodes: [], edges: [] };
+      }
+    }
+    return { nodes: [], edges: [] };
+  }, [initialData]);
+
+  const { nodes: initialNodes, edges: initialEdges } = processInitialData();
   
   // Core States
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { fitView, setCenter } = useReactFlow();
   
   // History System
@@ -165,10 +201,18 @@ const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ onSa
     console.log('Add node clicked!');
     const newNode = {
       id: `node-${Date.now()}`,
-      type: 'default',
+      type: 'advanced',
       position: position || { x: Math.random() * 400 + 200, y: Math.random() * 300 + 200 },
       data: {
         label: 'New Node',
+        shape: nodeStyle.shape || 'rectangle',
+        color: nodeStyle.color || '#6B46C1',
+        textColor: nodeStyle.textColor || '#FFFFFF',
+        borderColor: nodeStyle.borderColor || '#4C1D95',
+        fontSize: nodeStyle.fontSize || 14,
+        fontWeight: nodeStyle.fontWeight || 'normal',
+        borderWidth: nodeStyle.borderWidth || 2,
+        borderRadius: nodeStyle.borderRadius || 8
       },
     };
     
@@ -180,7 +224,7 @@ const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ onSa
       return newNodes;
     });
     saveToHistory();
-  }, [setNodes, saveToHistory]);
+  }, [setNodes, saveToHistory, nodeStyle]);
   
   const deleteNode = useCallback(() => {
     if (selectedNode) {
@@ -211,6 +255,13 @@ const ComprehensiveMindMapEditorInternal: React.FC<MindMapEditorProps> = ({ onSa
   //   }
   // }, [selectedNode, nodes, setNodes, saveToHistory]);
   
+  // Node Selection
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    event.stopPropagation();
+    setSelectedNode(node.id);
+    console.log('Node selected:', node.id);
+  }, []);
+
   // Edge Operations
   const onConnect = useCallback((params: Connection) => {
     const newEdge: Edge = {
@@ -491,22 +542,30 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedNode, undo, redo, deleteNode, addNode, onSave, nodes, edges]);
   
-  // Initialize with sample data
+  // Initialize with sample data only if no initial data was provided
   useEffect(() => {
-    if (nodes.length === 0) {
-      const initialNodes = [
+    if (nodes.length === 0 && (!initialData || (initialData as any)?.nodes?.length === 0)) {
+      const sampleNodes = [
         {
           id: '1',
-          type: 'default',
+          type: 'advanced',
           position: { x: 400, y: 300 },
           data: {
-            label: 'Central Topic'
+            label: 'Central Topic',
+            shape: 'rectangle',
+            color: '#6B46C1',
+            textColor: '#FFFFFF',
+            borderColor: '#4C1D95',
+            fontSize: 14,
+            fontWeight: 'normal',
+            borderWidth: 2,
+            borderRadius: 8
           },
         },
       ];
-      setNodes(initialNodes);
+      setNodes(sampleNodes);
     }
-  }, [nodes.length, setNodes]);
+  }, [nodes.length, setNodes, initialData]);
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
@@ -647,6 +706,13 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
                 <div className="p-4">
                   <h3 className="font-semibold mb-4">Style Panel</h3>
                   
+                  {/* Selected Node Indicator */}
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      {selectedNode ? `Editing: Node ${selectedNode}` : 'Click a node to edit its style'}
+                    </p>
+                  </div>
+                  
                   {/* Node Shapes */}
                   <div className="mb-6">
                     <label className="block text-sm font-medium mb-2">Shape</label>
@@ -654,7 +720,18 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
                       {['rectangle', 'circle', 'diamond'].map((shape) => (
                         <button
                           key={shape}
-                          onClick={() => setNodeStyle(prev => ({ ...prev, shape: shape as 'rectangle' | 'circle' | 'diamond' }))}
+                          onClick={() => {
+                            setNodeStyle(prev => ({ ...prev, shape: shape as 'rectangle' | 'circle' | 'diamond' }));
+                            
+                            // Apply shape to selected node immediately
+                            if (selectedNode) {
+                              setNodes(nds => nds.map(node => 
+                                node.id === selectedNode 
+                                  ? { ...node, data: { ...node.data, shape } }
+                                  : node
+                              ));
+                            }
+                          }}
                           className={`p-3 border rounded-lg hover:bg-gray-100 ${
                             nodeStyle.shape === shape ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
                           }`}
@@ -683,7 +760,7 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
                             if (selectedNode) {
                               setNodes(nds => nds.map(node => 
                                 node.id === selectedNode 
-                                  ? { ...node, style: { ...node.style, backgroundColor: color } }
+                                  ? { ...node, data: { ...node.data, color } }
                                   : node
                               ));
                             }
@@ -713,7 +790,7 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
                         if (selectedNode) {
                           setNodes(nds => nds.map(node => 
                             node.id === selectedNode 
-                              ? { ...node, style: { ...node.style, fontSize: `${fontSize}px` } }
+                              ? { ...node, data: { ...node.data, fontSize } }
                               : node
                           ));
                         }
@@ -792,12 +869,16 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
             )}
             
             <ReactFlow
-              nodes={nodes}
+              nodes={nodes.map(node => ({
+                ...node,
+                selected: node.id === selectedNode
+              }))}
               edges={edges}
               nodeTypes={nodeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
+              onNodeClick={onNodeClick}
               connectionMode={ConnectionMode.Loose}
               fitView
               className="bg-gray-50"
@@ -940,10 +1021,14 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
 };
 
 // Main component with ReactFlowProvider wrapper
-export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = (props) => {
+export const ComprehensiveMindMapEditor: React.FC<MindMapEditorProps> = ({ initialData, onSave, onClose }) => {
   return (
     <ReactFlowProvider>
-      <ComprehensiveMindMapEditorInternal {...props} />
+      <ComprehensiveMindMapEditorInternal 
+        initialData={initialData}
+        onSave={onSave}
+        onClose={onClose}
+      />
     </ReactFlowProvider>
   );
 };

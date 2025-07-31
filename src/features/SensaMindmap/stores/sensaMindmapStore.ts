@@ -23,7 +23,9 @@ export interface SensaMindmapState {
 // Actions interface - defines all the actions that can modify state
 export interface SensaMindmapActions {
   startGeneration: (subject: string) => Promise<void>;
+  generateFromEpistemicDriver: (historyEntryId: string) => Promise<void>;
   pollForResults: (jobId: string) => Promise<void>;
+  retryPolling: () => Promise<void>;
   setMindmapData: (data: { nodes: Node[]; edges: Edge[] }) => void;
   updateJobStatus: (jobId: string, status: LoadingStatus) => void;
   setError: (error: string) => void;
@@ -77,6 +79,17 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
   // Actions
   startGeneration: async (subject: string) => {
     try {
+      // Check if user is authenticated before starting generation
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ User not authenticated for mindmap generation');
+        set({ 
+          loadingStatus: 'error', 
+          error: 'Authentication required. Please sign in to generate mindmaps.' 
+        });
+        return;
+      }
+
       // Prevent multiple simultaneous requests
       const currentStatus = get().loadingStatus;
       if (currentStatus === 'pending_jobId' || currentStatus === 'generating') {
@@ -116,6 +129,286 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
     }
   },
 
+  generateFromEpistemicDriver: async (historyEntryId: string) => {
+    try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ User not authenticated for mindmap generation');
+        set({ 
+          loadingStatus: 'error', 
+          error: 'Authentication required. Please sign in to generate mindmaps from history.' 
+        });
+        return;
+      }
+
+      // Prevent multiple simultaneous requests
+      const currentStatus = get().loadingStatus;
+      if (currentStatus === 'pending_jobId' || currentStatus === 'generating') {
+        console.warn('Generation already in progress, ignoring request');
+        return;
+      }
+
+      // Set loading state
+      set({ 
+        loadingStatus: 'generating', 
+        error: null, 
+        nodes: [], 
+        edges: [], 
+        jobId: null 
+      });
+
+      console.log('🔄 Fetching epistemic driver history entry:', historyEntryId);
+
+      // Fetch the epistemic driver history entry
+      const { data: historyEntry, error: fetchError } = await supabase
+        .from('epistemic_driver_history')
+        .select('*')
+        .eq('id', historyEntryId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError || !historyEntry) {
+        console.error('❌ Failed to fetch history entry:', fetchError);
+        set({ 
+          loadingStatus: 'error', 
+          error: 'Failed to load study map data. Please try again.' 
+        });
+        return;
+      }
+
+      console.log('📊 Processing epistemic driver data:', historyEntry.study_map_data);
+
+      // Transform epistemic driver data into mindmap format
+      const studyMapData = historyEntry.study_map_data;
+      const nodes: Node[] = [];
+      const edges: Edge[] = [];
+      let nodeIdCounter = 0;
+
+      // Create central subject node
+      const centralNodeId = `node-${nodeIdCounter++}`;
+      nodes.push({
+        id: centralNodeId,
+        data: { 
+          label: historyEntry.subject,
+          description: 'Central Subject'
+        },
+        position: { x: 600, y: 300 },
+        type: 'default',
+        style: {
+          background: '#4f46e5',
+          color: 'white',
+          border: '2px solid #312e81',
+          borderRadius: '8px',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          width: '200px',
+          height: '60px',
+          padding: '10px'
+        }
+      });
+
+      // Add epistemological drivers (foundation)
+      if (studyMapData.epistemological_drivers) {
+        const foundationNodeId = `node-${nodeIdCounter++}`;
+        nodes.push({
+          id: foundationNodeId,
+          data: { 
+            label: 'Foundation (Why)',
+            description: studyMapData.epistemological_drivers.pillar
+          },
+          position: { x: 600, y: 50 },
+          type: 'default',
+          style: {
+            background: '#059669',
+            color: 'white',
+            border: '2px solid #047857',
+            borderRadius: '8px',
+            width: '180px',
+            height: '50px',
+            padding: '8px'
+          }
+        });
+
+        edges.push({
+          id: `edge-${centralNodeId}-${foundationNodeId}`,
+          source: centralNodeId,
+          target: foundationNodeId,
+          type: 'smoothstep',
+          style: { stroke: '#059669', strokeWidth: 2 }
+        });
+
+        // Add foundation points as child nodes
+        studyMapData.epistemological_drivers.points?.forEach((point: any, index: number) => {
+          const pointNodeId = `node-${nodeIdCounter++}`;
+          const pointsCount = studyMapData.epistemological_drivers.points.length;
+          const startX = 300 - (pointsCount * 80);
+          nodes.push({
+            id: pointNodeId,
+            data: { 
+              label: point.type,
+              description: point.content
+            },
+            position: { x: startX + (index * 160), y: -80 },
+            type: 'default',
+            style: {
+              background: '#10b981',
+              color: 'white',
+              border: '1px solid #047857',
+              borderRadius: '6px',
+              fontSize: '12px',
+              width: '140px',
+              height: '40px',
+              padding: '5px'
+            }
+          });
+
+          edges.push({
+            id: `edge-${foundationNodeId}-${pointNodeId}`,
+            source: foundationNodeId,
+            target: pointNodeId,
+            type: 'smoothstep',
+            style: { stroke: '#10b981', strokeWidth: 1 }
+          });
+        });
+      }
+
+      // Add learning paths (domains)
+      if (studyMapData.learning_paths) {
+        studyMapData.learning_paths.forEach((path: any, pathIndex: number) => {
+          const domainNodeId = `node-${nodeIdCounter++}`;
+          const angle = (pathIndex * 2 * Math.PI) / studyMapData.learning_paths.length;
+          const radius = 450;
+          const x = 600 + radius * Math.cos(angle);
+          const y = 300 + radius * Math.sin(angle);
+
+          nodes.push({
+            id: domainNodeId,
+            data: { 
+              label: path.domain,
+              description: 'Learning Domain'
+            },
+            position: { x, y },
+            type: 'default',
+            style: {
+              background: '#dc2626',
+              color: 'white',
+              border: '2px solid #991b1b',
+              borderRadius: '8px',
+              width: '160px',
+              height: '50px',
+              padding: '8px'
+            }
+          });
+
+          edges.push({
+            id: `edge-${centralNodeId}-${domainNodeId}`,
+            source: centralNodeId,
+            target: domainNodeId,
+            type: 'smoothstep',
+            style: { stroke: '#dc2626', strokeWidth: 2 }
+          });
+
+          // Add methodology points (How)
+          if (path.methodology?.points) {
+            path.methodology.points.forEach((point: any, pointIndex: number) => {
+              const methodNodeId = `node-${nodeIdCounter++}`;
+              const methodCount = path.methodology.points.length;
+              const methodStartX = x - (methodCount * 60);
+              const methodX = methodStartX + (pointIndex * 120);
+              const methodY = y + 120;
+
+              nodes.push({
+                id: methodNodeId,
+                data: { 
+                  label: point.type,
+                  description: point.content
+                },
+                position: { x: methodX, y: methodY },
+                type: 'default',
+                style: {
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: '1px solid #d97706',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  width: '100px',
+                  height: '35px',
+                  padding: '4px'
+                }
+              });
+
+              edges.push({
+                id: `edge-${domainNodeId}-${methodNodeId}`,
+                source: domainNodeId,
+                target: methodNodeId,
+                type: 'smoothstep',
+                style: { stroke: '#f59e0b', strokeWidth: 1 }
+              });
+            });
+          }
+
+          // Add application points (So What)
+          if (path.application?.points) {
+            path.application.points.forEach((point: any, pointIndex: number) => {
+              const appNodeId = `node-${nodeIdCounter++}`;
+              const appCount = path.application.points.length;
+              const appStartX = x - (appCount * 60);
+              const appX = appStartX + (pointIndex * 120);
+              const appY = y - 120;
+
+              nodes.push({
+                id: appNodeId,
+                data: { 
+                  label: point.type,
+                  description: point.content
+                },
+                position: { x: appX, y: appY },
+                type: 'default',
+                style: {
+                  background: '#7c3aed',
+                  color: 'white',
+                  border: '1px solid #5b21b6',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  width: '100px',
+                  height: '35px',
+                  padding: '4px'
+                }
+              });
+
+              edges.push({
+                id: `edge-${domainNodeId}-${appNodeId}`,
+                source: domainNodeId,
+                target: appNodeId,
+                type: 'smoothstep',
+                style: { stroke: '#7c3aed', strokeWidth: 1 }
+              });
+            });
+          }
+        });
+      }
+
+      console.log('✅ Generated mindmap with', nodes.length, 'nodes and', edges.length, 'edges');
+
+      // Set the generated mindmap data
+      set({ 
+        nodes,
+        edges,
+        loadingStatus: 'success',
+        error: null,
+        jobId: `epistemic-${historyEntryId}` // Use a pseudo job ID for tracking
+      });
+      
+    } catch (error) {
+      console.error('Failed to generate mindmap from epistemic driver:', error);
+      set({ 
+        loadingStatus: 'error', 
+        error: error instanceof Error ? error.message : 'Failed to generate mindmap from study map data' 
+      });
+    }
+  },
+
   pollForResults: async (jobId: string) => {
     const maxAttempts = 30; // 30 attempts = 5 minutes with 10-second intervals
     let attempts = 0;
@@ -125,6 +418,17 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
       console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} for job ${jobId}`);
       
       try {
+        // Check if user is authenticated before making the request
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('❌ User not authenticated for polling');
+          set({ 
+            loadingStatus: 'error', 
+            error: 'Authentication required. Please sign in and try again.' 
+          });
+          return;
+        }
+
         // Query Supabase for the mindmap result using authenticated client
         const { data, error } = await supabase
           .from('mindmap_results')
@@ -134,7 +438,19 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
         
         if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
           console.error('❌ Supabase query error:', error);
-          set({ loadingStatus: 'error', error: 'Failed to check job status' });
+          
+          // Handle specific authentication errors
+          if (error.message?.includes('JWT') || error.message?.includes('not authenticated')) {
+            set({ 
+              loadingStatus: 'error', 
+              error: 'Session expired. Please sign in again and retry.' 
+            });
+          } else {
+            set({ 
+              loadingStatus: 'error', 
+              error: `Database error: ${error.message || 'Failed to check job status'}` 
+            });
+          }
           return;
         }
         
@@ -197,18 +513,41 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
           console.error('❌ Polling timeout after', maxAttempts, 'attempts');
           set({ 
             loadingStatus: 'error', 
-            error: 'Mindmap generation timed out. Please try again.' 
+            error: 'Mindmap generation timed out. The job may still be processing. Please check back later or try generating a new mindmap.' 
           });
         }
         
       } catch (error) {
         console.error('❌ Polling error:', error);
+        
+        // Handle different types of errors
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Check if it's an authentication error
+        if (errorMessage.includes('JWT') || errorMessage.includes('not authenticated') || errorMessage.includes('No API key')) {
+          set({ 
+            loadingStatus: 'error', 
+            error: 'Authentication expired. Please sign in again and retry.' 
+          });
+          return;
+        }
+        
+        // Check if it's a network error
+        if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+          console.warn(`Network error on attempt ${attempts}, retrying...`);
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 10000); // Retry on network error
+            return;
+          }
+        }
+        
+        // For other errors, retry if we haven't exceeded max attempts
         if (attempts < maxAttempts) {
           setTimeout(poll, 10000); // Retry on error
         } else {
           set({ 
             loadingStatus: 'error', 
-            error: 'Failed to check mindmap generation status' 
+            error: `Failed to check mindmap generation status: ${errorMessage}` 
           });
         }
       }
@@ -216,6 +555,27 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
     
     // Start polling
     poll();
+  },
+
+  retryPolling: async () => {
+    const currentJobId = get().jobId;
+    if (!currentJobId) {
+      console.error('❌ No job ID available for retry');
+      set({ 
+        loadingStatus: 'error', 
+        error: 'No active job to retry. Please start a new mindmap generation.' 
+      });
+      return;
+    }
+
+    console.log('🔄 Retrying polling for job:', currentJobId);
+    set({ 
+      loadingStatus: 'generating', 
+      error: null 
+    });
+    
+    // Restart polling for the current job
+    get().pollForResults(currentJobId);
   },
 
   setMindmapData: (data: { nodes: Node[]; edges: Edge[] }) => {
@@ -261,6 +621,8 @@ export const useError = () => useSensaMindmapStore(state => state.error);
 
 // Action selectors for components that only need actions
 export const useStartGeneration = () => useSensaMindmapStore(state => state.startGeneration);
+export const useGenerateFromEpistemicDriver = () => useSensaMindmapStore(state => state.generateFromEpistemicDriver);
+export const useRetryPolling = () => useSensaMindmapStore(state => state.retryPolling);
 export const useSetMindmapData = () => useSensaMindmapStore(state => state.setMindmapData);
 export const useUpdateJobStatus = () => useSensaMindmapStore(state => state.updateJobStatus);
 export const useSetError = () => useSensaMindmapStore(state => state.setError);

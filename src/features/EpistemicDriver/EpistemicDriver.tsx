@@ -11,7 +11,7 @@ import { supabaseServices, SensaMindmapIntegration } from '../../services';
 import { supabase } from '../../lib/supabase';
 import { Button, BackButton } from '../../components';
 import { HistoryManager } from './components/HistoryManager';
-import { MermaidNativeEditor, ComprehensiveMindMapEditor } from '../MindMapEditor';
+import { ComprehensiveMindMapEditor } from '../MindMapEditor';
 import { SensaMindmapEditor } from '../SensaMindmap/components/SensaMindmapEditor';
 import { useSensaMindmapStore } from '../SensaMindmap/stores/sensaMindmapStore';
 import mermaid from 'mermaid';
@@ -210,7 +210,7 @@ const EpistemicDriver: React.FC = () => {
   }, []);
 
   // AWS-powered mindmap store
-  const { startGeneration, nodes, edges, loadingStatus, error: mindmapStoreError } = useSensaMindmapStore();
+  const { startGeneration, retryPolling, nodes, edges, loadingStatus, error: mindmapStoreError } = useSensaMindmapStore();
 
   // Handler for AWS-powered Mindmap generation
   const handleGenerateMindmap = useCallback(async () => {
@@ -244,6 +244,48 @@ const EpistemicDriver: React.FC = () => {
 
   // Note: Old Mermaid-based mindmap generation functions removed
   // Now using AWS-powered SensaMindmapEditor for better performance and AI-generated content
+
+  // Export functionality for AWS mindmap
+  const handleExportMindmap = useCallback(async () => {
+    if (nodes.length === 0) {
+      console.warn('No mindmap data to export');
+      return;
+    }
+
+    try {
+      // Create export data
+      const exportData = {
+        subject: currentInput?.subject || 'Untitled Subject',
+        generated_at: new Date().toISOString(),
+        mindmap_data: {
+          nodes,
+          edges
+        },
+        metadata: {
+          total_nodes: nodes.length,
+          total_edges: edges.length,
+          export_format: 'sensa_mindmap_v1'
+        }
+      };
+
+      // Create and download JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sensa-mindmap-${currentInput?.subject?.replace(/[^a-zA-Z0-9]/g, '-') || 'export'}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('✅ Mindmap exported successfully');
+    } catch (error) {
+      console.error('❌ Failed to export mindmap:', error);
+    }
+  }, [nodes, edges, currentInput]);
 
   // Helper function to get user-friendly loading messages
   const getMindmapStatusMessage = (): string => {
@@ -291,6 +333,11 @@ const EpistemicDriver: React.FC = () => {
             onSaveSuccess={() => {
               // Optional: Show a success message or refresh history
               console.log('Study map saved successfully!');
+            }}
+            onMindmapGenerated={() => {
+              // Open the mindmap modal when a mindmap is generated from history
+              console.log('🎯 Opening mindmap modal for history-generated mindmap');
+              setShowMindmapModal(true);
             }}
           />
         </motion.div>
@@ -430,7 +477,7 @@ const EpistemicDriver: React.FC = () => {
 
         {/* Mindmap Error State */}
         <AnimatePresence>
-          {mindmapError && !mindmapLoading && (
+          {(mindmapError || mindmapStoreError) && !mindmapLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -438,15 +485,52 @@ const EpistemicDriver: React.FC = () => {
               className={styles.errorContainer}
             >
               <h3 className={styles.errorTitle}>Mindmap Generation Failed</h3>
-              <p className={styles.errorMessage}>{mindmapError}</p>
-              <button 
-                onClick={() => {
-                  setMindmapError(null);
-                }} 
-                className={styles.retryButton}
-              >
-                Try Again
-              </button>
+              <p className={styles.errorMessage}>{mindmapError || mindmapStoreError}</p>
+              <div className={styles.errorActions}>
+                {(mindmapError || mindmapStoreError)?.includes('Authentication') || (mindmapError || mindmapStoreError)?.includes('sign in') ? (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setMindmapError(null);
+                        retryPolling();
+                      }} 
+                      className={styles.retryButton}
+                    >
+                      Retry Polling
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setMindmapError(null);
+                        handleGenerateMindmap();
+                      }} 
+                      className={`${styles.retryButton} ${styles.primaryButton}`}
+                    >
+                      Start New Generation
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setMindmapError(null);
+                        retryPolling();
+                      }} 
+                      className={styles.retryButton}
+                    >
+                      Retry Polling
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setMindmapError(null);
+                        handleGenerateMindmap();
+                      }} 
+                      className={`${styles.retryButton} ${styles.primaryButton}`}
+                    >
+                      Generate New
+                    </button>
+                  </>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -649,13 +733,7 @@ const EpistemicDriver: React.FC = () => {
                 <div className={styles.modalHeader}>
                   <h2 className={styles.modalTitle}>AWS-Powered Sensa Mindmap</h2>
                   <div className={styles.modalActions}>
-                    <Button
-                      onClick={() => setShowMindMapEditor(true)}
-                      variant="outline"
-                      className={styles.modalActionButton}
-                    >
-                      Edit Code
-                    </Button>
+
                     <Button
                       onClick={() => setShowMindMapEditor('comprehensive')}
                       variant="outline"
@@ -684,13 +762,43 @@ const EpistemicDriver: React.FC = () => {
                     ) : mindmapStoreError ? (
                       <div className={styles.errorContainer}>
                         <p className={styles.errorText}>Error: {mindmapStoreError}</p>
-                        <Button
-                          onClick={() => handleGenerateMindmap()}
-                          variant="outline"
-                          className={styles.retryButton}
-                        >
-                          Retry
-                        </Button>
+                        <div className={styles.errorActions}>
+                          {mindmapStoreError.includes('Authentication') || mindmapStoreError.includes('sign in') ? (
+                            <>
+                              <Button
+                                onClick={() => retryPolling()}
+                                variant="outline"
+                                className={styles.retryButton}
+                              >
+                                Retry Polling
+                              </Button>
+                              <Button
+                                onClick={() => handleGenerateMindmap()}
+                                variant="primary"
+                                className={styles.retryButton}
+                              >
+                                Start New Generation
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                onClick={() => retryPolling()}
+                                variant="outline"
+                                className={styles.retryButton}
+                              >
+                                Retry Polling
+                              </Button>
+                              <Button
+                                onClick={() => handleGenerateMindmap()}
+                                variant="primary"
+                                className={styles.retryButton}
+                              >
+                                Generate New
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ) : nodes.length > 0 ? (
                       <SensaMindmapEditor
@@ -716,10 +824,7 @@ const EpistemicDriver: React.FC = () => {
                     Close
                   </Button>
                   <Button
-                    onClick={() => {
-                      // Future: Add export functionality for AWS mindmap
-                      console.log('Export AWS mindmap functionality to be implemented');
-                    }}
+                    onClick={handleExportMindmap}
                     variant="primary"
                     className={styles.modalButton}
                     disabled={nodes.length === 0}
@@ -733,20 +838,10 @@ const EpistemicDriver: React.FC = () => {
         </AnimatePresence>
 
         {/* Mindmap Editors */}
-        {showMindMapEditor === true && mindmapData && (
-          <MermaidNativeEditor
-            initialData={mindmapData}
-            onSave={(editedData) => {
-              console.log('Mermaid mind map saved:', editedData);
-              setShowMindMapEditor(false);
-            }}
-            onClose={() => setShowMindMapEditor(false)}
-          />
-        )}
 
-        {showMindMapEditor === 'comprehensive' && mindmapData && (
+        {showMindMapEditor === 'comprehensive' && (nodes.length > 0 || mindmapData) && (
           <ComprehensiveMindMapEditor
-            initialData={mindmapData}
+            initialData={mindmapData || { nodes, edges }}
             onSave={(editedData) => {
               console.log('Comprehensive mind map saved:', editedData);
               setShowMindMapEditor(false);

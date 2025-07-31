@@ -284,6 +284,7 @@ export interface HistoryManagerProps {
   currentInput: EpistemicDriverInput | null;
   onLoadFromHistory: (entry: EpistemicDriverHistoryEntry) => void;
   onSaveSuccess?: () => void;
+  onMindmapGenerated?: () => void;
 }
 
 /**

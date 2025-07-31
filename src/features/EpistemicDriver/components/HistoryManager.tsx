@@ -9,8 +9,11 @@ import {
   FileText, 
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  Map,
+  Play
 } from 'lucide-react';
+import { useGenerateFromEpistemicDriver } from '../../SensaMindmap/stores/sensaMindmapStore';
 import { epistemicDriverHistoryService } from '../../../services/supabaseServices';
 import type { 
   HistoryManagerProps, 
@@ -33,7 +36,8 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
   currentData,
   currentInput,
   onLoadFromHistory,
-  onSaveSuccess
+  onSaveSuccess,
+  onMindmapGenerated
 }) => {
   const [saveModal, setSaveModal] = useState<SaveModalState>({
     isOpen: false,
@@ -48,6 +52,10 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [historyEntries, setHistoryEntries] = useState<EpistemicDriverHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [generatingMindmapId, setGeneratingMindmapId] = useState<string | null>(null);
+
+  // Get the mindmap generation function from the store
+  const generateFromEpistemicDriver = useGenerateFromEpistemicDriver();
 
   const openSaveModal = useCallback(() => {
     if (!currentData || !currentInput) return;
@@ -122,9 +130,35 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
   }, []);
 
   const handleLoadFromHistory = useCallback((entry: EpistemicDriverHistoryEntry) => {
+    console.log('🔄 Load button clicked for entry:', entry.id);
     onLoadFromHistory(entry);
     setShowHistory(false);
   }, [onLoadFromHistory]);
+
+  const handleGenerateMindmap = useCallback(async (entry: EpistemicDriverHistoryEntry, event: React.MouseEvent) => {
+    console.log('🗺️ Mindmap button clicked for entry:', entry.id);
+    event.stopPropagation(); // Prevent triggering the load action
+    
+    try {
+      setGeneratingMindmapId(entry.id);
+      console.log('🎯 Generating mindmap from epistemic driver history:', entry.id);
+      
+      await generateFromEpistemicDriver(entry.id);
+      
+      console.log('✅ Mindmap generation completed for entry:', entry.id);
+      
+      // Notify parent component to open the mindmap modal
+      onMindmapGenerated?.();
+      
+      // Close the history modal since we're opening the mindmap modal
+      setShowHistory(false);
+      
+    } catch (error) {
+      console.error('❌ Failed to generate mindmap from history:', error);
+    } finally {
+      setGeneratingMindmapId(null);
+    }
+  }, [generateFromEpistemicDriver]);
 
   const canSave = currentData && currentInput;
 
@@ -336,29 +370,66 @@ export const HistoryManager: React.FC<HistoryManagerProps> = ({
                       <div
                         key={entry.id}
                         className={styles.historyItem}
-                        onClick={() => handleLoadFromHistory(entry)}
                       >
-                        <div className={styles.historyItemHeader}>
-                          <h4 className={styles.historyItemTitle}>
-                            {entry.is_favorite && (
-                              <Star className="w-4 h-4 text-yellow-500 fill-current mr-2" />
-                            )}
-                            {entry.title}
-                          </h4>
-                          <span className={styles.historyItemDate}>
-                            {new Date(entry.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className={styles.historyItemSubject}>{entry.subject}</p>
-                        {entry.tags.length > 0 && (
-                          <div className={styles.historyItemTags}>
-                            {entry.tags.map((tag) => (
-                              <span key={tag} className={styles.tag}>
-                                {tag}
-                              </span>
-                            ))}
+                        <div 
+                          className={styles.historyItemContent}
+                          onClick={() => handleLoadFromHistory(entry)}
+                        >
+                          <div className={styles.historyItemHeader}>
+                            <h4 className={styles.historyItemTitle}>
+                              {entry.is_favorite && (
+                                <Star className="w-4 h-4 text-yellow-500 fill-current mr-2" />
+                              )}
+                              {entry.title}
+                            </h4>
+                            <span className={styles.historyItemDate}>
+                              {new Date(entry.created_at).toLocaleDateString()}
+                            </span>
                           </div>
-                        )}
+                          <p className={styles.historyItemSubject}>{entry.subject}</p>
+                          {entry.tags.length > 0 && (
+                            <div className={styles.historyItemTags}>
+                              {entry.tags.map((tag) => (
+                                <span key={tag} className={styles.tag}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className={styles.historyItemActions}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLoadFromHistory(entry);
+                            }}
+                            className={`${styles.historyActionButton} ${styles.loadButton}`}
+                            title="Load this study map"
+                          >
+                            <Play className="w-4 h-4" />
+                            Load
+                          </button>
+                          
+                          <button
+                            onClick={(e) => handleGenerateMindmap(entry, e)}
+                            disabled={generatingMindmapId === entry.id}
+                            className={`${styles.historyActionButton} ${styles.mindmapButton}`}
+                            title="Generate mindmap from this study map"
+                          >
+                            {generatingMindmapId === entry.id ? (
+                              <>
+                                <div className={styles.spinner} />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Map className="w-4 h-4" />
+                                Mindmap
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

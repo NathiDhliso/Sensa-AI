@@ -969,15 +969,73 @@
   padding: 1rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
-  cursor: pointer;
   transition: all 0.2s ease;
   background: white;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
 .historyItem:hover {
   border-color: #3b82f6;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
   transform: translateY(-1px);
+}
+
+.historyItemContent {
+  flex: 1;
+  cursor: pointer;
+}
+
+.historyItemActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.historyActionButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid;
+  cursor: pointer;
+  min-width: 100px;
+  justify-content: center;
+}
+
+.historyActionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loadButton {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.loadButton:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.mindmapButton {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: #059669;
+  color: white;
+}
+
+.mindmapButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .historyItemHeader {
@@ -1120,6 +1178,8 @@
   padding: 0;
   overflow: hidden;
   position: relative;
+  height: 600px;
+  min-height: 500px;
 }
 
 .mindmapEditor {
@@ -1175,13 +1235,23 @@
 }
 
 /* AWS-Powered Sensa Mindmap Editor Styles */
+.visualizationContent {
+  width: 100%;
+  height: 600px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
 .sensaMindmapEditor {
   width: 100%;
-  height: 500px;
+  height: 100%;
+  min-height: 500px;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background: #ffffff;
   overflow: hidden;
+  flex: 1;
 }
 
 .errorContainer {

@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -11,6 +11,12 @@ import {
   NodeTypes,
   EdgeTypes,
   ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  EdgeChange,
+  NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -127,27 +133,37 @@ export interface SensaMindmapEditorProps {
   ariaLabel?: string;
 }
 
-// Main Editor Component - Pure presentation component
+// Main Editor Component - Interactive mindmap editor
 const SensaMindmapEditorInternal = memo<SensaMindmapEditorProps>(({ 
   nodes, 
   edges, 
   className = '',
   ariaLabel = 'Interactive mind map visualization'
 }) => {
-  // Memoize the processed nodes and edges to prevent unnecessary re-renders
-  const processedNodes = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      type: node.type || 'mindmapNode',
-    }));
-  }, [nodes]);
+  // Initialize React Flow state with provided nodes and edges
+  const [flowNodes, setNodes, onNodesChange] = useNodesState(
+    useMemo(() => {
+      return nodes.map(node => ({
+        ...node,
+        type: node.type || 'mindmapNode',
+      }));
+    }, [nodes])
+  );
 
-  const processedEdges = useMemo(() => {
-    return edges.map(edge => ({
-      ...edge,
-      type: edge.type || 'mindmapEdge',
-    }));
-  }, [edges]);
+  const [flowEdges, setEdges, onEdgesChange] = useEdgesState(
+    useMemo(() => {
+      return edges.map(edge => ({
+        ...edge,
+        type: edge.type || 'mindmapEdge',
+      }));
+    }, [edges])
+  );
+
+  // Handle new connections between nodes
+  const onConnect = useCallback(
+    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
   // Accessibility configuration
   const ariaLabelConfig = useMemo(() => ({
@@ -163,16 +179,24 @@ const SensaMindmapEditorInternal = memo<SensaMindmapEditorProps>(({
       style={{ width: '100%', height: '100%' }}
     >
       <ReactFlow
-        nodes={processedNodes}
-        edges={processedEdges}
+        nodes={flowNodes}
+        edges={flowEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         // Accessibility props
         nodesFocusable={true}
         edgesFocusable={true}
+        // Interactive props
+        nodesDraggable={true}
+        nodesConnectable={true}
+        elementsSelectable={true}
+        selectNodesOnDrag={true}
         // Performance props
         onlyRenderVisibleElements={true}
-        // Interaction props
+        // Layout props
         fitView
         fitViewOptions={{
           padding: 0.2,
