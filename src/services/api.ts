@@ -195,7 +195,12 @@ export class SensaAPI {
         payload: {
           memory_content: memoryContent,
           category: category
-        }
+        },
+        memories: [{
+          id: 'temp-' + Date.now(),
+          category: category,
+          text_content: memoryContent
+        }]
       });
 
       // For now, return a structured response based on the enhanced mock data

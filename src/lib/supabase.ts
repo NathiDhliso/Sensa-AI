@@ -262,6 +262,41 @@ export interface Database {
           updated_at?: string
         }
       }
+      mindmap_results: {
+        Row: {
+          id: string
+          job_id: string
+          user_id: string | null
+          subject: string
+          status: 'queued' | 'processing' | 'completed' | 'failed'
+          result_data: Record<string, unknown> | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          user_id?: string | null
+          subject: string
+          status: 'queued' | 'processing' | 'completed' | 'failed'
+          result_data?: Record<string, unknown> | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          user_id?: string | null
+          subject?: string
+          status?: 'queued' | 'processing' | 'completed' | 'failed'
+          result_data?: Record<string, unknown> | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

@@ -1173,3 +1173,114 @@
     width: 100%;
   }
 }
+
+/* AWS-Powered Sensa Mindmap Editor Styles */
+.sensaMindmapEditor {
+  width: 100%;
+  height: 500px;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  min-height: 300px;
+}
+
+.errorText {
+  color: #dc2626;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.retryButton {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #dc2626;
+  background: white;
+  color: #dc2626;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background: #dc2626;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+  min-height: 300px;
+  color: #6b7280;
+}
+
+.emptyIcon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: 1rem;
+  color: #6b7280;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .sensaMindmapEditor {
+    height: 400px;
+  }
+  
+  .errorContainer,
+  .emptyState {
+    padding: 1.5rem 1rem;
+    min-height: 250px;
+  }
+  
+  .emptyIcon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  
+  .emptyText {
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sensaMindmapEditor {
+    height: 350px;
+  }
+  
+  .errorContainer,
+  .emptyState {
+    padding: 1rem;
+    min-height: 200px;
+  }
+  
+  .emptyIcon {
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  .emptyText {
+    font-size: 0.8125rem;
+  }
+}

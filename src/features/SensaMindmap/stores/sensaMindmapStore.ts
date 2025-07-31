@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Node, Edge } from '@xyflow/react';
+import { supabase } from '../../../lib/supabase';
 
 // Type definitions for granular loading states
 export type LoadingStatus = 
@@ -124,9 +125,7 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
       console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} for job ${jobId}`);
       
       try {
-         // Query Supabase for the mindmap result using existing client
-         const { supabase } = await import('../../../lib/supabase');
-        
+        // Query Supabase for the mindmap result using authenticated client
         const { data, error } = await supabase
           .from('mindmap_results')
           .select('*')

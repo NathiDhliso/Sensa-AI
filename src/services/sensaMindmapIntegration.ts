@@ -220,29 +220,48 @@ export class SensaMindmapIntegration {
     result: ADKAgentResponse, 
     metadata: Record<string, any> = {}
   ): MermaidStudyMap {
+    console.log('🔍 [transformToMindmapData] Input result:', result);
+    console.log('🔍 [transformToMindmapData] Input metadata:', metadata);
+    
     // Safely access nested data from the API response.
     const data = result.data || result;
+    console.log('🔍 [transformToMindmapData] Extracted data:', data);
+    
     const studyMap = data.study_map || data.mindmap || data;
+    console.log('🔍 [transformToMindmapData] Study map:', studyMap);
     
     // Check if we have the new JSON schema-enforced structure
     if (studyMap.nodes && studyMap.edges && Array.isArray(studyMap.nodes) && Array.isArray(studyMap.edges)) {
+      console.log('✅ [transformToMindmapData] Using nodes/edges structure');
+      console.log('🔍 [transformToMindmapData] Nodes:', studyMap.nodes);
+      console.log('🔍 [transformToMindmapData] Edges:', studyMap.edges);
+      
       // Convert nodes/edges structure to Mermaid mindmap format
       const mermaidCode = this.convertNodesToMermaidMindmap(studyMap.nodes, studyMap.edges, metadata);
       const nodeData = this.convertNodesToNodeData(studyMap.nodes);
       
-      return {
+      const result = {
         mermaid_code: mermaidCode,
         node_data: nodeData,
         legend_html: studyMap.legend_html || this.generateLegendFromNodes(studyMap.nodes)
       };
+      
+      console.log('✅ [transformToMindmapData] Final result (nodes/edges):', result);
+      return result;
     }
     
+    console.log('⚠️ [transformToMindmapData] Using fallback to legacy format');
+    console.log('🔍 [transformToMindmapData] studyMap.mermaid_code:', studyMap.mermaid_code);
+    
     // Fallback to legacy format
-    return {
+    const fallbackResult = {
       mermaid_code: studyMap.mermaid_code || `mindmap\n  root((${metadata.sourceType || 'Error'}))\n    Invalid data received`,
       node_data: studyMap.node_data || {},
       legend_html: studyMap.legend_html || '<p>Generated study map</p>'
     };
+    
+    console.log('✅ [transformToMindmapData] Final result (fallback):', fallbackResult);
+    return fallbackResult;
   }
 
   /**
