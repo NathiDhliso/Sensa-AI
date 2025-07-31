@@ -54,11 +54,14 @@ export const GraphvizViewer: React.FC<GraphvizViewerProps> = ({
       setError('');
 
       try {
+        console.log('Rendering DOT code:', dotCode);
         const svg = graphviz.dot(dotCode);
+        console.log('Generated SVG length:', svg.length);
         setSvgContent(svg);
       } catch (err) {
         console.error('Graphviz rendering error:', err);
-        setError('Failed to render diagram. Please check the Graphviz code syntax.');
+        console.error('DOT code that failed:', dotCode);
+        setError(`Failed to render diagram: ${err.message || 'Please check the Graphviz code syntax.'}`);
       } finally {
         setIsLoading(false);
       }
@@ -144,7 +147,7 @@ export const GraphvizViewer: React.FC<GraphvizViewerProps> = ({
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className={`${pageTheme.background} rounded-2xl shadow-2xl max-w-6xl max-h-[90vh] w-full flex flex-col`}
+          className={`${pageTheme.background} rounded-2xl shadow-2xl max-w-[95vw] max-h-[95vh] w-full flex flex-col`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -241,12 +244,12 @@ export const GraphvizViewer: React.FC<GraphvizViewerProps> = ({
             {svgContent && !isLoading && !error && (
               <div 
                 ref={svgRef}
-                className="flex justify-center items-center min-h-[400px]"
-                style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+                className="flex justify-center items-start min-h-[400px] overflow-auto"
+                style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
               >
                 <div 
                   dangerouslySetInnerHTML={{ __html: svgContent }}
-                  className="max-w-full max-h-full"
+                  className="w-auto h-auto"
                 />
               </div>
             )}

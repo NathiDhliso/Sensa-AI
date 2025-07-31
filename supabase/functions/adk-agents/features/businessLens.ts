@@ -29,6 +29,11 @@ export async function generateBusinessLensWorkflow(request: ADKRequest): Promise
 
 Your task is to analyze the provided study guide and create a comprehensive business project workflow for ${company_name}, a ${company_type}.
 
+IMPORTANT: When identifying business problems, ensure your solution directly addresses that specific problem. For example:
+- If the problem is customer churn, the solution should focus on churn analysis, prediction, and retention strategies
+- If the problem is operational inefficiency, the solution should focus on process optimization and automation
+- If the problem is data silos, the solution should focus on data integration and unified analytics
+
 Study Guide Content:
 ${study_guide_text}
 
@@ -73,8 +78,11 @@ Requirements:
 5. Generate valid Graphviz DOT code with proper syntax
 6. Ensure the narrative flows naturally and mentions specific tools
 7. Make the scenario challenging but achievable
+8. **CRITICAL**: The solution MUST directly address the specific problem identified in the business challenge
+9. **CRITICAL**: Ensure the tools and workflow phases are specifically chosen to solve the exact problem described
+10. **CRITICAL**: The solution should not be generic - it must be tailored to resolve the particular business challenge
 
-Focus on practical business value and real-world implementation.`;
+Focus on practical business value and real-world implementation. The solution must be a direct, logical response to the problem - not a general technology implementation.`;
 
     logWithContext('info', '🤖 Calling Gemini for Business Lens generation');
     
