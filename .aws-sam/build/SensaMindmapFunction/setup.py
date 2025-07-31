@@ -13,5 +13,5 @@ setup(
         "python-dotenv>=1.0.0",
         "functions-framework>=3.0.0"
     ],
-    python_requires=">=3.9",
-) 
+    python_requires=">=3.12",
+)

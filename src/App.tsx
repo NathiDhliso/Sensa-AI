@@ -18,6 +18,7 @@ import { NotificationSystem } from './features/NotificationSystem';
 import { PrimeMePage } from './features/PrimeMe';
 import { StudyGuideGenerator } from './features/StudyGuide';
 import { EpistemicDriver } from './features/EpistemicDriver';
+import { BusinessLens } from './features/BusinessLens';
 
 function App() {
   return (
@@ -84,6 +85,11 @@ function App() {
             <Route path="/epistemic-driver" element={
               <ProtectedRoute>
                 <EpistemicDriver />
+              </ProtectedRoute>
+            } />
+            <Route path="/business-lens" element={
+              <ProtectedRoute>
+                <BusinessLens />
               </ProtectedRoute>
             } />
           {/* Legacy routes redirecting to integrated learning hub */}

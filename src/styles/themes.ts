@@ -337,6 +337,20 @@ export const pageThemes = {
       wisdom: sensaBrandColors.gradients.wisdom.css,
       growth: sensaBrandColors.gradients.growth.css,
     }
+  },
+
+  // Business Lens
+  businessLens: {
+    background: 'bg-gradient-to-br from-orange-50 via-white to-red-50',
+    card: 'bg-white/90 backdrop-blur-sm border-orange-200/50',
+    accent: 'text-orange-600',
+    button: 'bg-gradient-to-r from-orange-500 to-red-500',
+    gradients: {
+      memoryToLearning: sensaBrandColors.gradients.memoryToLearning.css,
+      transformation: sensaBrandColors.gradients.transformation.css,
+      wisdom: sensaBrandColors.gradients.wisdom.css,
+      growth: sensaBrandColors.gradients.growth.css,
+    }
   }
 };
 
@@ -464,4 +478,4 @@ export const animations = {
   hoverGlow: 'hover:shadow-xl transition-shadow duration-300',
 };
 
-export default sensaTheme; 
+export default sensaTheme;

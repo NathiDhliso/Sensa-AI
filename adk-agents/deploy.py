@@ -59,7 +59,7 @@ def deploy_to_cloud_functions():
     # Deploy main agent handler
     deploy_cmd = """
     gcloud functions deploy sensa-agents \
-        --runtime python39 \
+        --runtime python312 \
         --trigger-http \
         --allow-unauthenticated \
         --source . \
@@ -75,7 +75,7 @@ def deploy_to_cloud_functions():
     # Deploy health check function
     health_deploy_cmd = """
     gcloud functions deploy sensa-agents-health \
-        --runtime python39 \
+        --runtime python312 \
         --trigger-http \
         --allow-unauthenticated \
         --source . \
@@ -132,4 +132,4 @@ def main():
     print("🎉 Deployment completed successfully!")
 
 if __name__ == "__main__":
-    main() 
+    main()

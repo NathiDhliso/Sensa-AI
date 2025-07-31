@@ -151,6 +151,18 @@ const pageThemes = {
       wisdom: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
       growth: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
     }
+  },
+  businessLens: {
+    background: 'bg-gradient-to-br from-orange-50 via-white to-red-50',
+    card: 'bg-white/90 backdrop-blur-sm border-orange-200/50',
+    accent: 'text-orange-600',
+    button: 'bg-gradient-to-r from-orange-500 to-red-500',
+    gradients: {
+      memoryToLearning: 'linear-gradient(135deg, #6B46C1 0%, #F97316 100%)',
+      transformation: 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)',
+      wisdom: 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 50%, #EC4899 100%)',
+      growth: 'linear-gradient(135deg, #F59E0B 0%, #10B981 100%)'
+    }
   }
 };
 

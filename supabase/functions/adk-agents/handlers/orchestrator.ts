@@ -29,6 +29,7 @@ import {
 import { generatePrimeMeNarrative } from '../features/primeMe.ts';
 import { generateStudyGuide } from '../features/studyGuideGenerator.ts';
 import { generateEpistemicDriver } from '../features/epistemicDriver.ts';
+import { generateBusinessLensWorkflow } from '../features/businessLens.ts';
 
 /**
  * Create task handler mapping for clean routing
@@ -49,6 +50,7 @@ function createTaskHandlerMap(): TaskHandlerMap {
     [Task.PrimeMeNarrative, generatePrimeMeNarrative],
     [Task.StudyGuideGeneration, generateStudyGuide],
     [Task.EpistemicDriverGeneration, generateEpistemicDriver],
+    [Task.BusinessLensWorkflow, generateBusinessLensWorkflow],
   ]);
 }
 
@@ -197,4 +199,4 @@ export function getTaskHandlerInfo(): Record<string, string> {
   });
   
   return info;
-} 
+}

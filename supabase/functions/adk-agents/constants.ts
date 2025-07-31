@@ -44,6 +44,7 @@ export enum Task {
   PrimeMeNarrative = 'prime_me_narrative',
   StudyGuideGeneration = 'study_guide_generation',
   EpistemicDriverGeneration = 'epistemic_driver_generation',
+  BusinessLensWorkflow = 'business_lens_workflow',
 }
 
 // Agent types
@@ -101,4 +102,4 @@ export const KNOW_ME = {
     'agreeableness',
     'neuroticism'
   ],
-} as const; 
+} as const;

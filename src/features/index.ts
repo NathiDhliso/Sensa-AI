@@ -24,3 +24,6 @@ export * from './Dialogue';
 // System features
 export * from './Onboarding';
 export * from './Privacy';
+
+// Business features
+export * from './BusinessLens';

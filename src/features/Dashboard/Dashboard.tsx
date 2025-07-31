@@ -19,7 +19,8 @@ import {
   Target,
   BookOpen,
   Award,
-  Zap
+  Zap,
+  Building2
 } from 'lucide-react';
 import { usePageTheme, useThemeClasses } from '../../contexts/themeUtils';
 import { useMemoryStore, useCourseStore, useUIStore } from '../../stores';
@@ -640,6 +641,24 @@ const Dashboard: React.FC = () => {
                   </h3>
                   <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
                     <ArrowRight className="text-blue-600 w-4 h-4" />
+                  </div>
+                </motion.button>
+
+                {/* Business Lens Button */}
+                <motion.button
+                  className="group relative bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 border-2 border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate('/business-lens')}
+                >
+                  <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
+                    <Building2 className="text-white w-6 h-6" />
+                  </div>
+                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
+                    Business Lens
+                  </h3>
+                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    <ArrowRight className="text-orange-600 w-4 h-4" />
                   </div>
                 </motion.button>
               </div>

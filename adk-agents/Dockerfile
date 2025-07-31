@@ -19,7 +19,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Stage 2: Final runtime image
-FROM public.ecr.aws/lambda/python:3.9
+FROM public.ecr.aws/lambda/python:3.12
 
 # Copy Graphviz binaries and libraries from builder stage
 COPY --from=builder /usr/bin/dot /usr/bin/
@@ -38,7 +38,7 @@ COPY --from=builder /usr/lib64/libpathplan.so* /usr/lib64/
 COPY --from=builder /usr/lib64/libexpat.so* /usr/lib64/
 
 # Copy Python packages from builder's virtual environment
-COPY --from=builder /opt/venv/lib/python3.9/site-packages/ ${LAMBDA_RUNTIME_DIR}/
+COPY --from=builder /opt/venv/lib/python3.12/site-packages/ ${LAMBDA_RUNTIME_DIR}/
 
 # Copy application source code
 COPY src/ ${LAMBDA_TASK_ROOT}/src/

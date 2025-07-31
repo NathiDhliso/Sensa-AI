@@ -791,6 +791,78 @@ export class SensaAPI {
   }
 
   /**
+   * Generate Business Lens workflow using AI
+   */
+  static async generateBusinessWorkflow(data: {
+    companyName: string;
+    companyType: string;
+    studyGuideText: string;
+    userId?: string;
+  }): Promise<{
+    extractedTools: Array<{
+      name: string;
+      category: string;
+      description: string;
+    }>;
+    scenario: {
+      start: {
+        title: string;
+        description: string;
+      };
+      goal: {
+        title: string;
+        description: string;
+      };
+    };
+    workflow: {
+      phases: Array<{
+        id: string;
+        title: string;
+        description: string;
+        tools: string[];
+      }>;
+      narrative: string;
+    };
+    graphvizCode: string;
+  }> {
+    try {
+      const result = await this.callADKAgents({
+        agent_type: 'orchestrator',
+        task: 'business_lens_workflow',
+        payload: {
+          company_name: data.companyName,
+          company_type: data.companyType,
+          study_guide_text: data.studyGuideText,
+          user_id: data.userId
+        }
+      });
+
+      // Check for data in both result.data and result.analysis for compatibility
+      const responseData = result.data || result.analysis;
+      
+      if (result.success && responseData) {
+        return {
+          extractedTools: responseData.extracted_tools || [],
+          scenario: responseData.scenario || {
+            start: { title: 'Business Challenge', description: 'Define the challenge' },
+            goal: { title: 'Solution Goal', description: 'Achieve the solution' }
+          },
+          workflow: responseData.workflow || {
+            phases: [],
+            narrative: 'Workflow narrative will be generated'
+          },
+          graphvizCode: responseData.graphviz_code || 'digraph G { A -> B; }'
+        };
+      }
+
+      throw new Error('Invalid response from AI service');
+    } catch (error) {
+      console.error('Business workflow generation error:', error);
+      throw new Error(`Failed to generate business workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Generate AI-powered study guide from exam content
    */
   static async generateStudyGuide(data: {

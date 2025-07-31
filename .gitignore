@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Build directories
+build/
+.aws-sam/build/
+.aws-sam/cache/
+.aws-sam/deps/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,10 +28,76 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# AWS SAM
+samconfig.toml
+sam-outputs-*.json
+.aws-sam/
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+supabase/config.toml.backup
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
 
 # Local deployment scripts
 deploy.ps1
 
 # Service account keys
 gcp-credentials.json
+aws-credentials.json
+*.pem
+*.key
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Package files
+*.tgz
+*.tar.gz
