@@ -22,9 +22,10 @@ export interface SensaMindmapState {
 // Actions interface - defines all the actions that can modify state
 export interface SensaMindmapActions {
   startGeneration: (subject: string) => Promise<void>;
+  pollForResults: (jobId: string) => Promise<void>;
   setMindmapData: (data: { nodes: Node[]; edges: Edge[] }) => void;
-  updateJobStatus: (status: LoadingStatus) => void;
-  setError: (message: string) => void;
+  updateJobStatus: (jobId: string, status: LoadingStatus) => void;
+  setError: (error: string) => void;
   reset: () => void;
   forceReset: () => void;
 }
@@ -112,6 +113,110 @@ export const useSensaMindmapStore = create<SensaMindmapStore>((set, get) => ({
         error: error instanceof Error ? error.message : 'Unknown error occurred' 
       });
     }
+  },
+
+  pollForResults: async (jobId: string) => {
+    const maxAttempts = 30; // 30 attempts = 5 minutes with 10-second intervals
+    let attempts = 0;
+    
+    const poll = async () => {
+      attempts++;
+      console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} for job ${jobId}`);
+      
+      try {
+         // Query Supabase for the mindmap result using existing client
+         const { supabase } = await import('../../../lib/supabase');
+        
+        const { data, error } = await supabase
+          .from('mindmap_results')
+          .select('*')
+          .eq('job_id', jobId)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+          console.error('❌ Supabase query error:', error);
+          set({ loadingStatus: 'error', error: 'Failed to check job status' });
+          return;
+        }
+        
+        if (data) {
+          console.log('📊 Found result data:', data);
+          
+          if (data.status === 'completed' && data.result_data) {
+            // Process the completed mindmap data
+            const resultData = data.result_data;
+            const nodes = resultData.nodes || [];
+            const edges = resultData.edges || [];
+            
+            // Convert to React Flow format
+            const reactFlowNodes = nodes.map((node: any, index: number) => ({
+              id: node.id || `node-${index}`,
+              data: { 
+                label: node.label || node.data?.label || 'Node',
+                description: node.description || node.data?.description || ''
+              },
+              position: { 
+                x: node.x || node.position?.x || Math.random() * 400, 
+                y: node.y || node.position?.y || Math.random() * 400 
+              },
+              type: 'default'
+            }));
+            
+            const reactFlowEdges = edges.map((edge: any, index: number) => ({
+              id: edge.id || `edge-${index}`,
+              source: edge.source,
+              target: edge.target,
+              label: edge.label || ''
+            }));
+            
+            console.log('✅ Mindmap generation completed:', {
+              nodes: reactFlowNodes.length,
+              edges: reactFlowEdges.length
+            });
+            
+            set({
+              nodes: reactFlowNodes,
+              edges: reactFlowEdges,
+              loadingStatus: 'success'
+            });
+            return;
+          } else if (data.status === 'failed') {
+            console.error('❌ Job failed:', data.error_message);
+            set({ 
+              loadingStatus: 'error', 
+              error: data.error_message || 'Mindmap generation failed' 
+            });
+            return;
+          }
+          // If status is still 'pending' or 'processing', continue polling
+        }
+        
+        // Continue polling if no result yet and haven't exceeded max attempts
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000); // Poll every 10 seconds
+        } else {
+          console.error('❌ Polling timeout after', maxAttempts, 'attempts');
+          set({ 
+            loadingStatus: 'error', 
+            error: 'Mindmap generation timed out. Please try again.' 
+          });
+        }
+        
+      } catch (error) {
+        console.error('❌ Polling error:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000); // Retry on error
+        } else {
+          set({ 
+            loadingStatus: 'error', 
+            error: 'Failed to check mindmap generation status' 
+          });
+        }
+      }
+    };
+    
+    // Start polling
+    poll();
   },
 
   setMindmapData: (data: { nodes: Node[]; edges: Edge[] }) => {

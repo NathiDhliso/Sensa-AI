@@ -111,21 +111,7 @@ const PrimeMePage: React.FC = () => {
 
 
 
-  const extractContentFromFile = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (file.type === 'text/plain') {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string || '');
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
-      } else {
-        // Mock content extraction for PDF/DOC files
-        setTimeout(() => {
-          resolve(`Extracted content from ${file.name}:\n\nSample past paper content with topics like calculus, linear algebra, differential equations, integration techniques, matrix operations, eigenvalues, and vector spaces.`);
-        }, 2000);
-      }
-    });
-  };
+  // File extraction now handled by centralized utility
 
   const generatePrimeNarrative = async () => {
     if (uploadedFiles.length === 0 || !uploadedFiles.some(f => f.status === 'completed')) {

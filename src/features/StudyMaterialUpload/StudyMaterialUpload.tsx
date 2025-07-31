@@ -7,6 +7,7 @@ import { usePageTheme } from '../../contexts/themeUtils';
 import { useUIStore } from '../../stores';
 import styles from './StudyMaterialUpload.module.css';
 import { orchestrateAgents } from '../../services/edgeFunctions';
+import { FileExtractor } from '../../utils/fileExtraction';
 
 interface UploadedFile {
   id: string;
@@ -66,8 +67,13 @@ const StudyMaterialUpload: React.FC = () => {
         f.id === uploadedFile.id ? { ...f, status: 'processing' } : f
       ));
 
-      // Extract content from file
-      const extractedContent = await extractContentFromFile(uploadedFile.file);
+      // Extract content from file using centralized utility
+      const result = await FileExtractor.extractContent(uploadedFile.file);
+      const extractedContent = result.content;
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to extract content');
+      }
       
       // If it's a past paper, generate study guide
       let generatedStudyGuide: string | undefined;
@@ -156,18 +162,7 @@ const StudyMaterialUpload: React.FC = () => {
     }
   }, [addNotification, setUploadedFiles, selectedType, processFile]);
 
-  const extractContentFromFile = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (file.type === 'text/plain') {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string || '');
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
-      } else {
-        reject(new Error(`Unsupported file type: ${file.type}. Please upload a text file or implement proper file parsing.`));
-      }
-    });
-  };
+  // File extraction now handled by centralized utility
 
   const generateStudyGuideFromPastPaper = async (pastPaperContent: string, fileName: string): Promise<string> => {
     const subject = fileName.split('.')[0].replace(/[_-]/g, ' ');
