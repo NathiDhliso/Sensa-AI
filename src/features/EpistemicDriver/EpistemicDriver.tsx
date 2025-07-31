@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
@@ -7,26 +7,14 @@ import {
   Map
 } from 'lucide-react';
 import { usePageTheme } from '../../contexts/themeUtils';
-import { supabaseServices } from '../../services/supabaseServices';
+import { supabaseServices, SensaMindmapIntegration } from '../../services';
 import { supabase } from '../../lib/supabase';
 import { Button, BackButton } from '../../components';
 import { HistoryManager } from './components/HistoryManager';
-import {
-  useSensaMindmapStore,
-  useJobId,
-  useLoadingStatus,
-  useNodes,
-  useEdges,
-  useError as useMindmapError,
-  useStartGeneration,
-  useUpdateJobStatus,
-  useSetMindmapData,
-  useSetError,
-  useReset,
-  useCanGenerate,
-  type LoadingStatus
-} from '../SensaMindmap/stores/sensaMindmapStore';
+import { MermaidNativeEditor, ComprehensiveMindMapEditor } from '../MindMapEditor';
 import { SensaMindmapEditor } from '../SensaMindmap/components/SensaMindmapEditor';
+import { useSensaMindmapStore } from '../SensaMindmap/stores/sensaMindmapStore';
+import mermaid from 'mermaid';
 import type {
   EpistemicDriverInput,
   EpistemicDriverState,
@@ -49,210 +37,40 @@ const EpistemicDriver: React.FC = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [currentInput, setCurrentInput] = useState<EpistemicDriverInput | null>(null);
   const [showMindmapModal, setShowMindmapModal] = useState(false);
+  const [mindmapData, setMindmapData] = useState<any>(null);
+  const [mindmapLoading, setMindmapLoading] = useState(false);
+  const [mindmapError, setMindmapError] = useState<string | null>(null);
+  const [showMindMapEditor, setShowMindMapEditor] = useState<boolean | string>(false);
+  const mermaidRef = useRef<HTMLDivElement>(null);
 
-  // Sensa Mindmap store hooks with granular selectors for performance
-  const jobId = useJobId();
-  const loadingStatus = useLoadingStatus();
-  const nodes = useNodes();
-  const edges = useEdges();
-  const mindmapError = useMindmapError();
-  const startGeneration = useStartGeneration();
-  const updateJobStatus = useUpdateJobStatus();
-  const setMindmapData = useSetMindmapData();
-  const setMindmapError = useSetError();
-  const resetMindmap = useReset();
-  const canGenerate = useCanGenerate();
-
-  // Real-time subscription and polling logic with cleanup
+  // Initialize mermaid when component mounts
   useEffect(() => {
-    if (!jobId || loadingStatus === 'success' || loadingStatus === 'error') return;
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default',
+      securityLevel: 'loose',
+      fontFamily: 'Inter, system-ui, sans-serif'
+    });
+  }, []);
 
-    // Check if we're in a stuck loading state from a previous session
-    if (loadingStatus === 'generating' || loadingStatus === 'pending_jobId' || loadingStatus === 'layout_complete') {
-      // Reset after 10 seconds if stuck from previous session
-      const stuckTimeout = setTimeout(() => {
-        console.warn('Detected stuck loading state, resetting...');
-        setMindmapError('Previous generation was stuck. Please try again.');
-        resetMindmap();
-      }, 10000);
-      
-      // Clear timeout if component unmounts
-      return () => clearTimeout(stuckTimeout);
+  // Render mermaid diagram when mindmapData changes
+  useEffect(() => {
+    if (mindmapData?.mermaid_code && mermaidRef.current) {
+      mermaidRef.current.innerHTML = '';
+      mermaid.render('mermaid-diagram', mindmapData.mermaid_code)
+        .then(({ svg }) => {
+          if (mermaidRef.current) {
+            mermaidRef.current.innerHTML = svg;
+          }
+        })
+        .catch((error) => {
+          console.error('Mermaid rendering error:', error);
+          if (mermaidRef.current) {
+            mermaidRef.current.innerHTML = '<p>Error rendering diagram</p>';
+          }
+        });
     }
-
-    let channel: any = null;
-    let pollingInterval: NodeJS.Timeout | null = null;
-    let pollingTimeout: NodeJS.Timeout | null = null;
-    let isSubscriptionActive = true;
-    const startTime = Date.now();
-    const maxPollingDuration = 2 * 60 * 1000; // 2 minutes max polling
-
-    // Helper function to get user-friendly status messages
-    const getStatusMessage = (status: LoadingStatus): string => {
-      switch (status) {
-        case 'pending_jobId':
-          return 'Initializing mind map generation...';
-        case 'generating':
-          return 'Processing structure and calculating layout...';
-        case 'layout_complete':
-          return 'Finalizing mind map visualization...';
-        case 'success':
-          return 'Mind map generated successfully!';
-        case 'error':
-          return 'Generation failed. Please try again.';
-        default:
-          return 'Generating mind map...';
-      }
-    };
-
-    // Set up real-time subscription
-    const setupRealtimeSubscription = () => {
-      try {
-        channel = supabase.channel(`sensa-mindmap-${jobId}`);
-        
-        channel
-          .on('broadcast', { event: 'status_update' }, (payload: any) => {
-            if (!isSubscriptionActive) return;
-            
-            const { status, data } = payload.payload;
-            console.log('Received status update:', status, data);
-            
-            if (status && status !== loadingStatus) {
-              updateJobStatus(status as LoadingStatus);
-            }
-            
-            // Handle final mind map data
-            if (status === 'success' && data?.nodes && data?.edges) {
-              setMindmapData({
-                nodes: data.nodes,
-                edges: data.edges
-              });
-              setShowMindmapModal(true);
-            }
-          })
-          .on('broadcast', { event: 'error' }, (payload: any) => {
-            if (!isSubscriptionActive) return;
-            
-            const { message } = payload.payload;
-            console.error('Received error:', message);
-            setMindmapError(message || 'An error occurred during generation');
-          })
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              console.log('Successfully subscribed to real-time updates');
-            } else if (status === 'CHANNEL_ERROR') {
-              console.warn('Real-time subscription error, falling back to polling');
-              setupPolling();
-            }
-          });
-      } catch (error) {
-        console.error('Failed to set up real-time subscription:', error);
-        setupPolling();
-      }
-    };
-
-    // Set up HTTP polling as fallback
-    const setupPolling = () => {
-      if (pollingInterval) return; // Avoid duplicate intervals
-      
-      pollingInterval = setInterval(async () => {
-        if (!isSubscriptionActive) return;
-        
-        // Check if we've exceeded the maximum polling duration
-        if (Date.now() - startTime > maxPollingDuration) {
-          console.warn('Polling timeout reached, stopping polling');
-          setMindmapError('Mind map generation timed out. Please try again.');
-          updateJobStatus('error');
-          clearInterval(pollingInterval!);
-          pollingInterval = null;
-          return;
-        }
-        
-        try {
-          // Query Supabase epistemic_driver_history table for completed mindmaps
-          const { data, error } = await supabase
-            .from('epistemic_driver_history')
-            .select('study_map_data')
-            .eq('study_map_data->>job_id', jobId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-            
-          if (data && data.study_map_data) {
-            const studyMapData = data.study_map_data as any;
-            
-            // Check if this is a completed mindmap job
-            if (studyMapData.job_id === jobId && studyMapData.status === 'completed' && studyMapData.mindmap_data) {
-              const mindmapData = studyMapData.mindmap_data;
-              
-              if (mindmapData.nodes && mindmapData.edges) {
-                setMindmapData({
-                  nodes: mindmapData.nodes,
-                  edges: mindmapData.edges
-                });
-                setShowMindmapModal(true);
-                updateJobStatus('success');
-                clearInterval(pollingInterval!);
-                pollingInterval = null;
-                return;
-              }
-            } else if (studyMapData.job_id === jobId && studyMapData.status === 'failed') {
-              // Handle failed job status
-              setMindmapError('Mind map generation failed. Please try again.');
-              updateJobStatus('error');
-              clearInterval(pollingInterval!);
-              pollingInterval = null;
-              return;
-            }
-          }
-          
-          // If no error but no data found, job is still processing
-          if (!error) {
-            updateJobStatus('generating');
-          }
-        } catch (error) {
-          console.error('Polling error:', error);
-          // Don't set error status immediately, keep polling for a while
-        }
-      }, 3000); // Poll every 3 seconds
-    };
-
-    // Start with real-time subscription
-    setupRealtimeSubscription();
-    
-    // Set up polling after a delay as additional fallback
-    pollingTimeout = setTimeout(() => {
-      if (isSubscriptionActive && loadingStatus !== 'success' && loadingStatus !== 'error') {
-        setupPolling();
-      }
-    }, 10000); // Start polling after 10 seconds if still in progress
-
-    // Cleanup function
-    return () => {
-      isSubscriptionActive = false;
-      
-      // Clean up real-time subscription
-      if (channel) {
-        supabase.removeChannel(channel);
-        channel = null;
-      }
-      
-      // Clean up polling
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-      }
-      
-      // Clean up polling timeout
-      if (pollingTimeout) {
-        clearTimeout(pollingTimeout);
-        pollingTimeout = null;
-      }
-      
-      // Reset store state for next generation
-      resetMindmap();
-    };
-  }, [jobId, loadingStatus, updateJobStatus, setMindmapData, setMindmapError, resetMindmap]);
+  }, [mindmapData]);
 
   // Learning strategy phases for the cohesive cycle
   const learningStrategyPhases: LearningStrategyPhase[] = [
@@ -391,41 +209,54 @@ const EpistemicDriver: React.FC = () => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Handler for Sensa Mindmap generation
+  // AWS-powered mindmap store
+  const { startGeneration, nodes, edges, loadingStatus, error: mindmapStoreError } = useSensaMindmapStore();
+
+  // Handler for AWS-powered Mindmap generation
   const handleGenerateMindmap = useCallback(async () => {
     if (!currentInput?.subject) {
       setMindmapError('Please generate a study map first to create a mind map visualization.');
       return;
     }
 
-    console.log('🚀 Starting mindmap generation for subject:', currentInput.subject);
-    console.log('📊 Current mindmap state:', { loadingStatus, nodes: nodes.length, edges: edges.length, jobId, mindmapError });
+    if (!state.data) {
+      setMindmapError('Please generate a study map first before creating a mindmap visualization.');
+      return;
+    }
+
+    setMindmapLoading(true);
+    setMindmapError(null);
 
     try {
+      // Use AWS Lambda-powered mindmap generation
       await startGeneration(currentInput.subject);
-      console.log('✅ Mindmap generation started successfully');
+      
+      // Show the mindmap modal immediately - the AWS store will handle the loading states
+      setShowMindmapModal(true);
+      console.log('✅ AWS mindmap generation started, modal opened');
     } catch (error) {
-      console.error('❌ Mindmap generation failed:', error);
-      setMindmapError(error instanceof Error ? error.message : 'Failed to start mind map generation');
+      console.error('AWS mindmap generation failed:', error);
+      setMindmapError(error instanceof Error ? error.message : 'Failed to generate mind map');
+    } finally {
+      setMindmapLoading(false);
     }
-  }, [currentInput, startGeneration, setMindmapError, loadingStatus, nodes, edges, jobId, mindmapError]);
+  }, [currentInput, state.data, startGeneration]);
+
+  // Note: Old Mermaid-based mindmap generation functions removed
+  // Now using AWS-powered SensaMindmapEditor for better performance and AI-generated content
 
   // Helper function to get user-friendly loading messages
-  const getMindmapStatusMessage = (status: LoadingStatus): string => {
-    switch (status) {
-      case 'pending_jobId':
-        return 'Initializing mind map generation...';
-      case 'generating':
-        return 'Processing structure and calculating layout...';
-      case 'layout_complete':
-        return 'Finalizing mind map visualization...';
-      case 'success':
-        return 'Mind map generated successfully!';
-      case 'error':
-        return 'Generation failed. Please try again.';
-      default:
-        return 'Generating mind map...';
+  const getMindmapStatusMessage = (): string => {
+    if (mindmapLoading) {
+      return 'Generating mind map...';
     }
+    if (mindmapError) {
+      return 'Generation failed. Please try again.';
+    }
+    if (mindmapData) {
+      return 'Mind map generated successfully!';
+    }
+    return 'Generate Mind Map';
   };
 
   return (
@@ -526,14 +357,14 @@ const EpistemicDriver: React.FC = () => {
             {/* Sensa Mindmap Button */}
             <Button
               onClick={handleGenerateMindmap}
-              disabled={!canGenerate || !currentInput?.subject}
+              disabled={mindmapLoading || !currentInput?.subject}
               className={`${styles.generateButton} ${styles.mindmapButton}`}
               variant="secondary"
             >
-              {loadingStatus === 'pending_jobId' || loadingStatus === 'generating' || loadingStatus === 'layout_complete' ? (
+              {mindmapLoading ? (
                 <>
                   <div className={styles.spinner} />
-                  {getMindmapStatusMessage(loadingStatus)}
+                  {getMindmapStatusMessage()}
                 </>
               ) : (
                 <>
@@ -541,35 +372,6 @@ const EpistemicDriver: React.FC = () => {
                   Generate Sensa Mindmap
                 </>
               )}
-            </Button>
-
-            {/* Reset Button for stuck loading states */}
-            {(loadingStatus === 'generating' || loadingStatus === 'pending_jobId' || loadingStatus === 'layout_complete') && (
-              <Button
-                onClick={() => {
-                  reset();
-                  setMindmapError('');
-                }}
-                className={`${styles.generateButton}`}
-                variant="outline"
-                style={{ marginTop: '10px', backgroundColor: '#f87171', color: 'white' }}
-              >
-                Reset Generation
-              </Button>
-            )}
-
-            {/* Debug Button to show mindmap modal */}
-            <Button
-              onClick={() => {
-                console.log('🔍 Debug: Opening mindmap modal manually');
-                console.log('📊 Current state:', { loadingStatus, nodes: nodes.length, edges: edges.length, jobId, mindmapError });
-                setShowMindmapModal(true);
-              }}
-              className={`${styles.generateButton}`}
-              variant="outline"
-              style={{ marginTop: '10px', backgroundColor: '#3b82f6', color: 'white' }}
-            >
-              Debug: Show Mindmap Modal
             </Button>
           </form>
         </motion.div>
@@ -611,7 +413,7 @@ const EpistemicDriver: React.FC = () => {
 
         {/* Mindmap Loading State */}
         <AnimatePresence>
-          {(loadingStatus === 'pending_jobId' || loadingStatus === 'generating' || loadingStatus === 'layout_complete') && (
+          {mindmapLoading && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -620,7 +422,7 @@ const EpistemicDriver: React.FC = () => {
             >
               <div className={styles.spinner} />
               <p className={styles.loadingText}>
-                {getMindmapStatusMessage(loadingStatus)}
+                {getMindmapStatusMessage()}
               </p>
             </motion.div>
           )}
@@ -628,7 +430,7 @@ const EpistemicDriver: React.FC = () => {
 
         {/* Mindmap Error State */}
         <AnimatePresence>
-          {mindmapError && loadingStatus === 'error' && (
+          {mindmapError && !mindmapLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -639,8 +441,7 @@ const EpistemicDriver: React.FC = () => {
               <p className={styles.errorMessage}>{mindmapError}</p>
               <button 
                 onClick={() => {
-                  setMindmapError('');
-                  resetMindmap();
+                  setMindmapError(null);
                 }} 
                 className={styles.retryButton}
               >
@@ -824,9 +625,9 @@ const EpistemicDriver: React.FC = () => {
           )}
         </AnimatePresence>
 
-        {/* Sensa Mindmap Modal */}
+        {/* AWS-Powered Sensa Mindmap Modal */}
         <AnimatePresence>
-          {showMindmapModal && (loadingStatus === 'success' || loadingStatus === 'error') && (
+          {showMindmapModal && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -846,36 +647,65 @@ const EpistemicDriver: React.FC = () => {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className={styles.modalHeader}>
-                  <h2 className={styles.modalTitle}>Sensa Mindmap Visualization</h2>
-                  <button
-                    onClick={() => setShowMindmapModal(false)}
-                    className={styles.modalCloseButton}
-                    aria-label="Close mindmap modal"
-                  >
-                    ×
-                  </button>
+                  <h2 className={styles.modalTitle}>AWS-Powered Sensa Mindmap</h2>
+                  <div className={styles.modalActions}>
+                    <Button
+                      onClick={() => setShowMindMapEditor(true)}
+                      variant="outline"
+                      className={styles.modalActionButton}
+                    >
+                      Edit Code
+                    </Button>
+                    <Button
+                      onClick={() => setShowMindMapEditor('comprehensive')}
+                      variant="outline"
+                      className={styles.modalActionButton}
+                    >
+                      Legacy Editor
+                    </Button>
+                    <button
+                      onClick={() => setShowMindmapModal(false)}
+                      className={styles.modalCloseButton}
+                      aria-label="Close mindmap modal"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <div className={styles.modalBody}>
-                  {nodes.length > 0 ? (
-                    <SensaMindmapEditor
-                      nodes={nodes}
-                      edges={edges}
-                      className={styles.mindmapEditor}
-                      ariaLabel={`Interactive mind map for ${currentInput?.subject || 'study material'}`}
-                    />
-                  ) : (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>
-                      <h3>Debug Information</h3>
-                      <p><strong>Loading Status:</strong> {loadingStatus}</p>
-                      <p><strong>Nodes:</strong> {nodes.length}</p>
-                      <p><strong>Edges:</strong> {edges.length}</p>
-                      <p><strong>Job ID:</strong> {jobId || 'None'}</p>
-                      <p><strong>Error:</strong> {mindmapError || 'None'}</p>
-                      <pre style={{ textAlign: 'left', background: '#f5f5f5', padding: '10px', borderRadius: '4px', fontSize: '12px' }}>
-                        {JSON.stringify({ nodes, edges }, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                  <div className={styles.visualizationContent}>
+                    {loadingStatus === 'pending_jobId' || loadingStatus === 'generating' ? (
+                      <div className={styles.loadingContainer}>
+                        <div className={styles.spinner} />
+                        <p className={styles.loadingText}>
+                          {loadingStatus === 'pending_jobId' ? 'Submitting to AWS Lambda...' : 'Generating mindmap with AI...'}
+                        </p>
+                      </div>
+                    ) : mindmapStoreError ? (
+                      <div className={styles.errorContainer}>
+                        <p className={styles.errorText}>Error: {mindmapStoreError}</p>
+                        <Button
+                          onClick={() => handleGenerateMindmap()}
+                          variant="outline"
+                          className={styles.retryButton}
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    ) : nodes.length > 0 ? (
+                      <SensaMindmapEditor
+                        nodes={nodes}
+                        edges={edges}
+                        className={styles.sensaMindmapEditor}
+                        ariaLabel={`Interactive mindmap for ${currentInput?.subject || 'study topic'}`}
+                      />
+                    ) : (
+                      <div className={styles.emptyState}>
+                        <Map className={styles.emptyIcon} />
+                        <p className={styles.emptyText}>Click "Generate Sensa Mindmap" to create your AWS-powered visualization.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className={styles.modalFooter}>
                   <Button
@@ -887,11 +717,12 @@ const EpistemicDriver: React.FC = () => {
                   </Button>
                   <Button
                     onClick={() => {
-                      // Future: Add export functionality
-                      console.log('Export mindmap functionality to be implemented');
+                      // Future: Add export functionality for AWS mindmap
+                      console.log('Export AWS mindmap functionality to be implemented');
                     }}
                     variant="primary"
                     className={styles.modalButton}
+                    disabled={nodes.length === 0}
                   >
                     Export
                   </Button>
@@ -900,6 +731,29 @@ const EpistemicDriver: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Mindmap Editors */}
+        {showMindMapEditor === true && mindmapData && (
+          <MermaidNativeEditor
+            initialData={mindmapData}
+            onSave={(editedData) => {
+              console.log('Mermaid mind map saved:', editedData);
+              setShowMindMapEditor(false);
+            }}
+            onClose={() => setShowMindMapEditor(false)}
+          />
+        )}
+
+        {showMindMapEditor === 'comprehensive' && mindmapData && (
+          <ComprehensiveMindMapEditor
+            initialData={mindmapData}
+            onSave={(editedData) => {
+              console.log('Comprehensive mind map saved:', editedData);
+              setShowMindMapEditor(false);
+            }}
+            onClose={() => setShowMindMapEditor(false)}
+          />
+        )}
       </div>
     </div>
   );
