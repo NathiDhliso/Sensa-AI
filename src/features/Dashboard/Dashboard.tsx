@@ -546,76 +546,22 @@ const Dashboard: React.FC = () => {
                 <h3 className={`text-lg font-semibold ${themeClasses.text.primary}`}>Ready to Grow?</h3>
               </div>
               
-              <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-                {/* Share Memories Button */}
-                <motion.button
-                  className="group relative bg-gradient-to-br from-rose-50 to-orange-50 hover:from-rose-100 hover:to-orange-100 border-2 border-rose-200 hover:border-rose-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => navigate('/memory-elicitation')}
-                >
-                  <div className={`${pageTheme.button} rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2`}>
-                    <Brain className="text-white w-6 h-6" />
-                  </div>
-                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
-                    Memories
-                  </h3>
-                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    <ArrowRight className="text-rose-600 w-4 h-4" />
-                  </div>
-                </motion.button>
-
-                {/* Know Me Button */}
+              <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+                {/* Memory Bank Button */}
                 <motion.button
                   className="group relative bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border-2 border-indigo-200 hover:border-indigo-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
                   whileHover={{ scale: 1.03, y: -2 }}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => navigate('/know-me')}
-                >
-                  <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
-                    <Target className="text-white w-6 h-6" />
-                  </div>
-                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
-                    Know Me
-                  </h3>
-                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    <ArrowRight className="text-indigo-600 w-4 h-4" />
-                  </div>
-                </motion.button>
-
-                {/* Memory Bank Button */}
-                <motion.button
-                  className="group relative bg-gradient-to-br from-green-50 to-teal-50 hover:from-green-100 hover:to-teal-100 border-2 border-green-200 hover:border-green-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
                   onClick={() => navigate('/memory-bank')}
                 >
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
+                  <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
                     <Eye className="text-white w-6 h-6" />
                   </div>
                   <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
                     View Profile
                   </h3>
                   <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    <ArrowRight className="text-green-600 w-4 h-4" />
-                  </div>
-                </motion.button>
-
-                {/* Prime Me Button */}
-                <motion.button
-                  className="group relative bg-gradient-to-br from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-2 border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => navigate('/prime-me')}
-                >
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
-                    <Compass className="text-white w-6 h-6" />
-                  </div>
-                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
-                    Prime Me
-                  </h3>
-                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    <ArrowRight className="text-purple-600 w-4 h-4" />
+                    <ArrowRight className="text-indigo-600 w-4 h-4" />
                   </div>
                 </motion.button>
 
@@ -655,6 +601,23 @@ const Dashboard: React.FC = () => {
                   </div>
                 </motion.button>
 
+                {/* Collaboration Button */}
+                <motion.button
+                  className="group relative bg-gradient-to-br from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 border-2 border-rose-200 hover:border-rose-300 rounded-xl transition-all duration-300 aspect-square flex flex-col items-center justify-center shadow-lg hover:shadow-xl overflow-hidden"
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => navigate('/collaborate')}
+                >
+                  <div className="bg-gradient-to-r from-rose-500 to-pink-500 rounded-2xl shadow-lg mb-2 group-hover:scale-110 transition-transform duration-300 p-2">
+                    <Users className="text-white w-6 h-6" />
+                  </div>
+                  <h3 className={`font-bold ${themeClasses.text.primary} text-center text-sm`}>
+                    Collaborate
+                  </h3>
+                  <div className="absolute bottom-2 right-2 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    <ArrowRight className="text-rose-600 w-4 h-4" />
+                  </div>
+                </motion.button>
 
               </div>
             </motion.div>

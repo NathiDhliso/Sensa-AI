@@ -2,19 +2,13 @@
 // @ts-expect-error - pdfjs-dist types may not be fully compatible
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 
-// Configure PDF.js worker with fallback options
+// Configure PDF.js to work without worker for better compatibility
 const configurePDFWorker = () => {
   try {
     // @ts-expect-error - GlobalWorkerOptions may not be typed correctly
     if (pdfjsLib?.GlobalWorkerOptions) {
-      // Try multiple CDN sources in order of preference
-      const workerSources = [
-        'https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
-        'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.3.93/pdf.worker.min.js'
-      ];
-
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSources[0];
+      // Disable worker to avoid CORS and loading issues
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     }
   } catch (err) {
     console.warn('Failed to configure PDF.js worker:', err);
@@ -106,9 +100,9 @@ export class UploadService {
       
       // Try multiple worker configurations for better compatibility
       const workerSources = [
-        '', // First try without worker (most compatible)
-        'https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js',
-        'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.93/build/pdf.worker.min.js'
+        '', // No worker (most compatible and reliable)
+        '/pdf.worker.min.js', // Local worker file if available
+        'https://unpkg.com/pdfjs-dist@5.3.93/build/pdf.worker.min.js' // Last resort: external CDN
       ];
 
       let pdf;
@@ -284,14 +278,6 @@ export const uploadService = UploadService.getInstance();
 
 // Export default configurations for different use cases
 export const uploadConfigs = {
-  knowMe: {
-    acceptedTypes: ['application/pdf'] as string[],
-    maxFileSize: 20,
-    maxFiles: 1,
-    extractText: true,
-    maxTextLength: 20000,
-    maxPages: 10
-  },
   primeMe: {
     acceptedTypes: ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] as string[],
     maxFileSize: 10,
@@ -316,4 +302,4 @@ export const uploadConfigs = {
     maxTextLength: 20000,
     maxPages: 10
   }
-}; 
+};

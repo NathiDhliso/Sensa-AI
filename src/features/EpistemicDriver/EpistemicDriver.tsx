@@ -7,8 +7,7 @@ import {
   Map
 } from 'lucide-react';
 import { usePageTheme } from '../../contexts/themeUtils';
-import { supabaseServices, SensaMindmapIntegration } from '../../services';
-import { supabase } from '../../lib/supabase';
+import { supabaseServices } from '../../services';
 import { Button, BackButton } from '../../components';
 import { HistoryManager } from './components/HistoryManager';
 import { ComprehensiveMindMapEditor } from '../MindMapEditor';
@@ -37,7 +36,7 @@ const EpistemicDriver: React.FC = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [currentInput, setCurrentInput] = useState<EpistemicDriverInput | null>(null);
   const [showMindmapModal, setShowMindmapModal] = useState(false);
-  const [mindmapData, setMindmapData] = useState<any>(null);
+  const [mindmapData] = useState<any>(null);
   const [mindmapLoading, setMindmapLoading] = useState(false);
   const [mindmapError, setMindmapError] = useState<string | null>(null);
   const [showMindMapEditor, setShowMindMapEditor] = useState<boolean | string>(false);
@@ -401,25 +400,7 @@ const EpistemicDriver: React.FC = () => {
               )}
             </button>
 
-            {/* Sensa Mindmap Button */}
-            <Button
-              onClick={handleGenerateMindmap}
-              disabled={mindmapLoading || !currentInput?.subject}
-              className={`${styles.generateButton} ${styles.mindmapButton}`}
-              variant="secondary"
-            >
-              {mindmapLoading ? (
-                <>
-                  <div className={styles.spinner} />
-                  {getMindmapStatusMessage()}
-                </>
-              ) : (
-                <>
-                  <Map className="w-5 h-5 mr-2" />
-                  Generate Sensa Mindmap
-                </>
-              )}
-            </Button>
+
           </form>
         </motion.div>
 

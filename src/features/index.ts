@@ -17,7 +17,6 @@ export * from './MindMapEditor';
 
 // Memory and analysis features
 export * from './Memory';
-export * from './KnowMe';
 export * from './PrimeMe';
 export * from './Dialogue';
 

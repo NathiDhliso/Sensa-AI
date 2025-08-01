@@ -21,18 +21,21 @@ CREATE INDEX IF NOT EXISTS idx_mindmap_results_created_at ON mindmap_results(cre
 ALTER TABLE mindmap_results ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for authenticated users to manage their own mindmap results
+DROP POLICY IF EXISTS "Users can view their own mindmap results" ON mindmap_results;
 CREATE POLICY "Users can view their own mindmap results"
   ON mindmap_results
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id OR user_id IS NULL);
 
+DROP POLICY IF EXISTS "Service can insert mindmap results" ON mindmap_results;
 CREATE POLICY "Service can insert mindmap results"
   ON mindmap_results
   FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service can update mindmap results" ON mindmap_results;
 CREATE POLICY "Service can update mindmap results"
   ON mindmap_results
   FOR UPDATE

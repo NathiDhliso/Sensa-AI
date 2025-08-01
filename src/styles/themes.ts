@@ -269,20 +269,6 @@ export const pageThemes = {
     }
   },
   
-  // Know Me feature - Transformation gradient (full spectrum)
-  knowMe: {
-    background: 'bg-gradient-to-br from-purple-50 via-orange-50 to-amber-50',
-    card: 'bg-white/80 backdrop-blur-sm border-purple-200/50',
-    accent: 'text-purple-600',
-    button: 'bg-gradient-to-r from-purple-700 via-purple-600 via-orange-500 to-amber-500', // transformation colors
-    gradients: {
-      memoryToLearning: sensaBrandColors.gradients.memoryToLearning.css,
-      transformation: sensaBrandColors.gradients.transformation.css,
-      wisdom: sensaBrandColors.gradients.wisdom.css,
-      growth: sensaBrandColors.gradients.growth.css,
-    }
-  },
-  
   // Analytics/Reports
   analytics: {
     background: 'bg-gradient-to-br from-purple-50 via-white to-blue-50',

@@ -5,7 +5,6 @@ import {
   ArrowLeft, 
   Brain, 
   Heart, 
-  Eye, 
   Lightbulb, 
   Target,
   BookOpen
@@ -17,7 +16,7 @@ import { memoryService } from '../../../services/supabaseServices';
 const MemoryBank: React.FC = () => {
   const navigate = useNavigate();
   const pageTheme = usePageTheme('memory');
-  const [selectedMemory, setSelectedMemory] = useState<string | null>(null);
+  // const [selectedMemory, setSelectedMemory] = useState<string | null>(null);
   const [profileView, setProfileView] = useState<'memories' | 'profile' | 'connections'>('memories');
   
   // Zustand stores

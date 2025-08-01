@@ -13,12 +13,13 @@ import { MemoryBank } from './features/Memory';
 import { SensaDialogue } from './features/Dialogue';
 import { StudyMaterialUpload } from './features/StudyMaterialUpload';
 import { EnhancedStudyMap } from './features/IntegratedLearning';
-import { KnowMePage } from './features/KnowMe';
 import { NotificationSystem } from './features/NotificationSystem';
 import { PrimeMePage } from './features/PrimeMe';
 import { StudyGuideGenerator } from './features/StudyGuide';
 import { EpistemicDriver } from './features/EpistemicDriver';
 import { BusinessLens } from './features/BusinessLens';
+import { CollaborationPage } from './pages/CollaborationPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
   return (
@@ -75,11 +76,7 @@ function App() {
               <StudyMaterialUpload />
             </ProtectedRoute>
           } />
-          <Route path="/know-me" element={
-            <ProtectedRoute>
-              <KnowMePage />
-            </ProtectedRoute>
-          } />
+
                       <Route path="/prime-me" element={<PrimeMePage />} />
             <Route path="/study-guide-generator" element={<StudyGuideGenerator />} />
             <Route path="/epistemic-driver" element={
@@ -90,6 +87,21 @@ function App() {
             <Route path="/business-lens" element={
               <ProtectedRoute>
                 <BusinessLens />
+              </ProtectedRoute>
+            } />
+            <Route path="/collaborate" element={
+              <ProtectedRoute>
+                <CollaborationPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/collaborate/:sessionId" element={
+              <ProtectedRoute>
+                <CollaborationPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             } />
           {/* Legacy routes redirecting to integrated learning hub */}

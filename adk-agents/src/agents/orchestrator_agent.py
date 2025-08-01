@@ -226,152 +226,13 @@ class OrchestratorAgent(SensaBaseAgent):
                 'timestamp': self._get_timestamp()
             }
     
-    async def know_me_workflow(self, pdf_content: str, user_id: str) -> Dict[str, Any]:
-        """
-        Complete Know Me workflow: PDF analysis -> questionnaire -> scenarios -> scoring -> reporting
-        """
-        self.log(f"Starting Know Me workflow for user {user_id}")
-        
-        try:
-            # Phase 1: Knowledge Extraction
-            self.log("Phase 1: Knowledge Extraction from PDF")
-            knowledge_result = await self.delegate_task('knowledge_extraction', {
-                'action': 'full_analysis',
-                'pdf_content': pdf_content
-            })
-            
-            return {
-                'success': True,
-                'phase': 'knowledge_extraction_complete',
-                'knowledge_analysis': knowledge_result,
-                'next_step': 'present_questionnaire',
-                'timestamp': self._get_timestamp()
-            }
-            
-        except Exception as e:
-            self.log(f"Know Me workflow failed: {str(e)}", "ERROR")
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': self._get_timestamp()
-            }
+
     
-    async def process_questionnaire_responses(self, questionnaire_responses: List[Dict], 
-                                            knowledge_analysis: Dict, user_id: str) -> Dict[str, Any]:
-        """
-        Phase 2: Process questionnaire responses and generate scenario questions
-        """
-        self.log(f"Processing questionnaire responses for user {user_id}")
-        
-        try:
-            core_topics = knowledge_analysis.get('topic_analysis', {}).get('core_topics', [])
-            subject_area = knowledge_analysis.get('topic_analysis', {}).get('subject_area', 'Unknown Subject')
-            
-            # Generate scenario questions
-            scenarios_result = await self.delegate_task('scenario_generation', {
-                'action': 'full_scenario_workflow',
-                'core_topics': core_topics,
-                'user_responses': questionnaire_responses,
-                'subject_area': subject_area
-            })
-            
-            return {
-                'success': True,
-                'phase': 'scenarios_generated',
-                'scenarios': scenarios_result,
-                'next_step': 'present_scenario_questions',
-                'timestamp': self._get_timestamp()
-            }
-            
-        except Exception as e:
-            self.log(f"Questionnaire processing failed: {str(e)}", "ERROR")
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': self._get_timestamp()
-            }
+
     
-    async def score_scenario_answer(self, question_id: str, user_answer: str, 
-                                  scenarios_data: Dict, partial_answer: bool = False) -> Dict[str, Any]:
-        """
-        Phase 3: Score a single scenario answer in real-time
-        """
-        self.log(f"Scoring answer for question {question_id}")
-        
-        try:
-            # Find the question and its rubric
-            scenarios = scenarios_data.get('scenarios', {}).get('scenarios', [])
-            rubrics = scenarios_data.get('rubrics', [])
-            
-            question_context = next((s for s in scenarios if s.get('question_id') == question_id), {})
-            rubric = next((r for r in rubrics if r.get('question_id') == question_id), {})
-            
-            if not question_context or not rubric:
-                raise ValueError(f"Question or rubric not found for {question_id}")
-            
-            if partial_answer:
-                # Provide real-time hints
-                result = await self.delegate_task('real_time_scoring', {
-                    'action': 'real_time_hints',
-                    'partial_answer': user_answer,
-                    'rubric': rubric,
-                    'question_context': question_context
-                })
-            else:
-                # Full scoring
-                result = await self.delegate_task('real_time_scoring', {
-                    'action': 'score_answer',
-                    'user_answer': user_answer,
-                    'rubric': rubric,
-                    'question_context': question_context
-                })
-            
-            return {
-                'success': True,
-                'scoring_result': result,
-                'timestamp': self._get_timestamp()
-            }
-            
-        except Exception as e:
-            self.log(f"Answer scoring failed: {str(e)}", "ERROR")
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': self._get_timestamp()
-            }
+
     
-    async def generate_performance_report(self, all_scoring_results: List[Dict], 
-                                        knowledge_analysis: Dict, user_id: str) -> Dict[str, Any]:
-        """
-        Phase 4: Generate final performance report and recommendations
-        """
-        self.log(f"Generating performance report for user {user_id}")
-        
-        try:
-            core_topics = knowledge_analysis.get('topic_analysis', {}).get('core_topics', [])
-            subject_area = knowledge_analysis.get('topic_analysis', {}).get('subject_area', 'Unknown Subject')
-            
-            report = await self.delegate_task('performance_reporting', {
-                'action': 'generate_report',
-                'scoring_results': all_scoring_results,
-                'subject_area': subject_area,
-                'core_topics': core_topics
-            })
-            
-            return {
-                'success': True,
-                'phase': 'know_me_complete',
-                'performance_report': report,
-                'timestamp': self._get_timestamp()
-            }
-            
-        except Exception as e:
-            self.log(f"Performance report generation failed: {str(e)}", "ERROR")
-            return {
-                'success': False,
-                'error': str(e),
-                'timestamp': self._get_timestamp()
-            }
+
 
     async def process(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Main processing method for the Orchestrator Agent"""
@@ -398,36 +259,7 @@ class OrchestratorAgent(SensaBaseAgent):
             user_id = data.get('user_id', '')
             return await self.generate_study_map_only(field_of_study, course_syllabus, user_id)
         
-        # Know Me Feature Actions
-        elif action == 'know_me_start':
-            pdf_content = data.get('pdf_content', '')
-            user_id = data.get('user_id', '')
-            if not user_id or not pdf_content:
-                raise ValueError("user_id and pdf_content are required")
-            return await self.know_me_workflow(pdf_content, user_id)
-        
-        elif action == 'know_me_questionnaire':
-            questionnaire_responses = data.get('questionnaire_responses', [])
-            knowledge_analysis = data.get('knowledge_analysis', {})
-            user_id = data.get('user_id', '')
-            if not user_id:
-                raise ValueError("user_id is required")
-            return await self.process_questionnaire_responses(questionnaire_responses, knowledge_analysis, user_id)
-        
-        elif action == 'know_me_score':
-            question_id = data.get('question_id', '')
-            user_answer = data.get('user_answer', '')
-            scenarios_data = data.get('scenarios_data', {})
-            partial_answer = data.get('partial_answer', False)
-            return await self.score_scenario_answer(question_id, user_answer, scenarios_data, partial_answer)
-        
-        elif action == 'know_me_report':
-            all_scoring_results = data.get('scoring_results', [])
-            knowledge_analysis = data.get('knowledge_analysis', {})
-            user_id = data.get('user_id', '')
-            if not user_id:
-                raise ValueError("user_id is required")
-            return await self.generate_performance_report(all_scoring_results, knowledge_analysis, user_id)
+
         
         else:
             raise ValueError(f"Unknown action: {action}")
@@ -454,4 +286,4 @@ class OrchestratorAgent(SensaBaseAgent):
             except Exception as e:
                 health_status['agents'][agent_name] = f'unhealthy: {str(e)}'
         
-        return health_status 
+        return health_status

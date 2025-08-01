@@ -882,7 +882,7 @@ ${nodes.map(node => `    ${node.data.label}`).join('\n')}`;
               connectionMode={ConnectionMode.Loose}
               fitView
               className="bg-gray-50"
-              nodesDraggable={currentTool === 'select'}
+              nodesDraggable={true}
               nodesConnectable={true}
               elementsSelectable={true}
               selectNodesOnDrag={false}

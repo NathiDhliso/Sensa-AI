@@ -10,7 +10,6 @@ import {
   FileText,
   Zap,
   Target,
-  ArrowRight,
   CheckCircle,
   AlertCircle,
   Copy,

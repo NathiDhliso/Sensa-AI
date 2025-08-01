@@ -15,9 +15,6 @@ export interface ADKRequest {
   subject?: string;
   content?: string;
   focus_question?: string;
-  // Know Me specific fields
-  question_data?: KnowMeQuestionData;
-  answers?: KnowMeAnswer[];
   user_profile?: UserProfile;
 }
 
@@ -164,83 +161,12 @@ export interface MindMapConnection {
   description: string;
 }
 
-// Know Me feature interfaces
-export interface KnowMeQuestionData {
-  question_id: string;
-  question_text: string;
-  scenario_context?: string;
-  question_type: 'multiple_choice' | 'scale' | 'open_ended';
-  options?: string[];
-  dimension_target?: string;
-}
 
-export interface KnowMeAnswer {
-  question_id: string;
-  selected_option?: string;
-  scale_value?: number;
-  text_response?: string;
-  response_time_ms?: number;
-  confidence_level?: number;
-}
-
-export interface KnowMeScenario {
-  scenario_id: string;
-  title: string;
-  description: string;
-  context: string;
-  questions: KnowMeQuestionData[];
-  target_dimensions: string[];
-}
-
-export interface PersonalityDimension {
-  dimension: string;
-  score: number; // 0-100
-  description: string;
-  characteristics: string[];
-  implications: string[];
-}
-
-export interface KnowMeReport {
-  user_id: string;
-  overall_score: number;
-  personality_dimensions: PersonalityDimension[];
-  learning_preferences: LearningPreference[];
-  memory_strategies: MemoryStrategy[];
-  personalized_recommendations: string[];
-  strengths: string[];
-  growth_areas: string[];
-  career_alignment: CareerAlignment[];
-}
-
-export interface LearningPreference {
-  category: string;
-  preference: string;
-  strength_score: number;
-  description: string;
-  study_tips: string[];
-}
-
-export interface MemoryStrategy {
-  strategy_name: string;
-  effectiveness_score: number;
-  description: string;
-  when_to_use: string[];
-  implementation_steps: string[];
-}
-
-export interface CareerAlignment {
-  career_field: string;
-  alignment_score: number;
-  reasoning: string;
-  recommended_skills: string[];
-  growth_path: string[];
-}
 
 // User profile interface
 export interface UserProfile {
   user_id: string;
   learning_style?: UserStyle;
-  personality_dimensions?: PersonalityDimension[];
   academic_interests?: string[];
   career_goals?: string[];
   current_level?: string;
@@ -266,7 +192,6 @@ export type CourseAnalysisResponse = ADKResponse<CourseAnalysisResult>;
 export type DocumentAnalysisResponse = ADKResponse<DocumentAnalysisResult>;
 export type MemoryAnalysisResponse = ADKResponse<MemoryAnalysisResult>;
 export type MindMapResponse = ADKResponse<MindMapData>;
-export type KnowMeResponse = ADKResponse<KnowMeReport>;
 
 // Utility types for handlers
 export type TaskHandler = (request: ADKRequest) => Promise<Response>;
@@ -290,4 +215,4 @@ export interface GeminiRequestBody {
     topP?: number;
     topK?: number;
   };
-} 
+}

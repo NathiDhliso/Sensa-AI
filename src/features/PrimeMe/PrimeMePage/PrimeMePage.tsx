@@ -49,7 +49,7 @@ interface PrimeNarrative {
 
 const PrimeMePage: React.FC = () => {
   const navigate = useNavigate();
-  const pageTheme = usePageTheme('knowMe');
+  const pageTheme = usePageTheme('home');
   const themeClasses = useThemeClasses();
   const { addNotification } = useUIStore();
 
@@ -269,37 +269,6 @@ The final output should not be a list. It must be a coherent story that illustra
     <div className={`min-h-screen ${pageTheme.background}`}>
       {/* Back Button */}
       <BackButton variant="floating" />
-
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white/90 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-10"
-      >
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div 
-                  className="p-2 rounded-xl shadow-lg"
-                  style={{ background: pageTheme?.gradients?.transformation || 'linear-gradient(135deg, #7C2D92 0%, #6B46C1 25%, #F97316 75%, #F59E0B 100%)' }}
-                >
-                  <Compass className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className={`text-lg font-bold ${themeClasses.text.primary}`}>Prime Me</h1>
-                  <p className={`text-xs ${themeClasses.text.tertiary}`}>Transform topics into compelling learning journeys</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Lightbulb className="w-4 h-4" />
-              <span>Educational Storytelling</span>
-            </div>
-          </div>
-        </div>
-      </motion.header>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Introduction */}

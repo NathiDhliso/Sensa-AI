@@ -37,10 +37,6 @@ export enum Task {
   SubjectIdentification = 'subject_identification',
   MemoryDialogue = 'memory_dialogue',
   UpdatedMemoryInsights = 'updated_memory_insights',
-  KnowMeStart = 'know_me_start',
-  KnowMeScenarios = 'know_me_scenarios',
-  KnowMeScore = 'know_me_score',
-  KnowMeReport = 'know_me_report',
   PrimeMeNarrative = 'prime_me_narrative',
   StudyGuideGeneration = 'study_guide_generation',
   EpistemicDriverGeneration = 'epistemic_driver_generation',
@@ -63,7 +59,6 @@ export enum ContentType {
   Course = 'course',
   Document = 'document',
   Memory = 'memory',
-  KnowMe = 'know_me',
 }
 
 // Response status constants
@@ -89,17 +84,4 @@ export const MEMORY_ANALYSIS = {
   MAX_INSIGHTS: 4,
   DEFAULT_ENTHUSIASM_SCORE: 5,
   TECHNICAL_TERMS_THRESHOLD: 3,
-} as const;
-
-// Know Me feature constants
-export const KNOW_ME = {
-  SCENARIOS_COUNT: 5,
-  MAX_SCORE: 100,
-  PERSONALITY_DIMENSIONS: [
-    'openness',
-    'conscientiousness', 
-    'extraversion',
-    'agreeableness',
-    'neuroticism'
-  ],
 } as const;

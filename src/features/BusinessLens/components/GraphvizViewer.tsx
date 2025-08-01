@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Eye, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, Download, Eye, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePageTheme } from '../../../contexts/themeUtils';
 
 // Import Graphviz library for rendering

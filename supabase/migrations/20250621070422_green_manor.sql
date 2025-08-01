@@ -55,18 +55,21 @@ ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_analyses ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for users table
+DROP POLICY IF EXISTS "Users can read own profile" ON users;
 CREATE POLICY "Users can read own profile"
   ON users
   FOR SELECT
   TO authenticated
   USING (auth.uid() = auth_id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
 CREATE POLICY "Users can update own profile"
   ON users
   FOR UPDATE
   TO authenticated
   USING (auth.uid() = auth_id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON users;
 CREATE POLICY "Users can insert own profile"
   ON users
   FOR INSERT
@@ -74,24 +77,28 @@ CREATE POLICY "Users can insert own profile"
   WITH CHECK (auth.uid() = auth_id);
 
 -- Create policies for memories table
+DROP POLICY IF EXISTS "Users can read own memories" ON memories;
 CREATE POLICY "Users can read own memories"
   ON memories
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own memories" ON memories;
 CREATE POLICY "Users can insert own memories"
   ON memories
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own memories" ON memories;
 CREATE POLICY "Users can update own memories"
   ON memories
   FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own memories" ON memories;
 CREATE POLICY "Users can delete own memories"
   ON memories
   FOR DELETE
@@ -99,6 +106,7 @@ CREATE POLICY "Users can delete own memories"
   USING (auth.uid() = user_id);
 
 -- Create policies for courses table (public read access)
+DROP POLICY IF EXISTS "Anyone can read courses" ON courses;
 CREATE POLICY "Anyone can read courses"
   ON courses
   FOR SELECT
@@ -106,24 +114,28 @@ CREATE POLICY "Anyone can read courses"
   USING (true);
 
 -- Create policies for course_analyses table
+DROP POLICY IF EXISTS "Users can read own course analyses" ON course_analyses;
 CREATE POLICY "Users can read own course analyses"
   ON course_analyses
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own course analyses" ON course_analyses;
 CREATE POLICY "Users can insert own course analyses"
   ON course_analyses
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own course analyses" ON course_analyses;
 CREATE POLICY "Users can update own course analyses"
   ON course_analyses
   FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own course analyses" ON course_analyses;
 CREATE POLICY "Users can delete own course analyses"
   ON course_analyses
   FOR DELETE
@@ -148,7 +160,11 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_memories_updated_at ON memories;
 CREATE TRIGGER update_memories_updated_at BEFORE UPDATE ON memories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_courses_updated_at ON courses;
 CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_course_analyses_updated_at ON course_analyses;
 CREATE TRIGGER update_course_analyses_updated_at BEFORE UPDATE ON course_analyses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

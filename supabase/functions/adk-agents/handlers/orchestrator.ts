@@ -19,13 +19,7 @@ import {
   generateAIMindMap,
   generateMemoryDialogue,
   generateUpdatedMemoryInsights 
-} from '../features/knowMe.ts';
-import {
-  generateKnowMeAnalysis,
-  generateKnowMeScenarios,
-  scoreKnowMeAnswer,
-  generateKnowMeReport
-} from '../features/knowMe.ts';
+} from '../features/memory.ts';
 import { generatePrimeMeNarrative } from '../features/primeMe.ts';
 import { generateStudyGuide } from '../features/studyGuideGenerator.ts';
 import { generateEpistemicDriver } from '../features/epistemicDriver.ts';
@@ -43,10 +37,6 @@ function createTaskHandlerMap(): TaskHandlerMap {
     [Task.GenerateAIMindMap, generateAIMindMap],
     [Task.MemoryDialogue, generateMemoryDialogue],
     [Task.UpdatedMemoryInsights, generateUpdatedMemoryInsights],
-    [Task.KnowMeStart, generateKnowMeAnalysis],
-    [Task.KnowMeScenarios, generateKnowMeScenarios],
-    [Task.KnowMeScore, scoreKnowMeAnswer],
-    [Task.KnowMeReport, generateKnowMeReport],
     [Task.PrimeMeNarrative, generatePrimeMeNarrative],
     [Task.StudyGuideGeneration, generateStudyGuide],
     [Task.EpistemicDriverGeneration, generateEpistemicDriver],
@@ -159,15 +149,6 @@ export function validateOrchestratorRequest(request: ADKRequest): {
         return {
           isValid: false,
           error: 'Memories data is required for memory analysis'
-        };
-      }
-      break;
-
-    case Task.KnowMeScore:
-      if (!request.answers && !request.payload.answers) {
-        return {
-          isValid: false,
-          error: 'Answers are required for Know Me scoring'
         };
       }
       break;

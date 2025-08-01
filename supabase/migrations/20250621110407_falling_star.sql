@@ -45,6 +45,6 @@ CREATE POLICY "Users can delete their own memories"
   USING (auth.uid() = user_id);
 
 -- Add indexes for better performance
-CREATE INDEX idx_memories_user_id ON memories(user_id);
-CREATE INDEX idx_memories_category ON memories(category);
-CREATE INDEX idx_memories_created_at ON memories(created_at);
+CREATE INDEX IF NOT EXISTS idx_memories_user_id ON memories(user_id);
+CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);

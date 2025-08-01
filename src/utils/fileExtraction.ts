@@ -175,7 +175,7 @@ export class FileExtractor {
    */
   static async extractFromMultipleFiles(
     files: File[], 
-    config: FileExtractionConfig = {}
+    _config: FileExtractionConfig = {}
   ): Promise<{
     combinedContent: string;
     results: ExtractedFileData[];
