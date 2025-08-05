@@ -1,13 +1,13 @@
 // Phase 3: Rich Media & Advanced Collaboration - Multimedia Node Component
 // Enhanced node component that supports images, videos, audio, and documents
 
-import React, { useState, useCallback, useRef, memo } from 'react';
+import React, { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Pause, Volume2, VolumeX, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, Paperclip, Eye, EyeOff, Maximize2,
-  Edit3, Trash2, Copy, Share2, MoreHorizontal
+  Edit3, Trash2, Copy, Share2, MoreHorizontal, RotateCw, RotateCcw, X
 } from 'lucide-react';
 import { MultimediaFile } from '../../services/multimediaUploadService';
 
@@ -22,6 +22,7 @@ export interface MultimediaNodeData {
   fontWeight: 'normal' | 'bold';
   borderWidth: number;
   borderRadius: number;
+  textRotation?: number; // Text rotation in degrees
   
   // Multimedia properties
   mediaFiles?: MultimediaFile[];
@@ -359,6 +360,7 @@ export const MultimediaNode: React.FC<NodeProps<MultimediaNodeData>> = memo(({
   const [label, setLabel] = useState(data.label);
   const [showMediaExpanded, setShowMediaExpanded] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
 
   const handleLabelChange = useCallback((newLabel: string) => {
     setLabel(newLabel);
@@ -379,7 +381,36 @@ export const MultimediaNode: React.FC<NodeProps<MultimediaNodeData>> = memo(({
     }
   }, [label, data.label, handleLabelChange]);
 
-  const getNodeStyle = () => {
+  const handleRotateText = useCallback((direction: 'left' | 'right') => {
+    const currentRotation = data.textRotation || 0;
+    const increment = direction === 'right' ? 15 : -15;
+    const newRotation = (currentRotation + increment) % 360;
+    
+    // Dispatch custom event to update node data
+    const event = new CustomEvent('updateNode', {
+      detail: {
+        nodeId: id,
+        updates: { textRotation: newRotation }
+      }
+    });
+    window.dispatchEvent(event);
+  }, [data.textRotation, id]);
+
+   // Close context menu when clicking outside
+   useEffect(() => {
+     const handleClickOutside = (event: MouseEvent) => {
+       if (showContextMenu) {
+         setShowContextMenu(false);
+       }
+     };
+
+     if (showContextMenu) {
+       document.addEventListener('mousedown', handleClickOutside);
+       return () => document.removeEventListener('mousedown', handleClickOutside);
+     }
+   }, [showContextMenu]);
+ 
+   const getNodeStyle = () => {
     const baseStyle: React.CSSProperties = {
       background: data.color,
       color: data.textColor,
@@ -428,7 +459,12 @@ export const MultimediaNode: React.FC<NodeProps<MultimediaNodeData>> = memo(({
       />
       
       {/* Node content */}
-      <div className="p-3 space-y-3">
+      <div 
+        className="p-3 space-y-3 transition-transform duration-300"
+        style={{
+          transform: `rotate(${data.textRotation || 0}deg)`
+        }}
+      >
         {/* Label */}
         <div className="text-center">
           {isEditing ? (
@@ -506,12 +542,41 @@ export const MultimediaNode: React.FC<NodeProps<MultimediaNodeData>> = memo(({
             >
               <Edit3 className="w-3 h-3" />
             </button>
-            <button
-              className="w-6 h-6 bg-gray-500 text-white rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors"
-              title="More options"
-            >
-              <MoreHorizontal className="w-3 h-3" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowContextMenu(!showContextMenu)}
+                className="w-6 h-6 bg-gray-500 text-white rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors"
+                title="More options"
+              >
+                <MoreHorizontal className="w-3 h-3" />
+              </button>
+              
+              {/* Context Menu */}
+              {showContextMenu && (
+                <div className="absolute top-8 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                  <button
+                    onClick={() => {
+                      handleRotateText('left');
+                      setShowContextMenu(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Rotate Text Left
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleRotateText('right');
+                      setShowContextMenu(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                    Rotate Text Right
+                  </button>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -35,26 +35,23 @@ export const callEdgeFunction = async (functionName: string, payload: unknown) =
     console.log(`📡 Response status: ${response.status} ${response.statusText}`);
     console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
 
+    const responseData = await response.json();
+    console.log(`📡 Response data:`, responseData);
+
     if (!response.ok) {
       let errorMessage = `Edge function ${functionName} failed with status ${response.status}`
 
-      try {
-        const errorData = await response.json()
-        console.log(`📡 Error response data:`, errorData);
-        if (errorData.error) {
-          errorMessage = errorData.error
-        } else {
-          errorMessage += `: ${response.statusText}`
-        }
-      } catch (parseError) {
-        console.log(`📡 Failed to parse error response:`, parseError);
+      console.log(`📡 Error response data:`, responseData);
+      if (responseData.error) {
+        errorMessage = responseData.error
+      } else {
         errorMessage += `: ${response.statusText}`
       }
 
       throw new Error(errorMessage)
     }
 
-    return await response.json()
+    return responseData
   } catch (error) {
     clearTimeout(timeoutId);
 

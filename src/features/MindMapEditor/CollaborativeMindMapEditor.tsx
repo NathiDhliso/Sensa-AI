@@ -36,6 +36,7 @@ import { collaborationService } from '../../services/collaborationService';
 import { Button } from '../../components';
 import SimpleAdvancedNode, { SimpleAdvancedNodeData as AdvancedNodeData } from './SimpleAdvancedNode';
 import MultimediaNode, { MultimediaNodeData } from './MultimediaNode';
+import { MindMapNode, MindMapNodeData } from './MindMapNode/MindMapNode';
 import { CollaborativeChat } from './CollaborativeChat';
 import { VoiceVideoChat } from './VoiceVideoChat';
 import { PresenceIndicator } from './PresenceIndicator';
@@ -57,6 +58,7 @@ import '@xyflow/react/dist/style.css';
 const nodeTypes = {
   advanced: SimpleAdvancedNode,
   multimedia: MultimediaNode,
+  mindmap: MindMapNode,
 };
 
 // Collaborative cursor component
@@ -310,6 +312,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   const [chatActiveTab, setChatActiveTab] = useState<'messages' | 'voice'>('messages');
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
   
   // Phase 3 UI state
   const [showFileSharing, setShowFileSharing] = useState(false);
@@ -319,7 +322,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   const [drawingSize, setDrawingSize] = useState(3);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showEnhancedExport, setShowEnhancedExport] = useState(false);
-  const [currentNodeType, setCurrentNodeType] = useState<'advanced' | 'multimedia'>('advanced');
+  const [currentNodeType, setCurrentNodeType] = useState<'advanced' | 'multimedia' | 'mindmap'>('mindmap');
   
   // Phase 4 UI state
   const [showLearningAnalytics, setShowLearningAnalytics] = useState(false);
@@ -606,7 +609,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   }, [isDemoMode, setEdges, addOperation]);
 
   // Handle node addition
-  const addNode = useCallback((nodeType: 'advanced' | 'multimedia' = currentNodeType) => {
+  const addNode = useCallback((nodeType: 'advanced' | 'multimedia' | 'mindmap' = currentNodeType) => {
     // Update current tool to indicate node creation (skip in demo mode)
     if (!isDemoMode) {
       updateCurrentTool('create');
@@ -621,7 +624,8 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
       fontSize: 14,
       fontWeight: 'normal' as const,
       borderWidth: 2,
-      borderRadius: 8
+      borderRadius: 8,
+      rotation: 0
     };
     
     const newNode: Node = {
@@ -635,6 +639,12 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
             showMediaPreview: true,
             mediaLayout: 'thumbnail' as const
           } as MultimediaNodeData
+        : nodeType === 'mindmap'
+        ? {
+            ...baseNodeData,
+            level: 1,
+            isRoot: false
+          } as MindMapNodeData
         : baseNodeData as AdvancedNodeData,
     };
     
@@ -733,6 +743,48 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
     onSave?.({ nodes, edges });
   }, [isDemoMode, createSnapshot, onSave, nodes, edges]);
 
+  // Handle quick export
+  const handleQuickExport = useCallback(async (format: 'json' | 'png' | 'pdf') => {
+    try {
+      const timestamp = new Date().toISOString().split('T')[0];
+      const sessionName = currentSession?.name || 'mindmap';
+      
+      if (format === 'json') {
+        const exportData = {
+          name: sessionName,
+          created_at: new Date().toISOString(),
+          nodes,
+          edges,
+          metadata: {
+            total_nodes: nodes.length,
+            total_edges: edges.length,
+            export_format: 'sensa_mindmap_v1',
+            collaborators: participants.map(p => p.user_id)
+          }
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+          type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sessionName}-${timestamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // For PNG and PDF, open the enhanced export modal with the format pre-selected
+        setShowEnhancedExport(true);
+      }
+      
+      setShowSaveMenu(false);
+    } catch (error) {
+      console.error('Quick export failed:', error);
+    }
+  }, [nodes, edges, currentSession, participants, setShowEnhancedExport]);
+
   // Handle close
   const handleClose = useCallback(async () => {
     if (!isDemoMode) {
@@ -740,6 +792,20 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
     }
     onClose?.();
   }, [isDemoMode, leaveSession, onClose]);
+
+  // Close save menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSaveMenu) {
+        setShowSaveMenu(false);
+      }
+    };
+
+    if (showSaveMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSaveMenu]);
 
   if (!isDemoMode && connectionStatus === 'connecting') {
     return (
@@ -873,13 +939,71 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
             <div className="w-px h-6 bg-white bg-opacity-30" />
             
             {/* Actions */}
-            <button
-              onClick={handleSave}
-              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded transition-colors"
-              title="Save"
-            >
-              <Save className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowSaveMenu(!showSaveMenu)}
+                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded transition-colors flex items-center gap-1"
+                title="Save & Export"
+              >
+                <Save className="w-4 h-4" />
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              
+              {showSaveMenu && (
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={handleSave}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      Quick Save
+                    </button>
+                    
+                    <div className="border-t border-gray-100 my-1" />
+                    
+                    <button
+                      onClick={() => handleQuickExport('json')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export as JSON
+                    </button>
+                    
+                    <button
+                      onClick={() => handleQuickExport('png')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Image className="w-4 h-4" />
+                      Export as PNG
+                    </button>
+                    
+                    <button
+                      onClick={() => handleQuickExport('pdf')}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export as PDF
+                    </button>
+                    
+                    <div className="border-t border-gray-100 my-1" />
+                    
+                    <button
+                      onClick={() => {
+                        setShowEnhancedExport(true);
+                        setShowSaveMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Advanced Export...
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             
             <button
               onClick={() => setShowEnhancedExport(true)}
@@ -1007,7 +1131,10 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
                       <Pen className="w-4 h-4 text-blue-600" />
                       <span className="text-sm font-medium">Drawing Tools</span>
                       <button
-                        onClick={() => setShowDrawingTools(false)}
+                        onClick={() => {
+                          setShowDrawingTools(false);
+                          setCurrentDrawingTool('select');
+                        }}
                         className="ml-auto p-1 text-gray-400 hover:text-gray-600"
                       >
                         <X className="w-3 h-3" />
@@ -1128,13 +1255,24 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
                       >
                         <Image className="w-3 h-3" />
                       </button>
+                      <button
+                        onClick={() => setCurrentNodeType('mindmap')}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentNodeType === 'mindmap' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                        title="Mind Map Node"
+                      >
+                        <Circle className="w-3 h-3" />
+                      </button>
                     </div>
                     
                     {/* Add node button */}
                     <button
                       onClick={() => addNode()}
                       className="p-2 hover:bg-gray-100 rounded transition-colors"
-                      title={`Add ${currentNodeType === 'multimedia' ? 'Multimedia' : 'Advanced'} Node`}
+                      title={`Add ${currentNodeType === 'multimedia' ? 'Multimedia' : currentNodeType === 'mindmap' ? 'Mind Map' : 'Advanced'} Node`}
                     >
                       <span className="text-2xl">+</span>
                     </button>
@@ -1363,6 +1501,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
                   key={nodeId}
                   nodeId={nodeId}
                   nodeLabel={analysis.nodeLabel}
+                  initialSolution={analysis.nodeLabel}
                   onProblemSelect={(problem: string) => handleRootProblemSelect(nodeId, problem)}
                   onClose={() => {
                     setActiveAnalyses(prev => {

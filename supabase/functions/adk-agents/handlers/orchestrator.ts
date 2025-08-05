@@ -14,16 +14,11 @@ import type { ADKRequest, TaskHandler, TaskHandlerMap } from '../types.ts';
 // Import analysis modules
 import { generateCourseAnalysis, generateDocumentAnalysis } from '../analysis/course.ts';
 import { generateMemoryAnalysis } from '../analysis/memory.ts';
-import { 
-  generateSubjectIdentification,
-  generateAIMindMap,
-  generateMemoryDialogue,
-  generateUpdatedMemoryInsights 
-} from '../features/memory.ts';
 import { generatePrimeMeNarrative } from '../features/primeMe.ts';
 import { generateStudyGuide } from '../features/studyGuideGenerator.ts';
 import { generateEpistemicDriver } from '../features/epistemicDriver.ts';
 import { generateBusinessLensWorkflow } from '../features/businessLens.ts';
+import { generateRootProblemAnalysis } from '../features/rootProblemAnalysis.ts';
 
 /**
  * Create task handler mapping for clean routing
@@ -33,14 +28,11 @@ function createTaskHandlerMap(): TaskHandlerMap {
     [Task.ComprehensiveCourseAnalysis, generateCourseAnalysis],
     [Task.DocumentContentAnalysis, generateDocumentAnalysis],
     [Task.MemoryAnalysis, generateMemoryAnalysis],
-    [Task.SubjectIdentification, generateSubjectIdentification],
-    [Task.GenerateAIMindMap, generateAIMindMap],
-    [Task.MemoryDialogue, generateMemoryDialogue],
-    [Task.UpdatedMemoryInsights, generateUpdatedMemoryInsights],
     [Task.PrimeMeNarrative, generatePrimeMeNarrative],
     [Task.StudyGuideGeneration, generateStudyGuide],
     [Task.EpistemicDriverGeneration, generateEpistemicDriver],
     [Task.BusinessLensWorkflow, generateBusinessLensWorkflow],
+    [Task.RootProblemAnalysis, generateRootProblemAnalysis],
   ]);
 }
 

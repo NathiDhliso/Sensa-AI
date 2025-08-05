@@ -41,6 +41,7 @@ export enum Task {
   StudyGuideGeneration = 'study_guide_generation',
   EpistemicDriverGeneration = 'epistemic_driver_generation',
   BusinessLensWorkflow = 'business_lens_workflow',
+  RootProblemAnalysis = 'root_problem_analysis',
 }
 
 // Agent types

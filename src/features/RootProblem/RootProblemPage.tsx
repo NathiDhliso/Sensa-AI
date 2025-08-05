@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { usePageTheme, useThemeClasses } from '../../contexts/themeUtils';
 import { useUIStore } from '../../stores';
-import { callEdgeFunction } from '../../services/edgeFunctions';
+import { supabaseServices } from '../../services';
 import { BackButton } from '../../components';
 
 interface AnalysisState {
@@ -28,6 +28,11 @@ interface AnalysisState {
   isLoading: boolean;
   currentView: 'standard' | 'child-friendly';
   error: string | null;
+  progress: {
+    currentStep: number;
+    totalSteps: number;
+    currentStepName: string;
+  };
 }
 
 const RootProblemPage: React.FC = () => {
@@ -42,7 +47,12 @@ const RootProblemPage: React.FC = () => {
     childFriendlyResults: [],
     isLoading: false,
     currentView: 'standard',
-    error: null
+    error: null,
+    progress: {
+      currentStep: 0,
+      totalSteps: 10, // 5 steps for each analysis type
+      currentStepName: ''
+    }
   });
   
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -65,18 +75,37 @@ const RootProblemPage: React.FC = () => {
     'They don\'t fix it because: "${context}". What\'s the real, real, deep-down reason for all of this? Tell me the big secret in one super simple sentence.'
   ];
 
-  const runAnalysis = async (prompts: string[], isChildFriendly: boolean) => {
+  const runAnalysis = async (prompts: string[], isChildFriendly: boolean, stepOffset: number = 0) => {
     const results = [analysis.initialSolution];
     let currentContext = analysis.initialSolution;
 
     for (let i = 0; i < prompts.length; i++) {
       try {
+        // Update progress
+        const currentStep = stepOffset + i + 1;
+        const stepName = `${isChildFriendly ? 'Child-Friendly' : 'Standard'} Analysis - Step ${i + 1}/5`;
+        
+        setAnalysis(prev => ({
+          ...prev,
+          progress: {
+            ...prev.progress,
+            currentStep,
+            currentStepName: stepName
+          }
+        }));
+
         // Replace ${context} placeholder with the current context
         const prompt = prompts[i].replace('${context}', currentContext);
         
-        const response = await callEdgeFunction('process-chat-message', {
-          message: prompt,
-          context: 'root-problem-analysis'
+        const response = await supabaseServices.callADKAgents({
+          agent_type: 'orchestrator',
+          task: 'root_problem_analysis',
+          payload: {
+            message: prompt,
+            context: 'root-problem-analysis',
+            step: i + 1,
+            analysis_type: isChildFriendly ? 'child-friendly' : 'standard'
+          }
         });
 
         if (response.success && response.data?.response) {
@@ -104,20 +133,36 @@ const RootProblemPage: React.FC = () => {
       return;
     }
 
-    setAnalysis(prev => ({ ...prev, isLoading: true, error: null }));
+    setAnalysis(prev => ({
+      ...prev,
+      isLoading: true,
+      error: null,
+      standardResults: [],
+      childFriendlyResults: [],
+      progress: {
+        currentStep: 0,
+        totalSteps: 10,
+        currentStepName: 'Starting analysis...'
+      }
+    }));
 
     try {
-      // Run both analyses in parallel
+      // Run both analyses in parallel with progress tracking
       const [standardResults, childFriendlyResults] = await Promise.all([
-        runAnalysis(standardPrompts, false),
-        runAnalysis(childFriendlyPrompts, true)
+        runAnalysis(standardPrompts, false, 0), // Steps 1-5
+        runAnalysis(childFriendlyPrompts, true, 5) // Steps 6-10
       ]);
 
       setAnalysis(prev => ({
         ...prev,
         standardResults,
         childFriendlyResults,
-        isLoading: false
+        isLoading: false,
+        progress: {
+          currentStep: 10,
+          totalSteps: 10,
+          currentStepName: 'Analysis complete!'
+        }
       }));
 
       addNotification({
@@ -253,6 +298,42 @@ const RootProblemPage: React.FC = () => {
             </motion.button>
           </div>
         </motion.div>
+
+        {/* Progress Indicator */}
+        <AnimatePresence>
+          {analysis.isLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`${themeClasses.bg.card} border ${themeClasses.border.light} rounded-2xl p-6 mb-6`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Loader2 className="w-5 h-5 text-indigo-500" style={{ animation: 'spin 1s linear infinite' }} />
+                <div className="flex-1">
+                  <div className={`text-sm font-medium ${themeClasses.text.primary} mb-1`}>
+                    {analysis.progress.currentStepName}
+                  </div>
+                  <div className={`text-xs ${themeClasses.text.secondary}`}>
+                    Step {analysis.progress.currentStep} of {analysis.progress.totalSteps}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className={`w-full ${themeClasses.bg.secondary} rounded-full h-2`}>
+                <motion.div
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: `${(analysis.progress.currentStep / analysis.progress.totalSteps) * 100}%` 
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Results Section */}
         <AnimatePresence>

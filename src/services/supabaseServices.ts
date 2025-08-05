@@ -485,54 +485,8 @@ export const courseAnalysisService = {
   },
 };
 
-// Legacy Edge Function Services - MIGRATED TO ADK
-// These functions now redirect to the new ADK multi-agent system
-export const edgeFunctionService = {
-  async analyzeMemory(memoryContent: string, category: string) {
-    console.warn('⚠️ Using legacy edgeFunctionService.analyzeMemory - consider migrating to SensaAPI.analyzeMemory');
-    // Redirect to new ADK system
-    const { SensaAPI } = await import('./api');
-    return await SensaAPI.analyzeMemory(memoryContent, category);
-  },
-
-  async analyzeCourse(courseQuery: string) {
-    console.warn('⚠️ Using legacy edgeFunctionService.analyzeCourse - consider migrating to SensaAPI.analyzeCourse');
-    // For compatibility, get current user and redirect to new system
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const { SensaAPI } = await import('./api');
-    const result = await SensaAPI.analyzeCourse(courseQuery, user.id);
-    return result.course_analysis;
-  },
-
-  async generateCareerPathways(courseName: string) {
-    console.warn('⚠️ Using legacy edgeFunctionService.generateCareerPathways - consider migrating to SensaAPI.generateCareerPathways');
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const { SensaAPI } = await import('./api');
-    return await SensaAPI.generateCareerPathways(courseName, user.id);
-  },
-
-  async generateStudyMap(fieldOfStudy: string, courseSyllabus: string[]) {
-    console.warn('⚠️ Using legacy edgeFunctionService.generateStudyMap - consider migrating to SensaAPI.generateStudyMap');
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const { SensaAPI } = await import('./api');
-    return await SensaAPI.generateStudyMap(fieldOfStudy, courseSyllabus, user.id);
-  },
-
-  async generateMermaidMap(fieldOfStudy: string, courseSyllabus: string[]) {
-    console.warn('⚠️ Using legacy edgeFunctionService.generateMermaidMap - consider migrating to SensaAPI.generateMermaidStudyMap');
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-    
-    const { SensaAPI } = await import('./api');
-    return await SensaAPI.generateMermaidStudyMap(fieldOfStudy, courseSyllabus, user.id);
-  },
-};
+// Legacy services have been migrated to SensaAPI in api.ts
+// Use SensaAPI directly for all AI-powered functionality
 
 // User Profile Services
 export const userService = {

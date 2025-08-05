@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Target, MoreHorizontal } from 'lucide-react';
+import { Target, MoreHorizontal, RotateCw, RotateCcw } from 'lucide-react';
 
 export interface SimpleAdvancedNodeData {
   label: string;
@@ -11,6 +11,7 @@ export interface SimpleAdvancedNodeData {
   fontWeight?: 'normal' | 'bold';
   borderWidth?: number;
   borderRadius?: number;
+  textRotation?: number; // Text rotation in degrees (0-360)
   rootProblem?: string; // Store attached root problem
   [key: string]: unknown; // Index signature for Record compatibility
 }
@@ -50,6 +51,20 @@ const SimpleAdvancedNode: React.FC<NodeProps<SimpleAdvancedNodeData>> = ({
     }));
   }, [id, label]);
 
+  const handleRotateText = useCallback((direction: 'clockwise' | 'counterclockwise') => {
+    const currentRotation = data.textRotation || 0;
+    const rotationStep = 15; // Rotate by 15 degrees each time
+    const newRotation = direction === 'clockwise' 
+      ? (currentRotation + rotationStep) % 360
+      : (currentRotation - rotationStep + 360) % 360;
+    
+    setShowContextMenu(false);
+    // Dispatch custom event to update node
+    window.dispatchEvent(new CustomEvent('updateNode', {
+      detail: { id, updates: { textRotation: newRotation } }
+    }));
+  }, [id, data.textRotation]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -82,7 +97,12 @@ const SimpleAdvancedNode: React.FC<NodeProps<SimpleAdvancedNodeData>> = ({
       <Handle type="target" position={Position.Top} />
       
       {/* Main content */}
-      <div style={{ textAlign: 'center', wordBreak: 'break-word' }}>
+      <div style={{ 
+        textAlign: 'center', 
+        wordBreak: 'break-word',
+        transform: `rotate(${data.textRotation || 0}deg)`,
+        transition: 'transform 0.3s ease'
+      }}>
         {isEditing ? (
           <input
             type="text"
@@ -190,6 +210,50 @@ const SimpleAdvancedNode: React.FC<NodeProps<SimpleAdvancedNodeData>> = ({
           >
             <Target size={16} color="#6B46C1" />
             Root Problem Analysis
+          </button>
+          
+          <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '4px 0' }} />
+          
+          <button
+            onClick={() => handleRotateText('counterclockwise')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: 'none',
+              background: 'none',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#374151',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            className="hover:bg-gray-50"
+          >
+            <RotateCcw size={16} color="#059669" />
+            Rotate Text Left
+          </button>
+          
+          <button
+            onClick={() => handleRotateText('clockwise')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: 'none',
+              background: 'none',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#374151',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            className="hover:bg-gray-50"
+          >
+            <RotateCw size={16} color="#059669" />
+            Rotate Text Right
           </button>
         </div>
       )}

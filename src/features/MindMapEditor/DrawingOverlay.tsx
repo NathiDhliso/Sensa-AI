@@ -60,27 +60,46 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   const getCanvasDimensions = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return { width: 0, height: 0 };
-    return { width: canvas.offsetWidth, height: canvas.offsetHeight };
+    
+    // Use parent container dimensions or fallback to window dimensions
+    const parent = canvas.parentElement;
+    if (parent) {
+      return { 
+        width: parent.clientWidth || window.innerWidth, 
+        height: parent.clientHeight || window.innerHeight 
+      };
+    }
+    
+    return { 
+      width: canvas.offsetWidth || window.innerWidth, 
+      height: canvas.offsetHeight || window.innerHeight 
+    };
   }, []);
 
   // Update canvas size
   useEffect(() => {
     const updateCanvasSize = () => {
       const { width, height } = getCanvasDimensions();
-      if (canvasRef.current) {
+      
+      if (canvasRef.current && width > 0 && height > 0) {
         canvasRef.current.width = width;
         canvasRef.current.height = height;
       }
-      if (overlayCanvasRef.current) {
+      if (overlayCanvasRef.current && width > 0 && height > 0) {
         overlayCanvasRef.current.width = width;
         overlayCanvasRef.current.height = height;
       }
     };
 
-    updateCanvasSize();
+    // Initial size update with a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(updateCanvasSize, 100);
+    
     window.addEventListener('resize', updateCanvasSize);
-    return () => window.removeEventListener('resize', updateCanvasSize);
-  }, [getCanvasDimensions]);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, [getCanvasDimensions, isActive]);
 
   // Redraw canvas
   const redrawCanvas = useCallback(() => {
@@ -415,7 +434,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   if (!isActive) return null;
 
   return (
-    <div className="absolute inset-0" style={{ zIndex: 500, pointerEvents: currentTool === 'select' ? 'none' : 'auto' }}>
+    <div 
+      className="absolute inset-0" 
+      style={{ 
+        zIndex: currentTool === 'select' ? -1 : 500, 
+        pointerEvents: currentTool === 'select' ? 'none' : 'auto' 
+      }}
+    >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"

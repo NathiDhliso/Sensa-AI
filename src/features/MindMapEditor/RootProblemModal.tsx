@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useThemeClasses } from '../../contexts/themeUtils';
 import { useUIStore } from '../../stores';
-import { callEdgeFunction } from '../../services/edgeFunctions';
+import { supabaseServices } from '../../services';
 import { Button } from '../../components';
 
 interface AnalysisState {
@@ -57,10 +57,11 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
   isMinimized = false
 }) => {
   const themeClasses = useThemeClasses();
-  const { addNotification } = useUIStore();
+  const { theme, addNotification } = useUIStore();
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   
   const [analysis, setAnalysis] = useState<AnalysisState>({
-    initialSolution: initialSolution || nodeLabel,
+    initialSolution: initialSolution || nodeLabel || '',
     standardResults: [],
     childFriendlyResults: [],
     isLoading: false,
@@ -72,95 +73,109 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
       currentStepName: ''
     }
   });
-  
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Standard prompts for 5-Why analysis
+  // Effect to update initial solution when props change
+  useEffect(() => {
+    const newInitialSolution = initialSolution || nodeLabel || '';
+    if (newInitialSolution !== analysis.initialSolution) {
+      setAnalysis(prev => ({
+        ...prev,
+        initialSolution: newInitialSolution
+      }));
+    }
+  }, [initialSolution, nodeLabel]);
+
+  // Standard prompts for 5-Why analysis - STRICT single sentence responses only
   const standardPrompts = [
-    'Analyze the following solution and identify the single, most direct problem it solves. State the problem in one short sentence. Solution: "${context}"',
-    'The problem is: "${context}". Why is this a significant problem? Summarize the reason in one concise sentence.',
-    'It\'s a problem because: "${context}". What is the direct underlying cause? Describe the cause in one short sentence.',
-    'The cause is: "${context}". Why does this cause persist? Explain why in one concise sentence.',
-    'It persists because: "${context}". What is the absolute fundamental, root-cause reason for this entire chain of issues? State the root cause in one short, impactful sentence.'
+    'IMPORTANT: Answer in exactly ONE sentence only. No explanations, no lists, no elaboration. What specific technical problem does this solution address? Solution: "${context}"',
+    'IMPORTANT: Answer in exactly ONE sentence only. No explanations, no elaboration. The problem is: "${context}". Why does this problem impact users or systems?',
+    'IMPORTANT: Answer in exactly ONE sentence only. No explanations, no elaboration. It impacts because: "${context}". What causes this impact to occur?',
+    'IMPORTANT: Answer in exactly ONE sentence only. No explanations, no elaboration. The cause is: "${context}". Why does this cause exist?',
+    'IMPORTANT: Answer in exactly ONE sentence only. No explanations, no elaboration. It exists because: "${context}". What is the fundamental root cause?'
   ];
 
-  // Child-friendly prompts for 5-Why analysis
+  // Child-friendly prompts for 5-Why analysis - STRICT single sentence responses only
   const childFriendlyPrompts = [
-    'Here\'s an idea: "${context}". What problem is it trying to fix? Tell me in one super simple sentence, like for a kid.',
-    'The problem is: "${context}". Why is that a big deal? Explain why it\'s a problem in one simple sentence.',
-    'It\'s a problem because: "${context}". Why does that happen? Tell me the reason in one easy sentence.',
-    'It happens because: "${context}". Why doesn\'t someone just fix that? Give me one simple reason.',
-    'They don\'t fix it because: "${context}". What\'s the real, real, deep-down reason for all of this? Tell me the big secret in one super simple sentence.'
+    'IMPORTANT: Answer in exactly ONE simple sentence only. No explanations, no lists. Here\'s an idea: "${context}". What problem is it trying to fix?',
+    'IMPORTANT: Answer in exactly ONE simple sentence only. No explanations. The problem is: "${context}". Why is that a big deal?',
+    'IMPORTANT: Answer in exactly ONE simple sentence only. No explanations. It\'s a problem because: "${context}". Why does that happen?',
+    'IMPORTANT: Answer in exactly ONE simple sentence only. No explanations. It happens because: "${context}". Why doesn\'t someone just fix that?',
+    'IMPORTANT: Answer in exactly ONE simple sentence only. No explanations. They don\'t fix it because: "${context}". What\'s the real, deep-down reason for all of this?'
   ];
 
+  const copyToClipboard = useCallback(async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  }, []);
 
+  // Mirror the dashboard implementation with progress tracking
+  const runAnalysis = async (prompts: string[], isChildFriendly: boolean, stepOffset: number = 0, initialSolution: string) => {
+    // Validate that we have a valid initial solution
+    if (!initialSolution || !initialSolution.trim()) {
+      throw new Error('Initial solution is required for analysis');
+    }
 
-  // Optimized sequential analysis with progressive display and faster processing
-  const runOptimizedSequentialAnalysis = async (prompts: string[], isChildFriendly: boolean, stepOffset: number = 0) => {
-    const results = [];
-    let currentContext = analysis.initialSolution;
-    const analysisType = isChildFriendly ? 'child-friendly' : 'standard';
+    const results = [initialSolution];
+    let currentContext = initialSolution;
 
     for (let i = 0; i < prompts.length; i++) {
       try {
-        const stepNumber = stepOffset + i + 1;
-        const stepName = `${analysisType} analysis - Step ${i + 1}/5`;
+        // Update progress
+        const currentStep = stepOffset + i + 1;
+        const stepName = `${isChildFriendly ? 'Child-Friendly' : 'Standard'} Analysis - Step ${i + 1}/5`;
         
-        // Update progress immediately
         setAnalysis(prev => ({
           ...prev,
           progress: {
             ...prev.progress,
-            currentStep: stepNumber,
+            currentStep,
             currentStepName: stepName
           }
         }));
 
-        // Optimized prompt with clearer instructions for faster AI processing
-        const optimizedPrompt = prompts[i].replace('${context}', currentContext) + 
-          ' Respond with exactly one concise sentence. Be direct and specific.';
+        // Validate current context before creating prompt
+        if (!currentContext || !currentContext.trim()) {
+          throw new Error('Context is empty - cannot continue analysis');
+        }
+
+        // Replace ${context} placeholder with the current context
+        const prompt = prompts[i].replace('${context}', currentContext.trim());
         
-        // Use Promise.race for faster timeout and better error handling
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 30000)
-        );
+        // Additional validation to ensure prompt is not empty
+        if (!prompt || prompt.trim().length < 20) {
+          throw new Error(`Generated prompt is too short or empty. Context: "${currentContext.trim()}", Prompt: "${prompt}"`);
+        }
         
-        const apiPromise = callEdgeFunction('process-chat-message', {
-          message: optimizedPrompt,
-          context: `root-problem-analysis-${analysisType}-${i}`,
-          temperature: 0.3, // Lower temperature for more focused, faster responses
-          max_tokens: 100 // Limit tokens for faster processing
+        // Validate that the context was properly replaced
+        if (prompt.includes('${context}')) {
+          throw new Error('Failed to replace context placeholder in prompt');
+        }
+        
+        const response = await supabaseServices.callADKAgents({
+          agent_type: 'orchestrator',
+          task: 'root_problem_analysis',
+          payload: {
+            message: prompt,
+            context: 'root-problem-analysis',
+            step: i + 1,
+            analysis_type: isChildFriendly ? 'child-friendly' : 'standard'
+          }
         });
 
-        const response = await Promise.race([apiPromise, timeoutPromise]);
-
         if (response.success && response.data?.response) {
-          currentContext = response.data.response.trim();
+          // The AI's response becomes the new context for the next step
+          currentContext = response.data.response;
           results.push(currentContext);
-          
-          // Progressive display - show results as they come in
-          setAnalysis(prev => {
-            const newResults = isChildFriendly 
-              ? [...prev.childFriendlyResults]
-              : [...prev.standardResults];
-            
-            // Add the new result
-            if (newResults.length <= i + 1) {
-              newResults.push(currentContext);
-            } else {
-              newResults[i + 1] = currentContext;
-            }
-            
-            return {
-              ...prev,
-              [isChildFriendly ? 'childFriendlyResults' : 'standardResults']: newResults
-            };
-          });
         } else {
           throw new Error('Failed to get AI response');
         }
       } catch (error) {
-        console.error(`Error in ${analysisType} analysis step ${i + 1}:`, error);
+        console.error(`Error in ${isChildFriendly ? 'child-friendly' : 'standard'} analysis step ${i + 1}:`, error);
         throw error;
       }
     }
@@ -168,94 +183,61 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
     return results;
   };
 
-  // Fast initial analysis that provides immediate value
-  const runQuickAnalysis = async () => {
-    try {
-      const quickPrompt = `Quickly identify the main problem this solution addresses and suggest the most likely root cause. Solution: "${analysis.initialSolution}". Respond with: Problem: [one sentence] | Root Cause: [one sentence]`;
-      
-      const response = await callEdgeFunction('process-chat-message', {
-        message: quickPrompt,
-        context: 'quick-root-analysis',
-        temperature: 0.2,
-        max_tokens: 80
-      });
-
-      if (response.success && response.data?.response) {
-        const quickResult = response.data.response;
-        // Show quick result immediately
-        setAnalysis(prev => ({
-          ...prev,
-          standardResults: [prev.initialSolution, quickResult],
-          progress: {
-            ...prev.progress,
-            currentStepName: 'Quick analysis complete - running detailed analysis...'
-          }
-        }));
-        return quickResult;
-      }
-    } catch (error) {
-      console.log('Quick analysis failed, proceeding with full analysis');
-    }
-    return null;
-  };
-
-  const handleStartAnalysis = async () => {
-    if (!analysis.initialSolution.trim()) {
+  const performAnalysis = useCallback(async () => {
+    const trimmedSolution = analysis.initialSolution?.trim() || '';
+    
+    if (!trimmedSolution) {
       addNotification({
         type: 'error',
-        message: 'Please enter a solution to analyze'
+        message: 'Please enter a solution to analyze before starting the analysis'
       });
+      setAnalysis(prev => ({
+        ...prev,
+        error: 'No solution provided for analysis'
+      }));
       return;
     }
 
-    setAnalysis(prev => ({ 
-      ...prev, 
-      isLoading: true, 
+    if (trimmedSolution.length < 10) {
+      addNotification({
+        type: 'error',
+        message: 'Please provide a more detailed solution description (at least 10 characters)'
+      });
+      setAnalysis(prev => ({
+        ...prev,
+        error: 'Solution description is too short for meaningful analysis'
+      }));
+      return;
+    }
+
+    setAnalysis(prev => ({
+      ...prev,
+      isLoading: true,
       error: null,
-      standardResults: [prev.initialSolution], // Reset with initial solution
-      childFriendlyResults: [prev.initialSolution],
+      standardResults: [],
+      childFriendlyResults: [],
       progress: {
         currentStep: 0,
-        totalSteps: 11, // Quick + 5 standard + 5 child-friendly
-        currentStepName: 'Starting quick analysis...'
+        totalSteps: 10,
+        currentStepName: 'Starting analysis...'
       }
     }));
 
     try {
-      // Step 1: Quick analysis for immediate feedback (1-2 seconds)
-      await runQuickAnalysis();
-      
-      // Step 2: Run optimized standard analysis (steps 2-6)
-      setAnalysis(prev => ({
-        ...prev,
-        progress: {
-          ...prev.progress,
-          currentStep: 1,
-          currentStepName: 'Running detailed standard analysis...'
-        }
-      }));
-      
-      const standardResults = await runOptimizedSequentialAnalysis(standardPrompts, false, 1);
-      
-      // Step 3: Run optimized child-friendly analysis (steps 7-11)
-      setAnalysis(prev => ({
-        ...prev,
-        progress: {
-          ...prev.progress,
-          currentStep: 6,
-          currentStepName: 'Running child-friendly analysis...'
-        }
-      }));
-      
-      const childFriendlyResults = await runOptimizedSequentialAnalysis(childFriendlyPrompts, true, 6);
+      // Run both analyses in parallel with progress tracking
+      const [standardResults, childFriendlyResults] = await Promise.all([
+        runAnalysis(standardPrompts, false, 0, trimmedSolution), // Steps 1-5
+        runAnalysis(childFriendlyPrompts, true, 5, trimmedSolution) // Steps 6-10
+      ]);
 
-      // Final update
       setAnalysis(prev => ({
         ...prev,
+        standardResults,
+        childFriendlyResults,
         isLoading: false,
         progress: {
-          currentStep: 11,
-          totalSteps: 11,
+          currentStep: 10,
+          totalSteps: 10,
           currentStepName: 'Analysis complete!'
         }
       }));
@@ -269,167 +251,78 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
       setAnalysis(prev => ({
         ...prev,
         isLoading: false,
-        error: 'Failed to complete analysis. Please try again.',
-        progress: {
-          ...prev.progress,
-          currentStepName: 'Analysis failed'
-        }
+        error: 'Failed to complete analysis. Please try again.'
       }));
       addNotification({
         type: 'error',
         message: 'Analysis failed. Please try again.'
       });
     }
-  };
+  }, [analysis.initialSolution, standardPrompts, childFriendlyPrompts, addNotification]);
 
-  // Smart mode selection based on solution complexity
-  const handleSmartAnalysis = async () => {
-    if (!analysis.initialSolution.trim()) {
-      addNotification({
-        type: 'error',
-        message: 'Please enter a solution to analyze'
-      });
-      return;
-    }
-
-    const solutionLength = analysis.initialSolution.length;
-    const isComplex = solutionLength > 200 || analysis.initialSolution.includes('multiple') || analysis.initialSolution.includes('complex');
-    
-    if (isComplex) {
-      // For complex solutions, run full analysis
-      await handleStartAnalysis();
-    } else {
-      // For simple solutions, run quick analysis only
-      setAnalysis(prev => ({ 
-        ...prev, 
-        isLoading: true, 
-        error: null,
-        standardResults: [prev.initialSolution],
-        progress: {
-          currentStep: 0,
-          totalSteps: 1,
-          currentStepName: 'Running smart quick analysis...'
-        }
-      }));
-
-      try {
-        await runQuickAnalysis();
-        
-        setAnalysis(prev => ({
-          ...prev,
-          isLoading: false,
-          progress: {
-            currentStep: 1,
-            totalSteps: 1,
-            currentStepName: 'Quick analysis complete!'
-          }
-        }));
-
-        addNotification({
-          type: 'success',
-          message: 'Quick analysis completed! Click "Full Analysis" for detailed 5-Why breakdown.'
-        });
-      } catch (error) {
-        console.error('Smart analysis failed:', error);
-        setAnalysis(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Failed to complete analysis. Please try again.'
-        }));
-      }
-    }
-  };
-
-  const handleCopy = async (text: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-      addNotification({
-        type: 'success',
-        message: 'Copied to clipboard!'
-      });
-    } catch (error) {
-      addNotification({
-        type: 'error',
-        message: 'Failed to copy to clipboard'
-      });
-    }
-  };
-
-  const handleSelectAndAttach = (problem: string) => {
+  const handleProblemSelect = useCallback((problem: string) => {
     onProblemSelect(problem);
-    addNotification({
-      type: 'success',
-      message: 'Problem attached to node!'
-    });
     onClose();
-  };
+  }, [onProblemSelect, onClose]);
 
-  const currentResults = analysis.currentView === 'standard' 
-    ? analysis.standardResults 
-    : analysis.childFriendlyResults;
-
-  const hasResults = currentResults.length > 1;
+  const currentResults = analysis.currentView === 'standard' ? analysis.standardResults : analysis.childFriendlyResults;
+  const hasResults = currentResults.length > 0;
 
   // Minimized view
   if (isMinimized) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
         className="fixed bottom-4 right-4 z-50"
       >
-        <div className={`${themeClasses.bg.card} rounded-lg shadow-lg border p-4 max-w-sm`}>
+        <div className={`${themeClasses.bg.card} rounded-lg shadow-lg p-4 border ${themeClasses.border.light} max-w-xs`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-indigo-500" />
+              <div className="bg-indigo-500 p-1 rounded">
+                <Target className="w-4 h-4 text-white" />
+              </div>
               <span className={`text-sm font-medium ${themeClasses.text.primary}`}>
-                AI Analysis Running
+                Root Analysis
               </span>
             </div>
             <div className="flex items-center gap-1">
-              {onMinimize && (
-                <button
-                  onClick={onMinimize}
-                  className={`p-1 rounded ${themeClasses.interactive.hover} ${themeClasses.text.secondary}`}
-                  title="Restore"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => onMinimize && onMinimize()}
+                className={`p-1 rounded ${themeClasses.interactive.hover} ${themeClasses.text.secondary}`}
+                title="Maximize"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
               <button
                 onClick={onClose}
                 className={`p-1 rounded ${themeClasses.interactive.hover} ${themeClasses.text.secondary}`}
-                title="Stop analysis"
+                title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
+          
           {analysis.isLoading && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 text-indigo-500" style={{ animation: 'spin 1s linear infinite' }} />
-                <span className={`text-xs ${themeClasses.text.secondary}`}>
-                  {analysis.progress.currentStepName}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(analysis.progress.currentStep / analysis.progress.totalSteps) * 100}%` }}
-                />
-              </div>
-              <div className={`text-xs ${themeClasses.text.tertiary} text-center`}>
-                {analysis.progress.currentStep}/{analysis.progress.totalSteps}
-              </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+              <span className={themeClasses.text.secondary}>
+                Step {analysis.progress.currentStep}/5
+              </span>
             </div>
           )}
-          {!analysis.isLoading && hasResults && (
-            <div className={`text-xs ${themeClasses.text.secondary}`}>
-              Analysis complete! Click to view results.
+          
+          {hasResults && (
+            <div className={`text-xs ${themeClasses.text.secondary} mt-2`}>
+              Found {currentResults.length} root causes
+            </div>
+          )}
+          
+          {analysis.error && (
+            <div className="text-xs text-red-600 mt-2">
+              Analysis failed
             </div>
           )}
         </div>
@@ -437,6 +330,7 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
     );
   }
 
+  // Full modal view
   return (
     <AnimatePresence>
       <motion.div
@@ -473,7 +367,7 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
                 <button
                   onClick={onMinimize}
                   className={`p-2 rounded-lg ${themeClasses.interactive.hover} ${themeClasses.text.secondary} hover:${themeClasses.text.primary}`}
-                  title="Minimize (continue in background)"
+                  title="Minimize"
                 >
                   <Minus className="w-5 h-5" />
                 </button>
@@ -507,6 +401,21 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
                 disabled={analysis.isLoading}
               />
               
+              {/* Input validation feedback */}
+              {analysis.initialSolution.trim().length > 0 && analysis.initialSolution.trim().length < 10 && (
+                <div className="mt-2 text-sm text-amber-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Please provide a more detailed solution description (at least 10 characters)</span>
+                </div>
+              )}
+              
+              {analysis.initialSolution.trim().length === 0 && (
+                <div className="mt-2 text-sm text-gray-500 flex items-center gap-1">
+                  <Lightbulb className="w-4 h-4" />
+                  <span>Describe the solution or approach you want to analyze for root causes</span>
+                </div>
+              )}
+              
               <div className="space-y-3 mt-4">
                 <div className="flex items-center gap-3">
                   <span className={`text-sm ${themeClasses.text.secondary}`}>View Mode:</span>
@@ -520,59 +429,28 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
                   >
                     {analysis.currentView === 'standard' ? (
                       <>
-                        <ToggleLeft className="w-5 h-5 text-gray-400" />
+                        <ToggleLeft className={`w-5 h-5 ${themeClasses.text.secondary}`} />
                         <span className={themeClasses.text.secondary}>Standard</span>
                       </>
                     ) : (
                       <>
                         <ToggleRight className="w-5 h-5 text-indigo-500" />
-                        <span className={themeClasses.text.primary}>Child-Friendly</span>
+                        <span className="text-indigo-500">Child-Friendly</span>
                       </>
                     )}
                   </button>
                 </div>
                 
-                <div className={`text-xs ${themeClasses.text.tertiary} bg-blue-50 p-3 rounded-lg`}>
-                  <div className="flex items-start gap-2">
-                    <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <span className="font-medium text-blue-700">Smart Analysis:</span> Quick 2-second analysis for simple solutions. 
-                      <span className="font-medium text-indigo-700">Full Analysis:</span> Complete 5-Why breakdown (30-60 seconds).
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                
                 <div className="flex items-center gap-3">
                   <Button
-                    onClick={handleSmartAnalysis}
-                    disabled={analysis.isLoading || !analysis.initialSolution.trim()}
-                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600"
-                  >
-                    {analysis.isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4" style={{ animation: 'spin 1s linear infinite' }} />
-                        <span>Analyzing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lightbulb className="w-4 h-4" />
-                        <span>Smart Analysis</span>
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleStartAnalysis}
+                    onClick={performAnalysis}
                     disabled={analysis.isLoading || !analysis.initialSolution.trim()}
                     className="flex items-center gap-2"
-                    variant="outline"
                   >
                     {analysis.isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4" style={{ animation: 'spin 1s linear infinite' }} />
-                        <span>Full Analysis...</span>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Analyzing...</span>
                       </>
                     ) : (
                       <>
@@ -584,6 +462,8 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
                 </div>
               </div>
             </div>
+
+
 
             {/* Progress Indicator */}
             <AnimatePresence>
@@ -649,74 +529,70 @@ const RootProblemModal: React.FC<RootProblemModalProps> = ({
                       <span className="text-sm">Switch View</span>
                     </button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     {currentResults.map((result, index) => (
                       <motion.div
-                        key={index}
+                        key={`${analysis.currentView}-${index}`}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className={`${themeClasses.bg.primary} rounded-lg p-4 relative group`}
+                        className={`${themeClasses.bg.primary} rounded-lg p-4 border ${themeClasses.border.light}`}
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              {index === 0 ? (
-                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                  S
-                                </div>
-                              ) : (
-                                <div className="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                  {index}
-                                </div>
-                              )}
+                              <div className="bg-indigo-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                {index + 1}
+                              </div>
                               <span className={`text-sm font-medium ${themeClasses.text.secondary}`}>
-                                {index === 0 ? 'Initial Solution' : `Why #${index}`}
+                                Why #{index + 1}
                               </span>
                             </div>
-                            <p className={`${themeClasses.text.primary} leading-relaxed`}>{result}</p>
+                            <p className={`${themeClasses.text.primary} leading-relaxed`}>
+                              {result}
+                            </p>
                           </div>
                           
-                          <div className="flex items-center gap-2 ml-4">
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleCopy(result, index)}
-                              className={`p-2 rounded-lg ${themeClasses.interactive.hover} opacity-0 group-hover:opacity-100 transition-opacity`}
+                              onClick={() => copyToClipboard(result, index)}
+                              className={`p-2 rounded-lg ${themeClasses.interactive.hover} ${themeClasses.text.secondary} hover:${themeClasses.text.primary} transition-colors`}
+                              title="Copy to clipboard"
                             >
                               {copiedIndex === index ? (
                                 <Check className="w-4 h-4 text-green-500" />
                               ) : (
-                                <Copy className="w-4 h-4 text-gray-500" />
+                                <Copy className="w-4 h-4" />
                               )}
                             </button>
                             
-                            {index > 0 && (
-                              <button
-                                onClick={() => handleSelectAndAttach(result)}
-                                className={`p-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors opacity-0 group-hover:opacity-100`}
-                                title="Attach to node"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleProblemSelect(result)}
+                              className="flex items-center gap-2 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm font-medium"
+                              title="Add to mindmap"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Add</span>
+                            </button>
                           </div>
                         </div>
                       </motion.div>
                     ))}
                   </div>
-                  
-                  {currentResults.length === 6 && (
+
+                  {hasResults && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.6 }}
-                      className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className={`mt-6 p-4 ${themeClasses.bg.primary} rounded-lg border ${themeClasses.border.light}`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <span className="font-medium text-green-800">Analysis Complete!</span>
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <span className={`font-medium ${themeClasses.text.primary}`}>Analysis Complete!</span>
                       </div>
-                      <p className="text-green-700 text-sm">
+                      <p className={`text-sm ${themeClasses.text.secondary}`}>
                         You've successfully identified the root cause through 5 levels of analysis. 
                         Click the + button next to any problem to attach it to your mindmap node.
                       </p>
