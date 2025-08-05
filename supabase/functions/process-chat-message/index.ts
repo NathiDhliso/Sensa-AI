@@ -2,13 +2,13 @@
 // Backend processing for chat messages including sentiment analysis, mention extraction, and content enhancement
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 interface ProcessMessageRequest {
   message: string;
-  session_id: string;
-  user_id: string;
-  context: {
+  session_id?: string;
+  user_id?: string;
+  context?: string | {
     participants: Array<{ id: string; name: string }>;
     recent_messages: Array<{ message: string; user_name: string }>;
     mindmap_context: boolean;
@@ -42,8 +42,13 @@ serve(async (req) => {
 
     const { message, session_id, user_id, context }: ProcessMessageRequest = await req.json()
 
-    if (!message || !session_id || !user_id) {
-      return new Response('Missing required fields', { status: 400 })
+    if (!message) {
+      return new Response('Message is required', { status: 400 })
+    }
+
+    // Handle simple AI chat requests (like Root Problem analysis)
+    if (typeof context === 'string' || (!session_id || !user_id)) {
+      return await handleSimpleAIChat(message)
     }
 
     // Initialize Supabase client
@@ -51,17 +56,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // Ensure context is the collaboration context type
+    const collaborationContext = context as {
+      participants: Array<{ id: string; name: string }>;
+      recent_messages: Array<{ message: string; user_name: string }>;
+      mindmap_context: boolean;
+    }
+
     // 1. Extract @mentions from message
-    const mentions = extractMentions(message, context.participants)
+    const mentions = extractMentions(message, collaborationContext.participants)
 
     // 2. Analyze sentiment using simple keyword-based approach
     const sentiment_score = analyzeSentiment(message)
 
     // 3. Enhance content with formatting and links
-    const processed_content = enhanceContent(message, context)
+    const processed_content = enhanceContent(message)
 
     // 4. Check if AI suggestion should be triggered
-    const should_suggest = shouldTriggerAISuggestion(message, context.recent_messages)
+    const should_suggest = shouldTriggerAISuggestion(message, collaborationContext.recent_messages)
 
     // 5. Content moderation flags
     const content_flags = moderateContent(message)
@@ -105,6 +117,66 @@ serve(async (req) => {
     )
   }
 })
+
+// Handle simple AI chat requests
+async function handleSimpleAIChat(message: string): Promise<Response> {
+  try {
+    // Get Gemini API key from environment
+    const geminiApiKey = Deno.env.get('GOOGLE_AI_API_KEY')
+    if (!geminiApiKey) {
+      throw new Error('Gemini API key not configured')
+    }
+
+    // Multiple Gemini models to try (in order of preference)
+    const GEMINI_MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.5-pro', 
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-1.5-flash-latest' // Keep the original as fallback
+    ];
+    
+    // Try each Gemini model with retry logic
+    for (const model of GEMINI_MODELS) {
+      try {
+        const result = await tryGeminiModel(geminiApiKey, model, message);
+        if (result) {
+          return new Response(JSON.stringify({
+            success: true,
+            data: {
+              response: result
+            }
+          }), {
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          });
+        }
+      } catch (error) {
+        console.log(`Model ${model} failed: ${error.message}`);
+        // Continue to next model
+      }
+    }
+    
+    throw new Error('All Gemini models failed');
+
+  } catch (error) {
+    console.error('Error in simple AI chat:', error)
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error'
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  }
+}
 
 // Extract @mentions from message
 function extractMentions(message: string, participants: Array<{ id: string; name: string }>): string[] {
@@ -162,7 +234,7 @@ function analyzeSentiment(message: string): number {
 }
 
 // Enhance content with formatting and smart links
-function enhanceContent(message: string, context: any): string {
+function enhanceContent(message: string): string {
   let enhanced = message
 
   // 1. Convert URLs to clickable links
@@ -235,8 +307,84 @@ function moderateContent(message: string): string[] {
   return flags
 }
 
+// Helper function to try a specific Gemini model with retry logic
+async function tryGeminiModel(apiKey: string, model: string, prompt: string): Promise<string | null> {
+  const maxRetries = 3;
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        
+        // Handle 404 - model not available, try next model
+        if (response.status === 404) {
+          console.log(`Model ${model} not found (404)`);
+          return null;
+        }
+        
+        // Check if this is a retryable error
+        if ((response.status === 503 || response.status === 429 || response.status === 500) && attempt < maxRetries - 1) {
+          attempt++;
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+          console.log(`${model} API error ${response.status}, retrying in ${delay/1000}s (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw new Error(`${model} API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!generatedText) {
+        throw new Error(`No response generated from ${model}`);
+      }
+
+      console.log(`✅ Model ${model} succeeded`);
+      return generatedText;
+    } catch (error) {
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+      attempt++;
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`${model} error, retrying in ${delay/1000}s (attempt ${attempt}/${maxRetries}): ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return null;
+}
+
 // Log processing metrics for analytics
-async function logMessageMetrics(supabase: any, metrics: any) {
+async function logMessageMetrics(supabase: SupabaseClient, metrics: {
+  session_id: string;
+  user_id: string;
+  message_length: number;
+  processing_time: number;
+  sentiment_score: number;
+  mentions_count: number;
+}) {
   try {
     await supabase
       .from('chat_message_metrics')

@@ -62,7 +62,7 @@ const CreateSessionForm: React.FC<{
           </label>
           <select
             value={sessionType}
-            onChange={(e) => setSessionType(e.target.value as any)}
+            onChange={(e) => setSessionType(e.target.value as 'public' | 'private' | 'invite_only')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             disabled={isLoading}
           >
@@ -209,6 +209,22 @@ export const CollaborationPage: React.FC = () => {
     }
   }, [user, authLoading, navigate, sessionId]);
   
+  // Auto-join session if sessionId is provided in URL
+  useEffect(() => {
+    if (sessionId && !currentSession && connectionStatus === 'disconnected' && !isLoading && user) {
+      handleJoinSession();
+    }
+  }, [sessionId, currentSession, connectionStatus, isLoading, user]);
+  
+  // Show editor when connected to a session
+  useEffect(() => {
+    if (currentSession && connectionStatus === 'connected') {
+      setShowEditor(true);
+    } else {
+      setShowEditor(false);
+    }
+  }, [currentSession, connectionStatus]);
+  
   // Show loading while checking authentication
   if (authLoading) {
     return (
@@ -225,22 +241,6 @@ export const CollaborationPage: React.FC = () => {
   if (!user) {
     return null;
   }
-  
-  // Auto-join session if sessionId is provided in URL
-  useEffect(() => {
-    if (sessionId && !currentSession && connectionStatus === 'disconnected' && !isLoading) {
-      handleJoinSession();
-    }
-  }, [sessionId, currentSession, connectionStatus, isLoading]);
-  
-  // Show editor when connected to a session
-  useEffect(() => {
-    if (currentSession && connectionStatus === 'connected') {
-      setShowEditor(true);
-    } else {
-      setShowEditor(false);
-    }
-  }, [currentSession, connectionStatus]);
   
   const handleCreateSession = async (name: string, type: 'public' | 'private' | 'invite_only') => {
     try {

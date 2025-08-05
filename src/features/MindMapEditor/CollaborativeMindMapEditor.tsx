@@ -19,6 +19,8 @@ import {
   Panel,
   useReactFlow,
   ConnectionMode,
+  Viewport,
+  NodeChange,
 } from '@xyflow/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -26,7 +28,8 @@ import {
   UserPlus, Crown, Eye, Mic, MicOff, Video, VideoOff,
   Download, Save, RotateCcw, RotateCw, X, Upload, Palette,
   Layout, FileText, Image, Pen, Layers, BarChart3,
-  GraduationCap, Trophy, Smartphone, Wifi
+  GraduationCap, Trophy, Smartphone, Wifi, Eraser, Circle,
+  Triangle, ArrowRight, Minus, MousePointer
 } from 'lucide-react';
 import { useCollaborationStore } from '../../stores/collaborationStore';
 import { collaborationService } from '../../services/collaborationService';
@@ -37,7 +40,7 @@ import { CollaborativeChat } from './CollaborativeChat';
 import { VoiceVideoChat } from './VoiceVideoChat';
 import { PresenceIndicator } from './PresenceIndicator';
 import FileSharing from './FileSharing';
-import AdvancedDrawing from './AdvancedDrawing';
+import DrawingOverlay from './DrawingOverlay';
 import CommunicationTest from '../../debug/CommunicationTest';
 import CollaborativeTemplates from './CollaborativeTemplates';
 import EnhancedExport from './EnhancedExport';
@@ -47,6 +50,7 @@ import GamificationSystem from './GamificationSystem';
 import MobileOptimization from './MobileOptimization';
 import OfflineSync from './OfflineSync';
 import AccessibilityFeatures from './AccessibilityFeatures';
+import RootProblemModal from './RootProblemModal';
 import '@xyflow/react/dist/style.css';
 
 // Node types for React Flow
@@ -309,7 +313,10 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   
   // Phase 3 UI state
   const [showFileSharing, setShowFileSharing] = useState(false);
-  const [showAdvancedDrawing, setShowAdvancedDrawing] = useState(false);
+  const [showDrawingTools, setShowDrawingTools] = useState(false);
+  const [currentDrawingTool, setCurrentDrawingTool] = useState<'select' | 'pen' | 'highlighter' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'text'>('select');
+  const [drawingColor, setDrawingColor] = useState('#000000');
+  const [drawingSize, setDrawingSize] = useState(3);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showEnhancedExport, setShowEnhancedExport] = useState(false);
   const [currentNodeType, setCurrentNodeType] = useState<'advanced' | 'multimedia'>('advanced');
@@ -319,6 +326,15 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   const [showAssessment, setShowAssessment] = useState(false);
   const [showGamification, setShowGamification] = useState(false);
   const [showMobileView, setShowMobileView] = useState(false);
+  
+  // Root Problem Modal state - support multiple concurrent analyses
+  const [activeAnalyses, setActiveAnalyses] = useState<Map<string, {
+    nodeId: string;
+    nodeLabel: string;
+    isVisible: boolean;
+    isMinimized: boolean;
+    isRunning: boolean;
+  }>>(new Map());
   
   // Debug state
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -350,8 +366,8 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
             // Load the most recent snapshot
             const latestSnapshot = snapshots[0];
             console.log('📸 Loading latest snapshot:', latestSnapshot);
-            setNodes(latestSnapshot.snapshot_data.nodes || []);
-            setEdges(latestSnapshot.snapshot_data.edges || []);
+            setNodes(latestSnapshot.nodes_data || []);
+        setEdges(latestSnapshot.edges_data || []);
             console.log('✅ Loaded existing mindmap data');
           } else {
             console.log('🆕 No existing snapshots, creating starter content');
@@ -452,6 +468,72 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   // Demo mode flag
   const isDemoMode = sessionId === 'demo-session';
 
+  // Listen for updateNode events from SimpleAdvancedNode components
+  useEffect(() => {
+    const handleUpdateNode = (event: CustomEvent) => {
+      const { id, updates } = event.detail;
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === id
+            ? { ...node, data: { ...node.data, ...updates } }
+            : node
+        )
+      );
+      
+      // Send collaboration operation for node update (skip in demo mode)
+      if (!isDemoMode) {
+        addOperation({
+          operation_type: 'edit_node',
+          operation_data: {
+            nodeId: id,
+            updates: updates
+          },
+          applied: false
+        });
+      }
+    };
+
+    const handleOpenRootProblemModal = (event: CustomEvent) => {
+      const { nodeId, nodeLabel } = event.detail;
+      
+      // Check if analysis already exists for this node
+      if (activeAnalyses.has(nodeId)) {
+        // If exists but minimized, restore it
+        setActiveAnalyses(prev => {
+          const updated = new Map(prev);
+          const existing = updated.get(nodeId)!;
+          updated.set(nodeId, {
+            ...existing,
+            isVisible: true,
+            isMinimized: false
+          });
+          return updated;
+        });
+      } else {
+        // Create new analysis
+        setActiveAnalyses(prev => {
+          const updated = new Map(prev);
+          updated.set(nodeId, {
+            nodeId,
+            nodeLabel,
+            isVisible: true,
+            isMinimized: false,
+            isRunning: false
+          });
+          return updated;
+        });
+      }
+    };
+
+    window.addEventListener('updateNode', handleUpdateNode as EventListener);
+    window.addEventListener('openRootProblemModal', handleOpenRootProblemModal as EventListener);
+    
+    return () => {
+      window.removeEventListener('updateNode', handleUpdateNode as EventListener);
+      window.removeEventListener('openRootProblemModal', handleOpenRootProblemModal as EventListener);
+    };
+  }, [setNodes, addOperation, isDemoMode]);
+
   // Handle cursor movement
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
     if (isDemoMode || (!isConnected || !canvasRef.current)) return;
@@ -467,14 +549,14 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   }, [isDemoMode, isConnected, updatePresencePosition, updateCursorPosition]);
 
   // Handle viewport changes
-  const handleViewportChange = useCallback((viewport: any) => {
+  const handleViewportChange = useCallback((viewport: Viewport) => {
     if (!isDemoMode) {
       updateViewport(viewport.x, viewport.y, viewport.zoom);
     }
   }, [isDemoMode, updateViewport]);
 
   // Handle node changes with collaboration
-  const handleNodesChange = useCallback((changes: any[]) => {
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
     onNodesChange(changes);
     
     if (!isDemoMode) {
@@ -572,14 +654,14 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   }, [isDemoMode, setNodes, addOperation, updateCurrentTool, currentNodeType]);
   
   // Handle template selection
-  const handleTemplateSelect = useCallback((template: any) => {
+  const handleTemplateSelect = useCallback((template: { id: string; nodes: Node[]; edges: Edge[] }) => {
     if (template.nodes && template.edges) {
       setNodes(template.nodes);
       setEdges(template.edges);
       
       // Send operation for template application
       addOperation({
-        operation_type: 'apply_template',
+        operation_type: 'batch_operation',
         operation_data: { templateId: template.id, nodes: template.nodes, edges: template.edges },
         applied: false
       });
@@ -588,7 +670,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
   }, [setNodes, setEdges, addOperation]);
   
   // Handle file selection from file sharing
-  const handleFileSelect = useCallback((file: any) => {
+  const handleFileSelect = useCallback((file: { name: string; url: string; type: string; size: number }) => {
     // Create a multimedia node with the selected file
     const newNode: Node = {
       id: `file-node-${Date.now()}`,
@@ -615,12 +697,32 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
     
     // Send operation
     addOperation({
-      operation_type: 'add_media_node',
+      operation_type: 'add_node',
       operation_data: newNode,
       applied: false
     });
     
     setShowFileSharing(false);
+  }, [setNodes, addOperation]);
+  
+  // Handle root problem selection
+  const handleRootProblemSelect = useCallback((nodeId: string, problem: string) => {
+    // Update the node with the selected root problem
+    setNodes(nds => nds.map(node => 
+      node.id === nodeId 
+        ? { ...node, data: { ...node.data, rootProblem: problem } }
+        : node
+    ));
+    
+    // Send operation for node update
+    addOperation({
+      operation_type: 'edit_node',
+      operation_data: { 
+        nodeId: nodeId, 
+        updates: { rootProblem: problem } 
+      },
+      applied: false
+    });
   }, [setNodes, addOperation]);
 
   // Handle save
@@ -749,9 +851,13 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
             </button>
             
             <button
-              onClick={() => setShowAdvancedDrawing(true)}
-              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded transition-colors"
-              title="Advanced Drawing"
+              onClick={() => setShowDrawingTools(!showDrawingTools)}
+              className={`p-2 rounded transition-colors ${
+                showDrawingTools
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white bg-opacity-20 hover:bg-opacity-30'
+              }`}
+              title="Drawing Tools"
             >
               <Pen className="w-4 h-4" />
             </button>
@@ -893,6 +999,107 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
               
               <Controls showZoom showFitView showInteractive />
               
+              {/* Drawing Tools Panel */}
+              {showDrawingTools && (
+                <Panel position="top-left" className="m-4" style={{ zIndex: 1001 }}>
+                  <div className="bg-white rounded-lg shadow-lg border p-3 flex flex-col gap-3" style={{ zIndex: 1001 }}>
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <Pen className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium">Drawing Tools</span>
+                      <button
+                        onClick={() => setShowDrawingTools(false)}
+                        className="ml-auto p-1 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    {/* Tool Selection */}
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { id: 'select', icon: MousePointer, name: 'Select' },
+                        { id: 'pen', icon: Pen, name: 'Pen' },
+                        { id: 'highlighter', icon: Palette, name: 'Highlighter' },
+                        { id: 'eraser', icon: Eraser, name: 'Eraser' },
+                        { id: 'rectangle', icon: Layout, name: 'Rectangle' },
+                        { id: 'circle', icon: Circle, name: 'Circle' },
+                        { id: 'triangle', icon: Triangle, name: 'Triangle' },
+                        { id: 'arrow', icon: ArrowRight, name: 'Arrow' },
+                        { id: 'line', icon: Minus, name: 'Line' },
+                        { id: 'text', icon: FileText, name: 'Text' }
+                      ].map(tool => (
+                        <button
+                          key={tool.id}
+                          onClick={() => setCurrentDrawingTool(tool.id as any)}
+                          className={`p-2 rounded transition-colors ${
+                            currentDrawingTool === tool.id
+                              ? 'bg-blue-100 text-blue-600 border-2 border-blue-300'
+                              : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                          title={tool.name}
+                        >
+                          <tool.icon className="w-4 h-4" />
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* Color Selection */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium">Color:</span>
+                      <div className="flex gap-1">
+                        {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'].map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setDrawingColor(color)}
+                            className={`w-6 h-6 rounded border-2 transition-all ${
+                              drawingColor === color ? 'border-gray-600 scale-110' : 'border-gray-200 hover:border-gray-400'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Size Selection */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium">Size:</span>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={drawingSize}
+                        onChange={(e) => setDrawingSize(Number(e.target.value))}
+                        className="flex-1 accent-blue-500"
+                      />
+                      <span className="text-xs text-gray-500 w-6 font-medium">{drawingSize}</span>
+                    </div>
+                    
+                    {/* Clear Drawing Button */}
+                    <button
+                      onClick={() => {
+                        // Clear drawing functionality will be implemented
+                        console.log('Clear drawing');
+                      }}
+                      className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </Panel>
+              )}
+              
+              {/* Drawing Overlay */}
+              <DrawingOverlay
+                isActive={showDrawingTools}
+                currentTool={currentDrawingTool}
+                color={drawingColor}
+                size={drawingSize}
+                onDrawingChange={(data) => {
+                  // Handle drawing data changes
+                  console.log('Drawing data:', data);
+                }}
+              />
+              
               {/* Add node panel */}
               <Panel position="top-left">
                 <div className="bg-white rounded-lg shadow-lg p-2">
@@ -1012,18 +1219,7 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
             )}
           </AnimatePresence>
           
-          <AnimatePresence>
-            {showAdvancedDrawing && (
-              <AdvancedDrawing
-                onClose={() => setShowAdvancedDrawing(false)}
-                onSave={(drawingData) => {
-                  // TODO: Integrate drawing data with mindmap
-                  console.log('Drawing saved:', drawingData);
-                  setShowAdvancedDrawing(false);
-                }}
-              />
-            )}
-          </AnimatePresence>
+
           
           <AnimatePresence>
             {showTemplates && (
@@ -1158,6 +1354,40 @@ const CollaborativeMindMapEditorInternal: React.FC<CollaborativeMindMapEditorPro
               // Add more voice command handlers
             }}
           />
+          
+          {/* Root Problem Modals - Multiple concurrent analyses */}
+          <AnimatePresence>
+            {Array.from(activeAnalyses.entries()).map(([nodeId, analysis]) => (
+              (analysis.isVisible || analysis.isMinimized) && (
+                <RootProblemModal
+                  key={nodeId}
+                  nodeId={nodeId}
+                  nodeLabel={analysis.nodeLabel}
+                  onProblemSelect={(problem: string) => handleRootProblemSelect(nodeId, problem)}
+                  onClose={() => {
+                    setActiveAnalyses(prev => {
+                      const updated = new Map(prev);
+                      updated.delete(nodeId);
+                      return updated;
+                    });
+                  }}
+                  onMinimize={() => {
+                    setActiveAnalyses(prev => {
+                      const updated = new Map(prev);
+                      const existing = updated.get(nodeId)!;
+                      updated.set(nodeId, {
+                        ...existing,
+                        isVisible: analysis.isMinimized ? true : false,
+                        isMinimized: analysis.isMinimized ? false : true
+                      });
+                      return updated;
+                    });
+                  }}
+                  isMinimized={analysis.isMinimized}
+                />
+              )
+            ))}
+          </AnimatePresence>
           
           {/* Debug Panel */}
           <AnimatePresence>

@@ -10,7 +10,7 @@ import { usePageTheme } from '../../contexts/themeUtils';
 import { supabaseServices } from '../../services';
 import { Button, BackButton } from '../../components';
 import { HistoryManager } from './components/HistoryManager';
-import { ComprehensiveMindMapEditor } from '../MindMapEditor';
+import { CollaborativeMindMapEditor } from '../MindMapEditor/CollaborativeMindMapEditor';
 import { SensaMindmapEditor } from '../SensaMindmap/components/SensaMindmapEditor';
 import { useSensaMindmapStore } from '../SensaMindmap/stores/sensaMindmapStore';
 import mermaid from 'mermaid';
@@ -36,7 +36,7 @@ const EpistemicDriver: React.FC = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [currentInput, setCurrentInput] = useState<EpistemicDriverInput | null>(null);
   const [showMindmapModal, setShowMindmapModal] = useState(false);
-  const [mindmapData] = useState<any>(null);
+  const [mindmapData] = useState<{ nodes: unknown[]; edges: unknown[] } | null>(null);
   const [mindmapLoading, setMindmapLoading] = useState(false);
   const [mindmapError, setMindmapError] = useState<string | null>(null);
   const [showMindMapEditor, setShowMindMapEditor] = useState<boolean | string>(false);
@@ -821,10 +821,10 @@ const EpistemicDriver: React.FC = () => {
         {/* Mindmap Editors */}
 
         {showMindMapEditor === 'comprehensive' && (nodes.length > 0 || mindmapData) && (
-          <ComprehensiveMindMapEditor
+          <CollaborativeMindMapEditor
             initialData={mindmapData || { nodes, edges }}
             onSave={(editedData) => {
-              console.log('Comprehensive mind map saved:', editedData);
+              console.log('Collaborative mind map saved:', editedData);
               setShowMindMapEditor(false);
             }}
             onClose={() => setShowMindMapEditor(false)}

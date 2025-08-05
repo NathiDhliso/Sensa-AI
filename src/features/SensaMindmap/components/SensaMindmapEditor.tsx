@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -22,17 +22,34 @@ import '@xyflow/react/dist/style.css';
 
 // Custom Node Component with accessibility and performance optimizations
 const MindmapNode = memo<NodeProps>(({ data, selected, id }) => {
-  const nodeLabel = data?.label || 'Untitled Node';
+  const [isEditing, setIsEditing] = useState(data?.isEditing || false);
+  const [label, setLabel] = useState(data?.label || 'Untitled Node');
   const nodeDescription = data?.description || '';
   const nodeLevel = data?.level || 0;
+  
+  const handleDoubleClick = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setIsEditing(false);
+      window.dispatchEvent(new CustomEvent('updateNode', {
+        detail: { id, updates: { label } }
+      }));
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setLabel(data?.label || 'Untitled Node');
+    }
+  }, [id, label, data?.label]);
   
   // Generate accessible label
   const ariaLabel = useMemo(() => {
     const levelText = nodeLevel > 0 ? `, level ${nodeLevel}` : '';
     const selectedText = selected ? ', selected' : '';
     const descriptionText = nodeDescription ? `, ${nodeDescription}` : '';
-    return `Mind map node: ${nodeLabel}${levelText}${selectedText}${descriptionText}`;
-  }, [nodeLabel, nodeLevel, selected, nodeDescription]);
+    return `Mind map node: ${label}${levelText}${selectedText}${descriptionText}`;
+  }, [label, nodeLevel, selected, nodeDescription]);
 
   return (
     <div
@@ -43,6 +60,7 @@ const MindmapNode = memo<NodeProps>(({ data, selected, id }) => {
       aria-label={ariaLabel}
       aria-selected={selected}
       tabIndex={0}
+      onDoubleClick={handleDoubleClick}
       style={
         {
           padding: '12px 16px',
@@ -63,7 +81,30 @@ const MindmapNode = memo<NodeProps>(({ data, selected, id }) => {
       }
     >
       <div className="mindmap-node__content">
-        <div className="mindmap-node__label">{nodeLabel}</div>
+        <div className="mindmap-node__label">
+          {isEditing ? (
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={handleKeyPress}
+              onBlur={() => setIsEditing(false)}
+              autoFocus
+              style={{
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: '#333333',
+                fontSize: '14px',
+                fontWeight: nodeLevel === 0 ? '600' : '400',
+                textAlign: 'center',
+                width: '100%',
+              }}
+            />
+          ) : (
+            label
+          )}
+        </div>
         {nodeDescription && (
           <div 
             className="mindmap-node__description"
@@ -164,6 +205,25 @@ const SensaMindmapEditorInternal = memo<SensaMindmapEditorProps>(({
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  // Listen for updateNode events from MindmapNode components
+  useEffect(() => {
+    const handleUpdateNode = (event: CustomEvent) => {
+      const { nodeId, newLabel } = event.detail;
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, nodeLabel: newLabel } }
+            : node
+        )
+      );
+    };
+
+    document.addEventListener('updateNode', handleUpdateNode as EventListener);
+    return () => {
+      document.removeEventListener('updateNode', handleUpdateNode as EventListener);
+    };
+  }, [setNodes]);
 
   // Accessibility configuration
   const ariaLabelConfig = useMemo(() => ({

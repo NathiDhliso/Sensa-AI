@@ -18,6 +18,7 @@ import { PrimeMePage } from './features/PrimeMe';
 import { StudyGuideGenerator } from './features/StudyGuide';
 import { EpistemicDriver } from './features/EpistemicDriver';
 import { BusinessLens } from './features/BusinessLens';
+import { RootProblemPage } from './features/RootProblem';
 import { CollaborationPage } from './pages/CollaborationPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -78,6 +79,11 @@ function App() {
           } />
 
                       <Route path="/prime-me" element={<PrimeMePage />} />
+            <Route path="/root-problem" element={
+              <ProtectedRoute>
+                <RootProblemPage />
+              </ProtectedRoute>
+            } />
             <Route path="/study-guide-generator" element={<StudyGuideGenerator />} />
             <Route path="/epistemic-driver" element={
               <ProtectedRoute>

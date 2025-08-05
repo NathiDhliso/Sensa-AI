@@ -16,7 +16,7 @@ import { usePageTheme } from '../../../contexts/themeUtils';
 import { supabase } from '../../../lib/supabase';
 import { memoryService, SensaAPI, SensaMindmapIntegration } from '../../../services';
 import { useCourseStore, useMemoryStore, useUIStore } from '../../../stores';
-import { ComprehensiveMindMapEditor } from '../../MindMapEditor';
+import { CollaborativeMindMapEditor } from '../../MindMapEditor/CollaborativeMindMapEditor';
 import mermaid from 'mermaid';
 import type { StudyGuide } from '../../../types';
 import { UnifiedUpload } from '../../../components';
@@ -54,7 +54,7 @@ interface WorkflowStep {
   title: string;
   description: string;
   status: 'pending' | 'current' | 'completed';
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
 }
 
 // Consolidated workflow state interface
@@ -81,7 +81,11 @@ interface LearningWorkflow {
   
   // Visualization state
   visualization: {
-    studyMap: any | null;
+    studyMap: {
+      mermaid_code?: string;
+      legend_html?: string;
+      [key: string]: unknown;
+    } | null;
     studyGuide: StudyGuide | null;
     showMindMapEditor: boolean | string;
   };
@@ -992,10 +996,10 @@ const IntegratedLearningHub: React.FC = () => {
 
 
           {workflow.visualization.showMindMapEditor === 'comprehensive' && workflow.visualization.studyMap && (
-            <ComprehensiveMindMapEditor
+            <CollaborativeMindMapEditor
               initialData={workflow.visualization.studyMap}
               onSave={(editedData) => {
-                console.log('Comprehensive mind map saved:', editedData);
+                console.log('Collaborative mind map saved:', editedData);
                 updateVisualization({ showMindMapEditor: false });
               }}
               onClose={() => updateVisualization({ showMindMapEditor: false })}

@@ -132,8 +132,8 @@ function analyzeMessageContext(message: string, mindmapState: any, history: any[
 }
 
 // Generate contextual suggestion based on analysis
-async function generateContextualSuggestion(analysis: any, mindmapState: any): Promise<GenerateSuggestionResponse> {
-  const { intent, message, mindmapNodes, mindmapEdges, recentMessages } = analysis
+async function generateContextualSuggestion(analysis: any, _mindmapState: any): Promise<GenerateSuggestionResponse> {
+  const { intent } = analysis
 
   switch (intent) {
     case 'question':
@@ -161,7 +161,7 @@ async function generateContextualSuggestion(analysis: any, mindmapState: any): P
 
 // Generate response to questions
 function generateQuestionResponse(analysis: any): GenerateSuggestionResponse {
-  const { message, mindmapNodes } = analysis
+  const { mindmapNodes } = analysis
   
   // Look for relevant nodes that might answer the question
   const relevantNodes = mindmapNodes.filter((node: any) => {
@@ -214,8 +214,7 @@ function generateBrainstormSuggestion(analysis: any): GenerateSuggestionResponse
 }
 
 // Generate clarification help
-function generateClarification(analysis: any): GenerateSuggestionResponse {
-  const { message, mindmapNodes } = analysis
+function generateClarification(_analysis: any): GenerateSuggestionResponse {
   
   return {
     suggestion: "I'd be happy to help clarify! Try breaking down the concept into smaller, more specific questions. You can also create a new node to explore the confusing topic step by step.",
@@ -279,7 +278,7 @@ function generateResourceSuggestion(analysis: any): GenerateSuggestionResponse {
 }
 
 // Generate help for when users are stuck
-function generateHelpSuggestion(analysis: any): GenerateSuggestionResponse {
+function generateHelpSuggestion(_analysis: any): GenerateSuggestionResponse {
   const helpStrategies = [
     "Take a step back and look at the big picture. What's the main goal you're trying to achieve?",
     "Try approaching the problem from a different angle. What would someone else do?",
@@ -298,8 +297,7 @@ function generateHelpSuggestion(analysis: any): GenerateSuggestionResponse {
 }
 
 // Generate general suggestions
-function generateGeneralSuggestion(analysis: any): GenerateSuggestionResponse {
-  const { mindmapNodes, recentMessages } = analysis
+function generateGeneralSuggestion(_analysis: any): GenerateSuggestionResponse {
   
   const generalSuggestions = [
     "Great point! How does this connect to your other ideas?",

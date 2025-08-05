@@ -20,7 +20,8 @@ import {
   BookOpen,
   Award,
   Zap,
-  Building2
+  Building2,
+  Search as SearchIcon
 } from 'lucide-react';
 import { usePageTheme, useThemeClasses } from '../../contexts/themeUtils';
 import { useMemoryStore, useCourseStore, useUIStore } from '../../stores';
@@ -383,6 +384,15 @@ const Dashboard: React.FC = () => {
               >
                 <Compass className="w-5 h-5" />
                 <span>Prime Me</span>
+              </motion.button>
+              
+              <motion.button
+                onClick={() => navigate('/root-problem')}
+                className="flex items-center gap-2 bg-white/20 text-white px-6 py-3 rounded-xl font-medium hover:bg-white/30 transition-all border border-white/30"
+                whileHover={{ scale: 1.05 }}
+              >
+                <Target className="w-5 h-5" />
+                <span>Root Problem</span>
               </motion.button>
             </motion.div>
           </div>

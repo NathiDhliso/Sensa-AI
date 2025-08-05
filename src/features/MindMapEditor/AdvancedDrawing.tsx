@@ -438,7 +438,7 @@ export const AdvancedDrawing: React.FC<AdvancedDrawingProps> = ({
       
       // Send collaboration event
       addOperation({
-        operation_type: 'add_drawing_stroke',
+        operation_type: 'add_node',
         operation_data: newStroke,
         applied: false
       });
@@ -460,7 +460,7 @@ export const AdvancedDrawing: React.FC<AdvancedDrawingProps> = ({
       
       // Send collaboration event
       addOperation({
-        operation_type: 'add_drawing_shape',
+        operation_type: 'add_node',
         operation_data: newShape,
         applied: false
       });
@@ -548,7 +548,7 @@ export const AdvancedDrawing: React.FC<AdvancedDrawingProps> = ({
       
       // Send collaboration event
       addOperation({
-        operation_type: 'add_drawing_text',
+        operation_type: 'add_node',
         operation_data: newText,
         applied: false
       });

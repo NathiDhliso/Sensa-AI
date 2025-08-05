@@ -39,7 +39,7 @@ export interface MindmapOperation {
   id?: string;
   session_id: string;
   user_id: string;
-  operation_type: 'add_node' | 'edit_node' | 'delete_node' | 'add_edge' | 'edit_edge' | 'delete_edge' | 'move_node';
+  operation_type: 'add_node' | 'edit_node' | 'delete_node' | 'move_node' | 'add_edge' | 'edit_edge' | 'delete_edge' | 'batch_operation' | 'undo' | 'redo';
   operation_data: any;
   timestamp: string;
   applied: boolean;
@@ -49,13 +49,12 @@ export interface MindmapOperation {
 export interface MindmapSnapshot {
   id?: string;
   session_id: string;
-  snapshot_data: {
-    nodes: any[];
-    edges: any[];
-  };
+  nodes_data: any[];
+  edges_data: any[];
   created_by: string;
   snapshot_name?: string;
-  is_auto_save: boolean;
+  is_checkpoint: boolean;
+  operation_sequence: number;
   created_at: string;
 }
 
@@ -576,10 +575,12 @@ export class CollaborationService {
         .from('mindmap_snapshots')
         .insert({
           session_id: this.currentSessionId,
-          snapshot_data: snapshotData,
+          nodes_data: snapshotData.nodes,
+          edges_data: snapshotData.edges,
           created_by: user.id,
           snapshot_name: snapshotName,
-          is_auto_save: isAutoSave
+          is_checkpoint: isAutoSave,
+          operation_sequence: 0
         })
         .select()
         .single();
